@@ -8,12 +8,32 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pülümür Automation Studio" />
   <title>Pülümür Automation Studio</title>
-  <link rel="manifest" href="manifest.webmanifest?v=8.4.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.7.0" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.4.1" />
+  <link rel="stylesheet" href="style.css?v=8.7.0" />
 </head>
-<body>
+<body class="auth-pending">
+  <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
+    <form id="loginForm" class="auth-card" autocomplete="on">
+      <img src="assets/plmr-logo-header.png" alt="PLMR" class="auth-logo" />
+      <h1>Pülümür Automation Studio</h1>
+      <p class="auth-subtitle">Kullanıcı Girişi ve Proje Yönetimi</p>
+      <label class="auth-field">
+        <span>E-posta</span>
+        <input id="loginEmail" type="email" autocomplete="username" required />
+      </label>
+      <label class="auth-field">
+        <span>Şifre</span>
+        <input id="loginPassword" type="password" autocomplete="current-password" required />
+      </label>
+      <button id="loginBtn" type="submit" class="primary-btn auth-login-btn">Giriş Yap</button>
+      <button id="forgotPasswordBtn" type="button" class="auth-link-btn">Şifremi Unuttum</button>
+      <p id="authMessage" class="auth-message" aria-live="polite">Oturum kontrol ediliyor…</p>
+      <p class="auth-note">Kullanıcı hesapları sistem yöneticisi tarafından tanımlanır.</p>
+    </form>
+  </section>
+
   <header class="app-header">
     <div class="brand-row">
       <div class="brand-mark"><img src="assets/plmr-logo-header.png" alt="PLMR" class="brand-logo" /></div>
@@ -33,6 +53,26 @@
       <button id="helpBtn" class="soft-btn" type="button">Yardım</button>
     </div>
   </header>
+
+  <section id="cloudProjectBar" class="cloud-project-bar" hidden aria-label="Proje yönetimi">
+    <div class="cloud-project-identity">
+      <div><span>Proje Kodu</span><strong id="cloudProjectCode">Yeni proje</strong></div>
+      <div><span>Revizyon</span><strong id="cloudRevision">R01</strong></div>
+      <div><span>Durum</span><strong id="cloudSaveState" data-state="new">Kaydedilmedi</strong></div>
+    </div>
+    <div class="cloud-project-actions">
+      <button id="newCloudProjectBtn" type="button" class="soft-btn">Yeni Proje</button>
+      <button id="saveCloudProjectBtn" type="button" class="primary-btn">Kaydet</button>
+      <button id="newRevisionBtn" type="button" class="accent-btn">Yeni Revizyon</button>
+      <button id="openCloudProjectsBtn" type="button" class="secondary-btn">Projelerim</button>
+      <button id="revisionHistoryBtn" type="button" class="soft-btn">Revizyonlar</button>
+    </div>
+    <div class="cloud-user-box">
+      <strong id="cloudUserName">Kullanıcı</strong>
+      <span id="cloudCompanyCode">Firma</span>
+      <button id="logoutBtn" type="button" class="danger-btn">Çıkış</button>
+    </div>
+  </section>
 
   <main class="layout">
     <section class="panel input-panel" aria-label="Parametreler">
@@ -68,6 +108,9 @@
           <div class="project-inline-actions">
             <button id="resetBtn" class="danger-btn form-action-btn" type="button">Değerleri Resetle</button>
             <button id="calcBtn" class="accent-btn form-action-btn" type="button">Pülümür Hesaplayıcı</button>
+            <button id="projectExportBtn" class="secondary-btn form-action-btn" type="button">Proje Dosyası İndir</button>
+            <button id="projectImportBtn" class="soft-btn form-action-btn" type="button">Proje Dosyası Aç</button>
+            <input id="projectImportInput" type="file" accept=".plmr,.json,application/json,text/plain" hidden />
           </div>
         </fieldset>
 
@@ -130,10 +173,7 @@
         </div>
         <div class="preview-download-actions">
           <button id="pdfBtn" class="secondary-btn preview-tool-btn" type="button">PDF İndir</button>
-          <div class="dxf-export-group">
-            <span id="dxfFormatBadge" class="dxf-format-badge">Modern DXF 2013</span>
-            <button id="generateBtn" class="primary-btn preview-tool-btn" type="button">DXF İndir</button>
-          </div>
+          <button id="generateBtn" class="primary-btn preview-tool-btn" type="button">DXF İndir</button>
         </div>
       </div>
       <div id="preview" class="preview-canvas" role="img" tabindex="-1" aria-label="DXF çizim önizlemesi"></div>
@@ -177,12 +217,103 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.4.1"></script>
-  <script src="peri01ExcelBridge.js?v=8.4.1"></script>
-  <script src="peri01Geometry.js?v=8.4.1"></script>
-  <script src="modernDxfTemplate.js?v=8.4.1"></script>
-  <script src="dxfModernEngine.js?v=8.4.1"></script>
+
+  <dialog id="projectsDialog" class="modal projects-modal">
+    <div class="modal-card projects-card">
+      <div class="modal-head">
+        <h2>Projelerim</h2>
+        <button id="projectsCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <div class="projects-toolbar">
+        <input id="projectsSearch" type="search" placeholder="Proje kodu, müşteri veya proje adı ara" autocomplete="off" />
+        <button id="projectsRefreshBtn" type="button" class="soft-btn">Yenile</button>
+      </div>
+      <div class="projects-table-wrap">
+        <table class="projects-table">
+          <thead>
+            <tr><th>Proje Kodu</th><th>Müşteri</th><th>Proje</th><th>Revizyon</th><th>Son Kayıt</th><th></th></tr>
+          </thead>
+          <tbody id="projectsTableBody"></tbody>
+        </table>
+        <p id="projectsEmpty" class="projects-empty">Projeler yükleniyor…</p>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="newRevisionDialog" class="modal revision-create-modal">
+    <form id="newRevisionForm" class="modal-card revision-create-card">
+      <div class="modal-head">
+        <h2 id="newRevisionTitle">Yeni Revizyon Oluştur</h2>
+        <button id="newRevisionCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <div class="revision-create-body">
+        <div class="revision-step-line">
+          <span id="revisionFromLabel">Mevcut</span>
+          <strong id="revisionFromValue">R01</strong>
+          <span aria-hidden="true">→</span>
+          <span id="revisionToLabel">Yeni</span>
+          <strong id="revisionToValue">R02</strong>
+        </div>
+        <label class="revision-note-field">
+          <span id="revisionNoteLabel">Revizyon notu (isteğe bağlı)</span>
+          <textarea id="revisionChangeNote" rows="3" maxlength="500" placeholder="Örn. Ön yükseklik ve dikme aralıkları güncellendi."></textarea>
+        </label>
+        <p id="newRevisionMessage" class="modal-sub">Mevcut çalışma kaydedilir ve yeni revizyon aynı proje koduyla açılır.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="newRevisionCancelBtn" type="button" class="soft-btn">İptal</button>
+        <button id="newRevisionConfirmBtn" type="submit" class="primary-btn">Revizyonu Oluştur</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="revisionsDialog" class="modal revisions-modal">
+    <div class="modal-card revisions-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="revisionsTitle">Revizyon Geçmişi</h2>
+          <p id="revisionsProjectCode" class="modal-sub project-code-cell">-</p>
+        </div>
+        <button id="revisionsCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <div class="projects-table-wrap revisions-table-wrap">
+        <table class="projects-table revisions-table">
+          <thead>
+            <tr><th id="revisionColRevision">Revizyon</th><th id="revisionColNote">Not</th><th id="revisionColDate">Oluşturma</th><th id="revisionColVersion">Uygulama</th><th></th></tr>
+          </thead>
+          <tbody id="revisionsTableBody"></tbody>
+        </table>
+        <p id="revisionsEmpty" class="projects-empty">Revizyonlar yükleniyor…</p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="passwordUpdateDialog" class="modal">
+    <form id="passwordUpdateForm" class="modal-card">
+      <div class="modal-head">
+        <h2>Yeni Şifre Belirle</h2>
+      </div>
+      <div class="password-update-fields">
+        <label><span>Yeni şifre</span><input id="newPassword" type="password" autocomplete="new-password" required /></label>
+        <label><span>Yeni şifre tekrar</span><input id="newPasswordConfirm" type="password" autocomplete="new-password" required /></label>
+      </div>
+      <p id="passwordUpdateMessage" class="modal-sub">Şifre en az 8 karakter olmalı.</p>
+      <div class="modal-actions">
+        <button type="submit" class="primary-btn">Şifreyi Güncelle</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="blocks/filteredBlocks.js?v=8.7.0"></script>
+  <script src="peri01ExcelBridge.js?v=8.7.0"></script>
+  <script src="peri01Geometry.js?v=8.7.0"></script>
+  <script src="modernDxfTemplate.js?v=8.7.0"></script>
+  <script src="dxfModernEngine.js?v=8.7.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="app.js?v=8.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
+  <script src="supabaseConfig.js?v=8.7.0"></script>
+  <script src="app.js?v=8.7.0"></script>
+  <script src="cloudProjects.js?v=8.7.0"></script>
 </body>
 </html>

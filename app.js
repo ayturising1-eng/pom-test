@@ -1,6 +1,10 @@
 (function () {
   'use strict';
 
+  const APP_VERSION = '8.7.0';
+  const PROJECT_FORMAT = 'PULUMUR_PROJECT';
+  const PROJECT_SCHEMA_VERSION = 1;
+
   const ids = [
     'product', 'moduleName', 'engine', 'customer', 'project', 'version', 'drawnBy', 'date',
     'systemCount', 'width', 'opening', 'rearHeight', 'frontHeight', 'rayCount', 'postCount',
@@ -37,6 +41,7 @@
   let pendingSlidingPlacementMeta = null;
   let guillotinePlacements = [];
   let pendingGuillotinePlacementMeta = null;
+  let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
   const EXCEL_COMBO_OPTIONS = {
     motor: ['-', 'RISING MOTOR', 'SOMFY RTS', 'SOMFY IO'],
     fabric: [
@@ -133,7 +138,7 @@
       options_motor: 'Motor', options_remote: 'Kumanda', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Ekstralar / Notlar',
       extra_triangleJoinery: 'Üçgen Doğrama', extra_waterStandard: 'Su Çıkışı Standart mı?', quickTestsHead: 'Hızlı Testler',
       previewTitle: 'Çizim Ön İzleme', previewBtn: 'Önizlemeyi Yenile', expandPreviewBtn: 'Önizlemeyi Büyüt', fitPreviewBtn: 'Çizimi Sığdır', shrinkPreviewBtn: 'Önizlemeyi Küçült', showMainDimsLabel: 'Ana ölçüleri göster', showAllDimsLabel: 'Tüm ölçüleri göster',
-      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', dxfFormatBadge: 'Modern DXF 2013', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı',
+      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç',
       calcTitle: 'Pülümür Hesaplayıcı', calcSub: '4 satırdan herhangi 3 tanesini doldur. Boş olan değer hesaplanır.',
       calcGuide: '<strong>TR</strong><ul><li>4 alandan 3 tanesini doldur.</li><li>Hesaplanacak alanı boş bırak.</li><li>Hesapla’ya bas.</li><li>Sonucu ana forma aktar.</li></ul>',
       calcWaiting: 'Sonuç bekleniyor.', calcReady: 'Sonuç', calcPoz: 'poz', calcOpenNote: 'Ana formdaki açılım / arka / ön değerleri aktarıldı. Açıyı hesaplamak için Hesapla’ya bas.',
@@ -158,7 +163,7 @@
       options_motor: 'Motor', options_remote: 'Remote', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Extras / Notes',
       extra_triangleJoinery: 'Triangle Joinery', extra_waterStandard: 'Standard Water Outlet?', quickTestsHead: 'Quick Tests',
       previewTitle: 'Drawing Preview', previewBtn: 'Refresh Preview', expandPreviewBtn: 'Expand Preview', fitPreviewBtn: 'Fit Drawing', shrinkPreviewBtn: 'Collapse Preview', showMainDimsLabel: 'Show main dimensions', showAllDimsLabel: 'Show all dimensions',
-      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', dxfFormatBadge: 'Modern DXF 2013', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator',
+      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File',
       calcTitle: 'Pulumur Calculator', calcSub: 'Fill any 3 of the 4 rows. The empty value will be calculated.',
       calcGuide: '<strong>EN</strong><ul><li>Fill 3 of the 4 fields.</li><li>Leave one field empty.</li><li>Click Calculate.</li><li>Transfer the result to the main form.</li></ul>',
       calcWaiting: 'Waiting for result.', calcReady: 'Result', calcPoz: 'position', calcOpenNote: 'Projection / rear H / front H values were copied from the main form. Click Calculate to calculate the angle.',
@@ -349,9 +354,10 @@
     setText('fitPreviewBtn', txt.fitPreviewBtn);
     setText('pdfBtn', txt.pdfBtn);
     setText('generateBtn', txt.generateBtn);
-    setText('dxfFormatBadge', txt.dxfFormatBadge);
     setText('resetBtn', txt.resetBtn);
     setText('calcBtn', txt.calcBtn);
+    setText('projectExportBtn', txt.projectExportBtn);
+    setText('projectImportBtn', txt.projectImportBtn);
     setText('calcTitle', txt.calcTitle);
     setText('calcSub', txt.calcSub);
     setText('calcGuide', txt.calcGuide, true);
@@ -422,7 +428,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.4.1').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.7.0').catch(() => {}), { once: true });
     }
   }
 
@@ -444,6 +450,7 @@
     pendingSlidingPlacementMeta = null;
     guillotinePlacements = [];
     pendingGuillotinePlacementMeta = null;
+    currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
     applyAutoRayPost(true);
   }
 
@@ -549,8 +556,8 @@
       applyPreviewDimensionFilter();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.4.1: Modern DXF 2013 is the only export format.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.4.1: Tek dışa aktarım formatı Modern DXF 2013'tür.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.7.0: cloud project revision history, R01/R02 workflow and portable JSON project files are active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.7.0: bulut proje revizyon geçmişi, R01/R02 iş akışı ve taşınabilir JSON proje dosyası aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
@@ -1833,6 +1840,251 @@
     window.addEventListener('resize', () => applyPreviewScale());
   }
 
+  function deepCloneJson(value) {
+    if (value === undefined) return undefined;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function cleanProjectFileToken(value, fallback) {
+    const raw = String(value ?? '').trim();
+    const safe = window.PulumurModernDXF && typeof window.PulumurModernDXF.safeFileName === 'function'
+      ? window.PulumurModernDXF.safeFileName(raw)
+      : raw.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+    return safe || fallback;
+  }
+
+  function createProjectSnapshot() {
+    const formData = {};
+    ids.forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      const rawValue = String(el.value ?? '');
+      formData[id] = BOOLEAN_FIELD_IDS.includes(id)
+        ? normalizeYesNo(rawValue)
+        : (upperTableFieldIds.includes(id) ? rawValue.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : rawValue);
+    });
+
+    return {
+      format: PROJECT_FORMAT,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      appVersion: APP_VERSION,
+      savedAt: new Date().toISOString(),
+      record: deepCloneJson(currentProjectRecord),
+      metadata: {
+        customerName: formData.customer || '',
+        projectName: formData.project || '',
+        drawingVersion: formData.version || '',
+        productType: formData.product || 'Pergo Rise',
+        moduleName: formData.moduleName || 'Module 1',
+        drawingEngine: formData.engine || 'Web DXF'
+      },
+      formData,
+      drawingState: {
+        manualPostPlacementMode,
+        glassTrackProfile: sanitizeGlassTrackProfile(glassTrackProfileState),
+        glassTrackSupportProfiles: {
+          left: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.left),
+          right: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.right)
+        },
+        frontPostCenters: Array.isArray(customFrontPostCenters) ? customFrontPostCenters.map(Number) : null,
+        slidingPlacements: deepCloneJson(slidingPlacements) || [],
+        guillotinePlacements: deepCloneJson(guillotinePlacements) || [],
+        manualInputFlags: {
+          rayCount: Boolean($('rayCount') && $('rayCount').dataset.userEdited === 'true'),
+          postCount: Boolean($('postCount') && $('postCount').dataset.userEdited === 'true')
+        }
+      },
+      uiSettings: {
+        language: currentLanguage,
+        dimensions: {
+          main: isPreviewToggleOn($('showMainDims')),
+          all: isPreviewToggleOn($('showAllDims'))
+        }
+      }
+    };
+  }
+
+  function normalizeProjectSnapshot(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error(currentLanguage === 'en' ? 'The project file is not a valid JSON object.' : 'Proje dosyası geçerli bir JSON nesnesi değil.');
+    }
+    if (raw.format !== PROJECT_FORMAT) {
+      throw new Error(currentLanguage === 'en' ? 'This is not a Pülümür project file.' : 'Bu dosya Pülümür proje dosyası değil.');
+    }
+    const schemaVersion = Number(raw.schemaVersion);
+    if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
+      throw new Error(currentLanguage === 'en' ? 'The project schema version is invalid.' : 'Proje veri şeması sürümü geçersiz.');
+    }
+    if (schemaVersion > PROJECT_SCHEMA_VERSION) {
+      throw new Error(currentLanguage === 'en'
+        ? `This project was created with a newer data schema (v${schemaVersion}).`
+        : `Bu proje daha yeni bir veri şemasıyla oluşturulmuş (v${schemaVersion}).`);
+    }
+    if (!raw.formData || typeof raw.formData !== 'object' || Array.isArray(raw.formData)) {
+      throw new Error(currentLanguage === 'en' ? 'The project form data is missing.' : 'Projenin form verileri eksik.');
+    }
+    return deepCloneJson(raw);
+  }
+
+  function restoreProjectSnapshot(rawSnapshot, options = {}) {
+    const snapshot = normalizeProjectSnapshot(rawSnapshot);
+    const formData = snapshot.formData || {};
+    const record = snapshot.record || {};
+    const drawingState = snapshot.drawingState || {};
+    const uiSettings = snapshot.uiSettings || {};
+    const nextLanguage = uiSettings.language === 'en' ? 'en' : 'tr';
+
+    suppressFormPreviewUpdate = true;
+    try {
+      currentProjectRecord = {
+        projectId: record.projectId ? String(record.projectId) : null,
+        projectCode: record.projectCode ? String(record.projectCode) : null,
+        revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+      };
+
+      if ($('languageSelect')) $('languageSelect').value = nextLanguage;
+      translateUI(nextLanguage);
+
+      ids.forEach(id => {
+        const el = $(id);
+        if (!el || formData[id] === undefined || formData[id] === null) return;
+        el.value = BOOLEAN_FIELD_IDS.includes(id) ? normalizeYesNo(formData[id]) : String(formData[id]);
+        autosizeTextarea(el);
+      });
+
+      manualPostPlacementMode = typeof drawingState.manualPostPlacementMode === 'string'
+        ? drawingState.manualPostPlacementMode
+        : 'standard';
+      glassTrackProfileState = sanitizeGlassTrackProfile(drawingState.glassTrackProfile);
+      const supports = drawingState.glassTrackSupportProfiles || {};
+      glassSupportProfileState = {
+        left: sanitizeOptionalGlassTrackProfile(supports.left),
+        right: sanitizeOptionalGlassTrackProfile(supports.right)
+      };
+      customFrontPostCenters = Array.isArray(drawingState.frontPostCenters)
+        ? drawingState.frontPostCenters.map(Number).filter(Number.isFinite)
+        : null;
+      slidingPlacements = Array.isArray(drawingState.slidingPlacements)
+        ? deepCloneJson(drawingState.slidingPlacements)
+        : [];
+      guillotinePlacements = Array.isArray(drawingState.guillotinePlacements)
+        ? deepCloneJson(drawingState.guillotinePlacements)
+        : [];
+      pendingSlidingPlacementMeta = null;
+      pendingGuillotinePlacementMeta = null;
+
+      const manualFlags = drawingState.manualInputFlags || {};
+      if ($('rayCount')) $('rayCount').dataset.userEdited = manualFlags.rayCount ? 'true' : 'false';
+      if ($('postCount')) $('postCount').dataset.userEdited = manualFlags.postCount ? 'true' : 'false';
+
+      updateRemoteOptions(true);
+
+      const dimensions = uiSettings.dimensions || {};
+      const mainOn = dimensions.main !== false;
+      const allOn = mainOn && dimensions.all === true;
+      setPreviewToggleState($('showMainDims'), mainOn);
+      setPreviewToggleState($('showAllDims'), allOn);
+      previewDimensionFilter.main = mainOn;
+      previewDimensionFilter.all = allOn;
+
+      document.querySelectorAll('.quick-test-btn.active').forEach(btn => btn.classList.remove('active'));
+    } finally {
+      suppressFormPreviewUpdate = false;
+    }
+
+    const drawing = updatePreview(options.resetZoom !== false);
+    if (!drawing && options.requireValidDrawing === true) {
+      throw new Error(currentLanguage === 'en'
+        ? 'The project data was loaded, but the drawing could not be rebuilt.'
+        : 'Proje verileri yüklendi ancak çizim yeniden oluşturulamadı.');
+    }
+    return drawing;
+  }
+
+  function serializeProjectSnapshot(snapshot = createProjectSnapshot()) {
+    return JSON.stringify(normalizeProjectSnapshot(snapshot), null, 2);
+  }
+
+  function parseProjectSnapshot(text) {
+    let raw;
+    try {
+      raw = JSON.parse(String(text ?? ''));
+    } catch (err) {
+      throw new Error(currentLanguage === 'en' ? 'The project file contains invalid JSON.' : 'Proje dosyasındaki JSON içeriği geçersiz.');
+    }
+    return normalizeProjectSnapshot(raw);
+  }
+
+  function projectSnapshotFileName(snapshot) {
+    const meta = (snapshot && snapshot.metadata) || {};
+    const record = (snapshot && snapshot.record) || {};
+    const projectName = cleanProjectFileToken(meta.projectName, currentLanguage === 'en' ? 'project' : 'proje');
+    const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
+    const revision = `R${String(revisionNo).padStart(2, '0')}`;
+    const projectCode = cleanProjectFileToken(record.projectCode, 'LOCAL');
+    return `${projectCode}-${projectName}-${revision}.plmr`;
+  }
+
+  function exportProjectSnapshot() {
+    try {
+      const snapshot = createProjectSnapshot();
+      const filename = projectSnapshotFileName(snapshot);
+      downloadText(filename, serializeProjectSnapshot(snapshot), 'application/json;charset=utf-8');
+      statusText.textContent = currentLanguage === 'en'
+        ? `Project file downloaded: ${filename}`
+        : `Proje dosyası indirildi: ${filename}`;
+    } catch (err) {
+      statusText.textContent = err.message;
+      window.alert(err.message);
+      console.error(err);
+    }
+  }
+
+  async function importProjectSnapshotFile(file) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error(currentLanguage === 'en' ? 'The project file is larger than 5 MB.' : 'Proje dosyası 5 MB sınırından büyük.');
+    }
+    const text = await file.text();
+    const snapshot = parseProjectSnapshot(text);
+    restoreProjectSnapshot(snapshot);
+    statusText.textContent = currentLanguage === 'en'
+      ? `Project loaded: ${file.name}`
+      : `Proje yüklendi: ${file.name}`;
+  }
+
+  function openProjectSnapshotPicker() {
+    const input = $('projectImportInput');
+    if (!input) return;
+    input.value = '';
+    input.click();
+  }
+
+  function getCurrentProjectRecord() {
+    return deepCloneJson(currentProjectRecord);
+  }
+
+  function setCurrentProjectRecord(record = {}) {
+    currentProjectRecord = {
+      projectId: record.projectId ? String(record.projectId) : null,
+      projectCode: record.projectCode ? String(record.projectCode) : null,
+      revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+    };
+    return getCurrentProjectRecord();
+  }
+
+  window.PulumurProjectState = Object.freeze({
+    format: PROJECT_FORMAT,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    createSnapshot: createProjectSnapshot,
+    restoreSnapshot: restoreProjectSnapshot,
+    serialize: serializeProjectSnapshot,
+    parse: parseProjectSnapshot,
+    getRecord: getCurrentProjectRecord,
+    setRecord: setCurrentProjectRecord
+  });
+
   function downloadBlob(filename, blob) {
     if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === 'function') {
       window.navigator.msSaveOrOpenBlob(blob, filename);
@@ -1857,7 +2109,11 @@
   }
 
   function buildNameRoot(drawing) {
-    return window.PulumurModernDXF.safeFileName(`${drawing.input.project}-${drawing.input.product}-web-dxf-modern-2013-v8_4_1-v${drawing.input.version}`);
+    const record = currentProjectRecord || {};
+    const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
+    const revision = `R${String(revisionNo).padStart(2, '0')}`;
+    const projectCode = record.projectCode || 'LOCAL';
+    return window.PulumurModernDXF.safeFileName(`${projectCode}-${drawing.input.project}-${revision}-${drawing.input.product}-web-dxf-v8_6_0-v${drawing.input.version}`);
   }
 
   function currentDxfDimensionHiddenLayers() {
@@ -1885,8 +2141,8 @@
       const nameRoot = buildNameRoot(drawing);
       downloadText(`${nameRoot}.dxf`, dxf, 'application/dxf;charset=utf-8');
       statusText.textContent = currentLanguage === 'en'
-        ? `Modern DXF 2013 downloaded: ${nameRoot}.dxf`
-        : `Modern DXF 2013 indirildi: ${nameRoot}.dxf`;
+        ? `DXF downloaded: ${nameRoot}.dxf`
+        : `DXF indirildi: ${nameRoot}.dxf`;
     } catch (err) {
       statusText.textContent = currentLanguage === 'en' ? `DXF generation error: ${err.message}` : `DXF oluşturma hatası: ${err.message}`;
       window.alert(currentLanguage === 'en' ? `DXF generation error:
@@ -2167,7 +2423,7 @@ Pülümür Automation Studio, Pergo Rise Module 1 için DXF ve A0 PDF üretir.
 - Sistem ölçülerini mm olarak gir.
 - Önizleme otomatik oluşur.
 - PDF İndir veya DXF İndir butonlarını kullan.
-- DXF İndir butonu Modern DXF 2013 formatında dosya üretir.
+- DXF İndir butonu düzenlenebilir modern DXF dosyası üretir.
 
 2) Çoklu poz
 - Değerleri noktalı virgül (;) ile ayır.
@@ -2201,7 +2457,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
 - Enter the system dimensions in mm.
 - The preview is created automatically.
 - Use Download PDF or Download DXF.
-- Download DXF creates a Modern DXF 2013 file.
+- Download DXF creates an editable modern DXF file.
 
 2) Multiple positions
 - Separate values with semicolon (;).
@@ -2446,6 +2702,19 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     $('expandPreviewBtn').addEventListener('click', () => { void togglePreviewFullscreen(); });
     $('fitPreviewBtn').addEventListener('click', fitPreview);
     $('calcBtn').addEventListener('click', openCalculator);
+    $('projectExportBtn').addEventListener('click', exportProjectSnapshot);
+    $('projectImportBtn').addEventListener('click', openProjectSnapshotPicker);
+    $('projectImportInput').addEventListener('change', async evt => {
+      try {
+        await importProjectSnapshotFile(evt.target.files && evt.target.files[0]);
+      } catch (err) {
+        statusText.textContent = err.message;
+        window.alert(err.message);
+        console.error(err);
+      } finally {
+        evt.target.value = '';
+      }
+    });
     $('helpBtn').addEventListener('click', showHelp);
     $('languageSelect').addEventListener('change', evt => { translateUI(evt.target.value); updatePreview(); });
     $('motor').addEventListener('input', () => { updateRemoteOptions(true); });

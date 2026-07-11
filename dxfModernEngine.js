@@ -96,7 +96,12 @@
   function entityColorPairs(entity) {
     const trueColor = rgbToTrueColor(entity && (entity.trueColor ?? entity.rgb ?? entity.hexColor));
     if (Number.isFinite(trueColor)) return [pair(420, trueColor)];
-    if (entity && Number.isFinite(Number(entity.color))) return [pair(62, aciColor(entity.color))];
+    if (entity && Number.isFinite(Number(entity.color))) {
+      const color = Number(entity.color);
+      if (color === 0) return [pair(62, 0)]; // BYBLOCK
+      if (color === 256) return [pair(62, 256)]; // BYLAYER
+      return [pair(62, aciColor(color))];
+    }
     return [];
   }
   function getLayerStyle(drawing, originalName) {
@@ -122,11 +127,40 @@
     const type = String((entity && entity.edit && entity.edit.dimensionType) || (entity && entity.dimensionFilterType) || 'main').toLowerCase();
     return type === 'detail' ? 'Ölçüler - Detay' : 'Ölçüler - Ana';
   }
+  function hatchFromLegacyInsert(entity) {
+    if (!entity || entity.type !== 'insert') return null;
+    const name = String(entity.name || '');
+    const isWall = name === 'PULUMUR WALL BRICK SAFE HATCH';
+    const isFabric = name === 'PULUMUR TRAPEZ SAFE HATCH';
+    if (!isWall && !isFabric) return null;
+    const sx = Number(entity.scaleX || 1);
+    const sy = Number(entity.scaleY || 1);
+    const x1 = Number(entity.x || 0);
+    const y1 = Number(entity.y || 0);
+    // V8.4.5: Ayna INSERT'in referans noktası sağ kenara dönüşür.
+    // mirrorX dikkate alınmazsa tarama sağ duvarın +X yönüne tam duvar kalınlığı kadar taşar.
+    const rawX2 = x1 + (entity.mirrorX ? -1 : 1) * 1000 * sx;
+    const rawY2 = y1 + 1000 * sy;
+    const minX = Math.min(x1, rawX2);
+    const maxX = Math.max(x1, rawX2);
+    const minY = Math.min(y1, rawY2);
+    const maxY = Math.max(y1, rawY2);
+    return {
+      type: 'hatch',
+      layer: entity.layer || (isWall ? 'HATCH_WALL' : 'HATCH_FABRIC'),
+      color: entity.color,
+      trueColor: entity.trueColor,
+      points: [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]],
+      patternKind: isWall ? 'brick' : 'fabric'
+    };
+  }
   function prepareDrawing(drawing) {
     const next = { ...(drawing || {}) };
     next.layers = Array.from(new Set([...(drawing.layers || []), 'Ölçüler - Ana', 'Ölçüler - Detay']));
     next.entities = (drawing.entities || []).map(entity => {
       if (!entity) return entity;
+      const modernHatch = hatchFromLegacyInsert(entity);
+      if (modernHatch) return modernHatch;
       if (entity.type === 'dimension') {
         const layer = dimensionLayer(entity);
         return { ...entity, layer, graphics: (entity.graphics || []).map(ge => ({ ...ge, layer })) };
@@ -150,6 +184,7 @@
     if (entity.type === 'line') return { ...entity, x1: -Number(entity.x1 || 0), x2: -Number(entity.x2 || 0) };
     if (entity.type === 'polyline') return { ...entity, points: (entity.points || []).map(p => [-Number(p[0] || 0), Number(p[1] || 0)]).reverse() };
     if (entity.type === 'circle') return { ...entity, x: -Number(entity.x || 0) };
+    if (entity.type === 'hatch') return { ...entity, points: (entity.points || []).map(p => [-Number(p[0] || 0), Number(p[1] || 0)]).reverse() };
     if (entity.type === 'text' || entity.type === 'mtext') return { ...entity, x: -Number(entity.x || 0) };
     return { ...entity };
   }
@@ -179,6 +214,105 @@
     return Array.from(names);
   }
 
+  function emptyBounds() {
+    return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  }
+  function includePoint(bounds, x, y) {
+    const px = Number(x), py = Number(y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+    bounds.minX = Math.min(bounds.minX, px);
+    bounds.minY = Math.min(bounds.minY, py);
+    bounds.maxX = Math.max(bounds.maxX, px);
+    bounds.maxY = Math.max(bounds.maxY, py);
+  }
+  function mergeBounds(target, source) {
+    if (!source || !Number.isFinite(source.minX)) return target;
+    includePoint(target, source.minX, source.minY);
+    includePoint(target, source.maxX, source.maxY);
+    return target;
+  }
+  function localInsertPoint(px, py, insert) {
+    const sx = Math.abs(Number(insert.scaleX) || 1);
+    const sy = Number(insert.scaleY) || 1;
+    const lx = insert.mirrorX ? -Number(px || 0) : Number(px || 0);
+    const ly = Number(py || 0);
+    const angle = (Number(insert.rotation) || 0) * Math.PI / 180;
+    const xx = lx * sx, yy = ly * sy;
+    return {
+      x: Number(insert.x || 0) + xx * Math.cos(angle) - yy * Math.sin(angle),
+      y: Number(insert.y || 0) + xx * Math.sin(angle) + yy * Math.cos(angle)
+    };
+  }
+  function entityModelBounds(entity, blocks, depth = 0) {
+    const b = emptyBounds();
+    if (!entity || depth > 8) return b;
+    if (entity.type === 'line') {
+      includePoint(b, entity.x1, entity.y1);
+      includePoint(b, entity.x2, entity.y2);
+    } else if (entity.type === 'polyline' || entity.type === 'hatch') {
+      for (const p of entity.points || []) includePoint(b, p[0], p[1]);
+    } else if (entity.type === 'circle') {
+      const x = Number(entity.x) || 0, y = Number(entity.y) || 0, r = Math.abs(Number(entity.r) || 0);
+      includePoint(b, x - r, y - r);
+      includePoint(b, x + r, y + r);
+    } else if (entity.type === 'text' || entity.type === 'mtext') {
+      const x = Number(entity.x) || 0, y = Number(entity.y) || 0;
+      const h = Math.max(1, Math.abs(Number(entity.height) || 80));
+      const w = entity.type === 'mtext' && Number(entity.width) > 0
+        ? Number(entity.width)
+        : Math.max(h, cleanSingleLine(entity.value).length * h * 0.65);
+      const left = x - (entity.align === 'center' ? w / 2 : (entity.align === 'right' ? w : 0));
+      const right = x + (entity.align === 'center' ? w / 2 : (entity.align === 'right' ? 0 : w));
+      includePoint(b, left, y - h);
+      includePoint(b, right, y + h);
+    } else if (entity.type === 'dimension') {
+      for (const ge of entity.graphics || []) mergeBounds(b, entityModelBounds(ge, blocks, depth + 1));
+      if (!Number.isFinite(b.minX)) {
+        if (entity.p1) includePoint(b, entity.p1.x, entity.p1.y);
+        if (entity.p2) includePoint(b, entity.p2.x, entity.p2.y);
+        if (entity.dimLine) includePoint(b, entity.dimLine.x, entity.dimLine.y);
+      }
+    } else if (entity.type === 'insert') {
+      const block = blocks && blocks[entity.name];
+      if (block) {
+        const bb = emptyBounds();
+        for (const be of block.entities || []) mergeBounds(bb, entityModelBounds(be, blocks, depth + 1));
+        if (Number.isFinite(bb.minX)) {
+          const corners = [[bb.minX, bb.minY], [bb.maxX, bb.minY], [bb.maxX, bb.maxY], [bb.minX, bb.maxY]];
+          for (const corner of corners) {
+            const pt = localInsertPoint(corner[0], corner[1], entity);
+            includePoint(b, pt.x, pt.y);
+          }
+        }
+      }
+      if (!Number.isFinite(b.minX)) includePoint(b, entity.x, entity.y);
+    }
+    return b;
+  }
+  function drawingExtents(drawing, sourceBlocks) {
+    const b = emptyBounds();
+    for (const entity of drawing.entities || []) mergeBounds(b, entityModelBounds(entity, sourceBlocks));
+    if (!Number.isFinite(b.minX)) return { minX: -500, minY: -500, maxX: 500, maxY: 500 };
+    const width = Math.max(1, b.maxX - b.minX);
+    const height = Math.max(1, b.maxY - b.minY);
+    const pad = Math.max(250, Math.max(width, height) * 0.035);
+    return { minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad };
+  }
+  function applySavedZoomExtents(dxf, extents) {
+    const width = Math.max(1, extents.maxX - extents.minX);
+    const height = Math.max(1, extents.maxY - extents.minY);
+    const centerX = (extents.minX + extents.maxX) / 2;
+    const centerY = (extents.minY + extents.maxY) / 2;
+    const viewportAspect = 1.34;
+    const viewHeight = Math.max(height, width / viewportAspect) * 1.04;
+    let out = dxf;
+    out = out.replace(/(\$EXTMIN\n\s*10\n)[^\n]+(\n\s*20\n)[^\n]+(\n\s*30\n)[^\n]+/, `$1${fixed(extents.minX)}$2${fixed(extents.minY)}$3${fixed(0)}`);
+    out = out.replace(/(\$EXTMAX\n\s*10\n)[^\n]+(\n\s*20\n)[^\n]+(\n\s*30\n)[^\n]+/, `$1${fixed(extents.maxX)}$2${fixed(extents.maxY)}$3${fixed(0)}`);
+    out = out.replace(/(AcDbViewportTableRecord[\s\S]*?\n\s*12\n)[^\n]+(\n\s*22\n)[^\n]+([\s\S]*?\n\s*40\n)[^\n]+(\n\s*41\n)[^\n]+/, `$1${fixed(centerX)}$2${fixed(centerY)}$3${fixed(viewHeight)}$4${fixed(viewportAspect)}`);
+    out = out.replace(/(AcDbLayout\n\s*1\nModel[\s\S]*?\n\s*14\n)[^\n]+(\n\s*24\n)[^\n]+(\n\s*34\n)[^\n]+(\n\s*15\n)[^\n]+(\n\s*25\n)[^\n]+(\n\s*35\n)[^\n]+/, `$1${fixed(extents.minX)}$2${fixed(extents.minY)}$3${fixed(0)}$4${fixed(extents.maxX)}$5${fixed(extents.maxY)}$6${fixed(0)}`);
+    return out;
+  }
+
   function commonEntityPrefix(type, handle, owner, layerName, entity) {
     return [pair(0, type), pair(5, handle), pair(330, owner), pair(100, 'AcDbEntity'), pair(8, layerName), ...entityColorPairs(entity)];
   }
@@ -194,19 +328,66 @@
     for (const p of points) out.push(pair(10, fixed(p[0])), pair(20, fixed(p[1])));
     return out;
   }
-  function textEntity(e, ctx) {
-    const align = e.align === 'center' ? 1 : (e.align === 'right' ? 2 : 0);
-    const vertical = align ? 2 : 0;
-    const out = [...commonEntityPrefix('TEXT', ctx.nextHandle(), ctx.owner, ctx.layerName(e.layer), e), pair(100, 'AcDbText'), pair(10, fixed(e.x)), pair(20, fixed(e.y)), pair(30, 0), pair(40, fixed(e.height || 80)), pair(1, cleanSingleLine(e.value)), pair(50, fixed(e.rotation || 0)), pair(7, 'Standard')];
-    if (align) out.push(pair(72, align), pair(11, fixed(e.x)), pair(21, fixed(e.y)), pair(31, 0));
-    out.push(pair(100, 'AcDbText'));
-    if (vertical) out.push(pair(73, vertical));
-    return out;
+  function textAsMText(e) {
+    const raw = String(e.value || '');
+    const lines = raw.replace(/\\P/g, '\n').split(/\r?\n/);
+    const longest = Math.max(1, ...lines.map(line => line.length));
+    const height = Math.max(1, Number(e.height) || 80);
+    const width = Math.max(height * 1.2, Number(e.width) || longest * height * 0.68);
+    const attachment = e.align === 'center' ? 8 : (e.align === 'right' ? 9 : 7);
+    return { ...e, type: 'mtext', width, attachment, lineSpacing: e.lineSpacing || 1.0, __convertedFromText: true };
   }
   function mtextEntity(e, ctx) {
-    const attachment = e.align === 'center' ? 5 : (e.align === 'right' ? 3 : 1);
+    const attachment = Number(e.attachment) || (e.align === 'center' ? 5 : (e.align === 'right' ? 3 : 1));
     const out = [...commonEntityPrefix('MTEXT', ctx.nextHandle(), ctx.owner, ctx.layerName(e.layer), e), pair(100, 'AcDbMText'), pair(10, fixed(e.x)), pair(20, fixed(e.y)), pair(30, 0), pair(40, fixed(e.height || 80)), pair(41, fixed(Math.max(1, Number(e.width) || 1000))), pair(71, attachment), pair(72, 1), pair(1, cleanMText(e.value)), pair(7, 'Standard'), pair(44, fixed(e.lineSpacing || 1.15))];
     if (Number(e.rotation)) out.push(pair(50, fixed(e.rotation)));
+    return out;
+  }
+  function hatchPattern(e) {
+    if (e.patternKind === 'brick') {
+      const scale = Math.max(0.01, Number(e.patternScale) || 30);
+      return {
+        name: 'BRICK', type: 1, angle: 0, scale,
+        lines: [
+          { angle: 0, baseX: 0, baseY: 0, offsetX: 0, offsetY: 6.35 * scale, dashes: [] },
+          { angle: 90, baseX: 0, baseY: 0, offsetX: -12.7 * scale, offsetY: 0, dashes: [6.35 * scale, -6.35 * scale] },
+          { angle: 90, baseX: 6.35 * scale, baseY: 0, offsetX: -12.7 * scale, offsetY: 0, dashes: [-6.35 * scale, 6.35 * scale] }
+        ]
+      };
+    }
+    if (e.patternKind === 'fabric') {
+      return {
+        name: 'PULUMUR_FABRIC', type: 0, angle: 0, scale: 1,
+        lines: [
+          { angle: 90, baseX: 0, baseY: 0, offsetX: 150, offsetY: 0, dashes: [] },
+          { angle: 90, baseX: 42, baseY: 0, offsetX: 150, offsetY: 0, dashes: [] }
+        ]
+      };
+    }
+    return {
+      name: 'ANSI31', type: 1, angle: Number(e.patternAngle) || 0, scale: Math.max(0.01, Number(e.patternScale) || 25),
+      lines: [{ angle: 45, baseX: 0, baseY: 0, offsetX: -3.175, offsetY: 3.175, dashes: [] }]
+    };
+  }
+  function hatchEntity(e, ctx) {
+    const points = Array.isArray(e.points) ? e.points.filter(p => Array.isArray(p) && p.length >= 2) : [];
+    if (points.length < 3) return [];
+    const pattern = hatchPattern(e);
+    const out = [
+      ...commonEntityPrefix('HATCH', ctx.nextHandle(), ctx.owner, ctx.layerName(e.layer), e),
+      pair(100, 'AcDbHatch'),
+      pair(10, 0), pair(20, 0), pair(30, 0),
+      pair(210, 0), pair(220, 0), pair(230, 1),
+      pair(2, pattern.name), pair(70, 0), pair(71, 0),
+      pair(91, 1), pair(92, 3), pair(72, 0), pair(73, 1), pair(93, points.length)
+    ];
+    for (const p of points) out.push(pair(10, fixed(p[0])), pair(20, fixed(p[1])));
+    out.push(pair(97, 0), pair(75, 1), pair(76, pattern.type), pair(52, fixed(pattern.angle)), pair(41, fixed(pattern.scale)), pair(77, 0), pair(78, pattern.lines.length));
+    for (const ln of pattern.lines) {
+      out.push(pair(53, fixed(ln.angle)), pair(43, fixed(ln.baseX)), pair(44, fixed(ln.baseY)), pair(45, fixed(ln.offsetX)), pair(46, fixed(ln.offsetY)), pair(79, (ln.dashes || []).length));
+      for (const dash of ln.dashes || []) out.push(pair(49, fixed(dash)));
+    }
+    out.push(pair(98, 0));
     return out;
   }
   function insertEntity(e, ctx, blockKey) {
@@ -237,8 +418,9 @@
     if (e.type === 'line') return lineEntity(e, ctx);
     if (e.type === 'polyline') return polyEntity(e, ctx);
     if (e.type === 'circle') return circleEntity(e, ctx);
-    if (e.type === 'text') return textEntity(e, ctx);
+    if (e.type === 'text') return mtextEntity(textAsMText(e), ctx);
     if (e.type === 'mtext') return mtextEntity(e, ctx);
+    if (e.type === 'hatch') return hatchEntity(e, ctx);
     if (e.type === 'dimension') return dimensionEntity(e, ctx);
     if (e.type === 'insert') {
       if (isHeavyDisabledBlockName(e.name)) return [];
@@ -308,6 +490,7 @@
     const customBlocks = blockInfos.map(info => blockSection(info, ctx, sourceBlocks)).join('\n');
     const entityLines = [];
     for (const e of drawing.entities || []) append(entityLines, entityOut(e, ctx, sourceBlocks));
+    const extents = drawingExtents(drawing, sourceBlocks);
     const modern = TEMPLATE
       .replace('__LAYER_COUNT__', String(2 + layerOriginals.filter(n => n !== '0' && n !== 'Defpoints').length))
       .replace('__CUSTOM_LAYER_RECORDS__', customLayerRecords)
@@ -315,7 +498,7 @@
       .replace('__CUSTOM_BLOCK_RECORDS__', customBlockRecords)
       .replace('__CUSTOM_BLOCKS__', customBlocks)
       .replace('__ENTITIES__', entityLines.join('\n'));
-    return modern.replace(/\n/g, '\r\n');
+    return applySavedZoomExtents(modern, extents).replace(/\n/g, '\r\n');
   }
 
   function safeFileName(value) {
@@ -331,7 +514,7 @@
       .replace(/^-+|-+$/g, '') || 'pergo-rise';
   }
 
-  const api = { toDxf, safeFileName, modernLayerName, modernBlockName, version: 'AC1027' };
+  const api = { toDxf, safeFileName, modernLayerName, modernBlockName, version: 'AC1027-V850-ZOOM-EXTENTS-MESUTMM-HATCH' };
   root.PulumurModernDXF = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

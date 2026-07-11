@@ -167,7 +167,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.4.1 - MODERN DXF 2013 ONLY / SLIDING + GUILLOTINE - 11.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.7.0 - CLOUD REVISION SYSTEM - 11.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {
@@ -850,20 +850,26 @@
 
 
   function customHatchBlocks() {
+    // V8.4.5: Bu bloklar geometri yer tutucusudur; önizleme/PDF sabit model-uzayı desenini doğrudan üretir, Modern DXF motoru gerçek HATCH'e dönüştürür.
     const brick = [];
-    const brickCourse = 200;
-    for (let y = brickCourse; y < 1000; y += brickCourse) brick.push({ type: 'line', layer: 'HATCH_WALL', color: 8, x1: 0, y1: y, x2: 1000, y2: y });
-    for (let row = 0; row < 5; row += 1) {
+    const brickCourse = 190.5;
+    const brickWidth = 381;
+    for (let y = brickCourse; y < 1000; y += brickCourse) {
+      brick.push({ type: 'line', layer: 'HATCH_WALL', color: 8, x1: 0, y1: y, x2: 1000, y2: y });
+    }
+    for (let row = 0; row <= Math.ceil(1000 / brickCourse); row += 1) {
       const y1 = row * brickCourse;
       const y2 = Math.min(1000, y1 + brickCourse);
-      const start = row % 2 === 0 ? 250 : 125;
-      for (let x = start; x < 1000; x += 250) brick.push({ type: 'line', layer: 'HATCH_WALL', color: 8, x1: x, y1, x2: x, y2 });
+      const rowOffset = row % 2 === 0 ? 0 : brickWidth / 2;
+      for (let x = rowOffset; x <= 1000; x += brickWidth) {
+        if (x > 0 && x < 1000) brick.push({ type: 'line', layer: 'HATCH_WALL', color: 8, x1: x, y1, x2: x, y2 });
+      }
     }
 
     const trapez = [];
-    for (let x = 75; x < 1000; x += 150) {
+    for (let x = 0; x < 1000; x += 150) {
       trapez.push({ type: 'line', layer: 'HATCH_FABRIC', color: 42, x1: x, y1: 0, x2: x, y2: 1000 });
-      trapez.push({ type: 'line', layer: 'HATCH_FABRIC', color: 42, x1: x + 42, y1: 0, x2: x + 42, y2: 1000 });
+      if (x + 42 < 1000) trapez.push({ type: 'line', layer: 'HATCH_FABRIC', color: 42, x1: x + 42, y1: 0, x2: x + 42, y2: 1000 });
     }
 
     return {
@@ -876,10 +882,9 @@
     const ww = Number(w) || 0;
     const hh = Number(h) || 0;
     if (Math.abs(ww) < 50 || Math.abs(hh) < 50) return;
-    // R12 güvenli tarama: gerçek HATCH yerine 1000x1000 blok tek INSERT ile ölçeklenir.
-    // X yönünde negatif ölçek, özellikle aynalı yan görünüşlerde taramayı duvar dışına taşıyabiliyordu.
-    // Bu yüzden INSERT noktası gerçek sol sınıra alınır; X ölçeği her zaman pozitif tutulur.
-    // Y yönünde üst referansı korumak için gerektiğinde negatif scaleY kullanılabilir.
+    // Çizim modelinde tarama alanı hafif bir INSERT taşıyıcısıyla tutulur.
+    // Modern DXF motoru bunu gerçek HATCH'e, önizleme/PDF motoru ise aynı ölçekli kesilmiş çizgi desenine dönüştürür.
+    // X referansı normalize edilerek aynalı sağ görünüşte taramanın duvar dışına taşması engellenir.
     const insX = ww >= 0 ? x : x + ww;
     const scaleX = Math.abs(ww) / 1000;
     const scaleY = hh / 1000;
@@ -1047,7 +1052,8 @@
     /* drawTopTrapez disabled for no-polyline-simplify lightweight DXF */
     drawTopPergoText(g, d);
 
-    addDimV(g, 0, -d.opening, 100, 100, `AÇILIM ${formatMm(d.opening)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: 'top_opening_pos_1', ruleKey: 'top_opening', field: 'opening', index: 0, label: 'Açılım', view: 'Top', relatedZoneId: 'top_opening_pos_1' } });
+    // V8.4.5: Üst görünüşte açılım ölçüsü gösterilmez.
+    // Açılım ölçüsü yan görünüşte poz bazlı olarak korunur.
 
     if (d.systemCount === 1) {
       addDimH(g, d.rayAreaStartX - 6, d.rayAreaStartX + d.raySystemW + 6, 0, 800, `GENİŞLİK ${formatMm(d.nominalWidth)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: 'top_total_width', ruleKey: 'top_total_width', field: 'width', index: 0, label: 'Toplam Genişlik', view: 'Top', relatedZoneId: 'top_total_width_zone' } });
@@ -1082,6 +1088,10 @@
     const poz = String((placement && placement.pozNo) || 'S01').toUpperCase().replace(/[^A-Z0-9_-]+/g, '_');
     return `SLIDING_POZ_${poz}`;
   }
+
+  // V8.4.3: Sliding iç bilgi tablosu kodda korunur fakat varsayılan olarak çizilmez.
+  // İleride başka bir yerleşim modunda placement.showInternalTable=true ile yeniden kullanılabilir.
+  const SLIDING_INTERNAL_TABLE_ENABLED = false;
 
   function slidingTextHeight(value, cellW, baseH, minH = 12) {
     const text = String(value || '');
@@ -1148,12 +1158,12 @@
       const cy = topY - i * rowH - rowH / 2;
       if (i === 0) {
         const th = slidingTextHeight(row[0], w, Math.min(28, rowH * 0.55), 12);
-        entities.push({ type: 'text', layer, color, x: x + w / 2, y: cy, value: row[0], height: th, align: 'center', rotation: 0 });
+        entities.push({ type: 'text', layer, color, x: x + w / 2, y: cy, value: row[0], height: th, width: Math.max(1, w - 16), align: 'center', rotation: 0 });
       } else {
         const leftH = slidingTextHeight(row[0], leftW, Math.min(24, rowH * 0.48), 10);
         const rightH = slidingTextHeight(row[1], rightW, Math.min(24, rowH * 0.48), 10);
-        entities.push({ type: 'text', layer, color, x: x + 8, y: cy, value: row[0], height: leftH, align: 'left', rotation: 0 });
-        entities.push({ type: 'text', layer, color, x: x + w - 8, y: cy, value: row[1], height: rightH, align: 'right', rotation: 0 });
+        entities.push({ type: 'text', layer, color, x: x + 8, y: cy, value: row[0], height: leftH, width: Math.max(1, leftW - 16), align: 'left', rotation: 0 });
+        entities.push({ type: 'text', layer, color, x: x + w - 8, y: cy, value: row[1], height: rightH, width: Math.max(1, rightW - 16), align: 'right', rotation: 0 });
       }
     });
   }
@@ -1204,12 +1214,13 @@
       arrowDefs.push({ panelIndex: 0, direction: 'RIGHT' });
       arrowDefs.push({ panelIndex: panelCount - 1, direction: 'LEFT' });
     }
-    const tableChoice = chooseSlidingTablePanel(panels, occupied);
+    const showInternalTable = placement.showInternalTable === true || SLIDING_INTERNAL_TABLE_ENABLED;
+    const tableChoice = showInternalTable ? chooseSlidingTablePanel(panels, occupied) : null;
     arrowDefs.forEach(def => {
-      const arrowColor = tableChoice.greyArrowPanel === def.panelIndex ? 8 : 4;
+      const arrowColor = tableChoice && tableChoice.greyArrowPanel === def.panelIndex ? 8 : 4;
       entities.push(slidingArrowEntity(panels[def.panelIndex], def.direction, arrowY, arrowColor));
     });
-    addSlidingTableEntities(entities, panels[tableChoice.index], placement);
+    if (showInternalTable && tableChoice) addSlidingTableEntities(entities, panels[tableChoice.index], placement);
     return {
       dxfName: slidingBlockName(placement),
       entities,
@@ -1426,7 +1437,11 @@
   }
 
   function triangleDogramaKapaliCiz(g, pA, pB, pC, pD, layer = 'TRIANGLE') {
-    g.poly([pA, pB, pC, pD], true, layer);
+    const ent = g.poly([pA, pB, pC, pD], true, layer);
+    // V8.4.3: Önizleme ve DXF aynı üçgen doğrama rengini kullanır.
+    ent.color = 130;
+    ent.trueColor = 0x00BF00;
+    return ent;
   }
 
   function triangleDogramaUrunCiz(g, baseX, baseY, AB, BC, AD, slope, off = 41.7, memberW = 41.7) {
@@ -1525,7 +1540,7 @@
     // V8.2.1: Yan görünüşte çatı kayıt profili ve ray çekici araba setleri çizilmez.
     if (K.showDimensions !== false) {
       const anglePt = rotatePoint(startRayX + rayLen / 2, startRayY, arkaMekX, arkaMekY, aci);
-      const angleText = g.text(anglePt[0], anglePt[1] + 140, `${formatDeg(Math.abs(aci) * 180 / Math.PI)}`, 170, 'TEXT', 'center');
+      const angleText = g.text(anglePt[0], anglePt[1] + 140, `${formatDeg(Math.abs(aci) * 180 / Math.PI)}  POZ ${p.index + 1}`, 170, 'TEXT', 'center');
       angleText.keepReadableOnMirror = true;
       angleText.dimensionFilterType = 'main';
     }
@@ -1840,8 +1855,13 @@
     // TEXT entity baseline verdiği için ilk satır baseline'ı optik merkeze göre ayarlanır.
     const firstBaseline = centerY + textBlockH / 2 - fit.h * 0.72;
     const textX = x + padX;
+    const mtextCellWidth = Math.max(1, w - 2 * padX);
     fit.lines.forEach((line, i) => {
-      g.text(textX, firstBaseline - i * lineStep, line, fit.h, layer, 'left');
+      const ent = g.text(textX, firstBaseline - i * lineStep, line, fit.h, layer, 'left');
+      // Modern DXF'te MTEXT genişliği hücrenin kullanılabilir genişliği kadar olsun.
+      // Böylece CAD tarafında beklenmeyen otomatik satır kırımları oluşmaz.
+      ent.width = mtextCellWidth;
+      ent.cellWidth = mtextCellWidth;
     });
   }
 
@@ -2087,6 +2107,47 @@
     };
   }
 
+  function applyByBlockPresentation(entities) {
+    (entities || []).forEach(e => {
+      if (!e) return;
+      if (e.type === 'text' || e.type === 'mtext') {
+        // Normal yazılar ve açı yazısı BYBLOCK. Ölçü entity grafiklerine dokunulmaz.
+        e.color = 0;
+        delete e.trueColor;
+        delete e.rgb;
+        delete e.hexColor;
+        return;
+      }
+      if ((e.type === 'line' || e.type === 'polyline' || e.type === 'circle') && ['OUTLINE', 'TABLE', 'TITLE'].includes(e.layer)) {
+        e.color = 0;
+        delete e.trueColor;
+        delete e.rgb;
+        delete e.hexColor;
+      }
+    });
+    return entities;
+  }
+
+  function byBlockBlockLibrary(blocks) {
+    const out = {};
+    Object.entries(blocks || {}).forEach(([name, block]) => {
+      out[name] = {
+        ...block,
+        entities: (block.entities || []).map(e => {
+          const next = { ...e };
+          if (next.type === 'text' || next.type === 'mtext') {
+            next.color = 0;
+            delete next.trueColor;
+            delete next.rgb;
+            delete next.hexColor;
+          }
+          return next;
+        })
+      };
+    });
+    return out;
+  }
+
   function buildDrawing(raw) {
     const d = normalizeInput(raw);
     const g = makeEntitySink();
@@ -2098,8 +2159,10 @@
     drawFrame(g, d);
     drawUpperOptionsTable(g, d);
     drawBottomTitleTable(g, d);
+    applyByBlockPresentation(g.entities);
     const smart = buildSmartMetadata(g.entities, d);
-    return { input: d, entities: g.entities, layers: Object.keys(LAYER_STYLE), layerStyle: LAYER_STYLE, blocks: { ...getBlocks(), ...customHatchBlocks(), ...slidingBlocksFor(d), ...guillotineBlocksFor(d) }, smartDimensions: smart.dimensions, zones: smart.zones, profileInstances: smart.profileInstances, dimensionEditRules: DIMENSION_EDIT_RULES, dimensionActions: DIMENSION_ACTIONS, profileLibrary: PROFILE_LIBRARY, productLibrary: PRODUCT_LIBRARY };
+    const blocks = byBlockBlockLibrary({ ...getBlocks(), ...customHatchBlocks(), ...slidingBlocksFor(d), ...guillotineBlocksFor(d) });
+    return { input: d, entities: g.entities, layers: Object.keys(LAYER_STYLE), layerStyle: LAYER_STYLE, blocks, smartDimensions: smart.dimensions, zones: smart.zones, profileInstances: smart.profileInstances, dimensionEditRules: DIMENSION_EDIT_RULES, dimensionActions: DIMENSION_ACTIONS, profileLibrary: PROFILE_LIBRARY, productLibrary: PRODUCT_LIBRARY };
   }
 
   function entityBounds(e, blockLib) {
@@ -2134,6 +2197,7 @@
     10: '#ff0000',
     42: '#ffbf00',
     130: '#00bf00',
+    167: '#293189',
     256: null
   };
 
@@ -2143,7 +2207,18 @@
     return ACI_HEX[n] || fallback;
   }
 
+  function entityTrueColorHex(e) {
+    if (!e) return null;
+    if (typeof e.hexColor === 'string' && /^#?[0-9a-f]{6}$/i.test(e.hexColor)) return e.hexColor.startsWith('#') ? e.hexColor : `#${e.hexColor}`;
+    const tc = Number(e.trueColor);
+    if (Number.isFinite(tc) && tc >= 0) return `#${(tc & 0xFFFFFF).toString(16).padStart(6, '0')}`;
+    if (Array.isArray(e.rgb) && e.rgb.length >= 3) return `#${e.rgb.slice(0,3).map(v => Math.max(0, Math.min(255, Number(v)||0)).toString(16).padStart(2,'0')).join('')}`;
+    return null;
+  }
+
   function entityStroke(e, st) {
+    const trueHex = entityTrueColorHex(e);
+    if (trueHex) return trueHex;
     return aciColorToHex(e && e.color, (st && st.stroke) || '#000000');
   }
 
@@ -2161,6 +2236,96 @@
     return pts.map(p => `${sx(p[0])},${sy(p[1])}`).join(' ');
   }
 
+  function previewMTextLines(e) {
+    const explicit = String(e.value || '').split('\\P');
+    const width = Math.max(1, Number(e.width) || 1000);
+    const height = Math.max(1, Number(e.height) || 80);
+    const maxChars = Math.max(1, Math.floor(width / (height * 0.62)));
+    const result = [];
+    explicit.forEach(part => {
+      const words = String(part).split(/\s+/).filter(Boolean);
+      if (!words.length) { result.push(''); return; }
+      let line = '';
+      words.forEach(word => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (candidate.length <= maxChars || !line) line = candidate;
+        else { result.push(line); line = word; }
+      });
+      result.push(line);
+    });
+    return result.length ? result : [''];
+  }
+
+
+  // V8.4.5: Önizleme/PDF taramaları DXF HATCH ile aynı model-uzayı ölçeğinde üretilir.
+  // Önceki 1000x1000 blok yaklaşımı bölgeye non-uniform ölçeklendiği için tuğla ve kumaş
+  // desenleri sınır dikdörtgeninin en/boy oranına göre esniyor, DXF ile uyuşmuyordu.
+  function legacyHatchInfo(entity) {
+    if (!entity || entity.type !== 'insert') return null;
+    const name = String(entity.name || '');
+    const isWall = name === 'PULUMUR WALL BRICK SAFE HATCH';
+    const isFabric = name === 'PULUMUR TRAPEZ SAFE HATCH';
+    if (!isWall && !isFabric) return null;
+    const sxv = Math.abs(Number(entity.scaleX) || 1);
+    const syv = Number(entity.scaleY) || 1;
+    const x1 = Number(entity.x) || 0;
+    const y1 = Number(entity.y) || 0;
+    const x2 = x1 + (entity.mirrorX ? -1 : 1) * 1000 * sxv;
+    const y2 = y1 + 1000 * syv;
+    return {
+      kind: isWall ? 'brick' : 'fabric',
+      minX: Math.min(x1, x2), maxX: Math.max(x1, x2),
+      minY: Math.min(y1, y2), maxY: Math.max(y1, y2)
+    };
+  }
+
+  function hatchSegmentsForRect(info) {
+    if (!info) return [];
+    const minX = Number(info.minX) || 0;
+    const maxX = Number(info.maxX) || 0;
+    const minY = Number(info.minY) || 0;
+    const maxY = Number(info.maxY) || 0;
+    if (!(maxX > minX) || !(maxY > minY)) return [];
+    const segments = [];
+    const eps = 1e-7;
+    if (info.kind === 'fabric') {
+      const repeat = 150;
+      const pairOffset = 42;
+      const startN = Math.floor((minX - pairOffset) / repeat) - 1;
+      const endN = Math.ceil(maxX / repeat) + 1;
+      for (let n = startN; n <= endN; n += 1) {
+        const xa = n * repeat;
+        const xb = xa + pairOffset;
+        if (xa >= minX - eps && xa <= maxX + eps) segments.push({ x1: xa, y1: minY, x2: xa, y2: maxY });
+        if (xb >= minX - eps && xb <= maxX + eps) segments.push({ x1: xb, y1: minY, x2: xb, y2: maxY });
+      }
+      return segments;
+    }
+
+    const course = 190.5;
+    const brickWidth = 381;
+    const firstCourse = Math.ceil((minY - eps) / course);
+    const lastCourse = Math.floor((maxY + eps) / course);
+    for (let n = firstCourse; n <= lastCourse; n += 1) {
+      const y = n * course;
+      if (y > minY + eps && y < maxY - eps) segments.push({ x1: minX, y1: y, x2: maxX, y2: y });
+    }
+    const firstRow = Math.floor(minY / course);
+    const lastRow = Math.ceil(maxY / course) - 1;
+    for (let row = firstRow; row <= lastRow; row += 1) {
+      const y1 = Math.max(minY, row * course);
+      const y2 = Math.min(maxY, (row + 1) * course);
+      if (!(y2 > y1 + eps)) continue;
+      const parity = ((row % 2) + 2) % 2;
+      const offset = parity ? course : 0;
+      let x = Math.ceil((minX - offset - eps) / brickWidth) * brickWidth + offset;
+      for (; x <= maxX + eps; x += brickWidth) {
+        if (x > minX + eps && x < maxX - eps) segments.push({ x1: x, y1, x2: x, y2 });
+      }
+    }
+    return segments;
+  }
+
   function renderSvg(drawing) {
     const ents = drawing.entities;
     const blockLib = drawing.blocks || { ...getBlocks(), ...customHatchBlocks() };
@@ -2173,6 +2338,7 @@
     const sx = x => x - minX;
     const sy = y => maxY - y;
     const parts = [];
+    let hatchSeq = 0;
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewW} ${viewH}" preserveAspectRatio="xMidYMid meet">`);
     parts.push('<rect x="0" y="0" width="100%" height="100%" fill="white"/>');
     for (const e of ents) {
@@ -2180,6 +2346,19 @@
       const stroke = entityStroke(e, st);
       const sw = previewStrokeWidth(st.width);
       const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : '';
+      const hatchInfo = legacyHatchInfo(e);
+      if (hatchInfo) {
+        const clipId = `pulumur-hatch-${hatchSeq++}`;
+        const rx = sx(hatchInfo.minX);
+        const ry = sy(hatchInfo.maxY);
+        const rw = Math.max(0, hatchInfo.maxX - hatchInfo.minX);
+        const rh = Math.max(0, hatchInfo.maxY - hatchInfo.minY);
+        const hatchSw = hatchInfo.kind === 'brick' ? 0.52 : 0.58;
+        parts.push(`<defs><clipPath id="${clipId}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}"/></clipPath></defs>`);
+        const hatchLines = hatchSegmentsForRect(hatchInfo).map(seg => `<line x1="${sx(seg.x1)}" y1="${sy(seg.y1)}" x2="${sx(seg.x2)}" y2="${sy(seg.y2)}" vector-effect="non-scaling-stroke"/>`).join('');
+        parts.push(`<g clip-path="url(#${clipId})" stroke="${stroke}" stroke-width="${hatchSw}" fill="none">${hatchLines}</g>`);
+        continue;
+      }
       if (e.type === 'line') parts.push(`<line x1="${sx(e.x1)}" y1="${sy(e.y1)}" x2="${sx(e.x2)}" y2="${sy(e.y2)}" stroke="${stroke}" stroke-width="${sw}"${dash} fill="none"/>`);
       else if (e.type === 'polyline') {
         const points = svgPointString(e.points, e.closed, sx, sy);
@@ -2192,10 +2371,11 @@
         const dimAttr = dimType ? ` data-dimension-type="${escXml(dimType)}"` : '';
         parts.push(`<text class="${cls}"${dimAttr} x="${sx(e.x)}" y="${sy(e.y)}" font-size="${e.height}" text-anchor="${anchor}" fill="${stroke}"${rot}>${escXml(e.value)}</text>`);
       } else if (e.type === 'mtext') {
-        const lines = String(e.value || '').split('\\P');
+        const lines = previewMTextLines(e);
+        const anchor = e.align === 'center' ? 'middle' : (e.align === 'right' ? 'end' : 'start');
         const rot = e.rotation ? ` transform="rotate(${-e.rotation} ${sx(e.x)} ${sy(e.y)})"` : '';
-        const tspans = lines.map((ln, ii) => `<tspan x="${sx(e.x)}" dy="${ii===0?0:e.height*1.15}">${escXml(ln)}</tspan>`).join('');
-        parts.push(`<text class="dxf-text" x="${sx(e.x)}" y="${sy(e.y)}" font-size="${e.height}" fill="${stroke}"${rot}>${tspans}</text>`);
+        const tspans = lines.map((ln, ii) => `<tspan x="${sx(e.x)}" dy="${ii===0?0:e.height*(e.lineSpacing||1.15)}">${escXml(ln)}</tspan>`).join('');
+        parts.push(`<text class="dxf-text" x="${sx(e.x)}" y="${sy(e.y)}" font-size="${e.height}" text-anchor="${anchor}" fill="${stroke}"${rot}>${tspans}</text>`);
       } else if (e.type === 'circle') parts.push(`<circle cx="${sx(e.x)}" cy="${sy(e.y)}" r="${Math.abs(e.r)}" stroke="${stroke}" stroke-width="${sw}"${dash} fill="none"/>`);
       else if (e.type === 'interaction') {
         const data = e.data || {};
@@ -2281,8 +2461,12 @@
         if (block) {
           const group = [];
           (block.entities || []).forEach(be => {
-            const bst = drawing.layerStyle[e.layer] || drawing.layerStyle[be.layer] || drawing.layerStyle.BLOCKREF;
-            const bstroke = entityStroke(be, { ...bst, stroke: entityStroke(e, bst) });
+            const insertStyle = drawing.layerStyle[e.layer] || drawing.layerStyle.BLOCKREF;
+            const ownStyle = drawing.layerStyle[be.layer] || insertStyle;
+            const byBlock = Number(be.color) === 0;
+            const bst = byBlock ? insertStyle : ownStyle;
+            const inheritedStroke = entityStroke(e, insertStyle);
+            const bstroke = byBlock ? inheritedStroke : entityStroke(be, ownStyle);
             const bsw = previewStrokeWidth(bst.width || 2, 0.24);
             if (be.type === 'line') {
               const p1 = transformLocalPoint(be.x1, be.y1, e), p2 = transformLocalPoint(be.x2, be.y2, e);
@@ -2294,13 +2478,16 @@
               const p = transformLocalPoint(be.x, be.y, e);
               const rr = Math.abs(be.r * ((Number(e.scaleX || 1) + Number(e.scaleY || 1)) / 2));
               group.push(`<circle cx="${sx(p[0])}" cy="${sy(p[1])}" r="${rr}" stroke="${bstroke}" stroke-width="${bsw}" fill="none"/>`);
-            } else if (be.type === 'text') {
+            } else if (be.type === 'text' || be.type === 'mtext') {
               const p = transformLocalPoint(be.x || 0, be.y || 0, e);
               const anchor = be.align === 'center' ? 'middle' : (be.align === 'right' ? 'end' : 'start');
               const rotDeg = Number(be.rotation || 0) + Number(e.rotation || 0);
               const rot = rotDeg ? ` transform="rotate(${-rotDeg} ${sx(p[0])} ${sy(p[1])})"` : '';
-              const h = Math.abs((Number(be.height) || 24) * ((Math.abs(Number(e.scaleX || 1)) + Math.abs(Number(e.scaleY || 1))) / 2));
-              group.push(`<text class="dxf-text" x="${sx(p[0])}" y="${sy(p[1])}" font-size="${h}" text-anchor="${anchor}" fill="${bstroke}"${rot}>${escXml(be.value)}</text>`);
+              const scaleAvg = ((Math.abs(Number(e.scaleX || 1)) + Math.abs(Number(e.scaleY || 1))) / 2);
+              const h = Math.abs((Number(be.height) || 24) * scaleAvg);
+              const lines = be.type === 'mtext' ? previewMTextLines(be) : [String(be.value || '')];
+              const tspans = lines.map((ln, ii) => `<tspan x="${sx(p[0])}" dy="${ii===0?0:h*(be.lineSpacing||1.15)}">${escXml(ln)}</tspan>`).join('');
+              group.push(`<text class="dxf-text" x="${sx(p[0])}" y="${sy(p[1])}" font-size="${h}" text-anchor="${anchor}" fill="${bstroke}"${rot}>${tspans}</text>`);
             }
           });
           parts.push(`<g data-block="${escXml(e.name)}">${group.join('')}</g>`);
@@ -2328,6 +2515,11 @@
         return;
       }
       if (e.type === 'insert') {
+        const hatchInfo = legacyHatchInfo(e);
+        if (hatchInfo) {
+          hatchSegmentsForRect(hatchInfo).forEach(seg => push({ type: 'line', layer, color: e.color, x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 }));
+          return;
+        }
         const block = blockLib[e.name];
         if (!block) {
           const w = Math.abs(e.previewW || 120), h = Math.abs(e.previewH || 80);

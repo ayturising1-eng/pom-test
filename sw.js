@@ -1,20 +1,23 @@
-const CACHE_NAME = 'pulumur-pwa-v8_4_1';
+const CACHE_NAME = 'pulumur-pwa-v8_7_0';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css?v=8.4.1',
-  './app.js?v=8.4.1',
-  './peri01ExcelBridge.js?v=8.4.1',
-  './peri01Geometry.js?v=8.4.1',
-  './modernDxfTemplate.js?v=8.4.1',
-  './dxfModernEngine.js?v=8.4.1',
-  './blocks/filteredBlocks.js?v=8.4.1',
+  './style.css?v=8.7.0',
+  './app.js?v=8.7.0',
+  './supabaseConfig.js?v=8.7.0',
+  './cloudProjects.js?v=8.7.0',
+  './peri01ExcelBridge.js?v=8.7.0',
+  './peri01Geometry.js?v=8.7.0',
+  './modernDxfTemplate.js?v=8.7.0',
+  './dxfModernEngine.js?v=8.7.0',
+  './blocks/filteredBlocks.js?v=8.7.0',
   './assets/plmr-logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-64.png',
-  'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2'
 ];
 
 self.addEventListener('install', event => {
