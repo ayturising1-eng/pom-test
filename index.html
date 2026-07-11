@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d5d5f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Pülümür Automation Studio" />
+  <title>Pülümür Automation Studio</title>
+  <link rel="manifest" href="manifest.webmanifest?v=8.4.1" />
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css?v=8.4.1" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-row">
+      <div class="brand-mark"><img src="assets/plmr-logo-header.png" alt="PLMR" class="brand-logo" /></div>
+      <div>
+        <h1 id="appTitle"><span id="appTitleMain">Pülümür Automation Studio</span><span id="appTitleSub">| Parametrik Çizim ve Proje Otomasyonu | Hazırlayan / Geliştiren : Ayetullah KILINÇ</span></h1>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="installBtn" class="soft-btn install-btn" type="button">Ana Ekrana Ekle</button>
+      <label class="lang-picker" aria-label="Dil / Language">
+        <span id="langLabel">Dil</span>
+        <select id="languageSelect">
+          <option value="tr">TR</option>
+          <option value="en">EN</option>
+        </select>
+      </label>
+      <button id="helpBtn" class="soft-btn" type="button">Yardım</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel input-panel" aria-label="Parametreler">
+      <div class="selector-grid">
+        <label class="selector-product">
+          <span id="labelProduct">Ürün</span>
+          <select id="product">
+            <option selected>Pergo Rise</option>
+          </select>
+        </label>
+        <label class="selector-module">
+          <span id="labelModule">Modül</span>
+          <select id="moduleName">
+            <option selected>Module 1</option>
+          </select>
+        </label>
+        <label class="selector-engine">
+          <span id="labelEngine">Çizim Motoru</span>
+          <select id="engine">
+            <option selected>Web DXF</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <fieldset>
+          <legend id="legendProject">Proje Bilgileri</legend>
+          <label><span>Müşteri</span><input id="customer" autocomplete="organization" /></label>
+          <label><span>Proje</span><input id="project" /></label>
+          <label><span>Versiyon</span><input id="version" value="01" /></label>
+          <label><span>Çizen</span><input id="drawnBy" value="AYETULLAH KILINC" /></label>
+          <label><span>Tarih</span><input id="date" type="date" /></label>
+          <div class="project-inline-actions">
+            <button id="resetBtn" class="danger-btn form-action-btn" type="button">Değerleri Resetle</button>
+            <button id="calcBtn" class="accent-btn form-action-btn" type="button">Pülümür Hesaplayıcı</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend id="legendSystem">Sistem Ölçüleri <b>*(mm)</b></legend>
+          <label><span id="labelSystemCount">Sistem Adedi</span><input id="systemCount" type="text" inputmode="text" value="1" placeholder="Örn. 1" /></label>
+          <label><span id="labelWidth">Genişlik</span><input id="width" type="text" inputmode="text" placeholder="Örn. 4000 veya 3000;100;2500;NO" /></label>
+          <label><span id="labelOpening">Açılım</span><input id="opening" type="text" inputmode="text" placeholder="Örn. 6000 veya 4500;5200" /></label>
+          <label><span id="labelRearHeight">Arka H</span><input id="rearHeight" type="text" inputmode="text" placeholder="Örn. 3200 veya 3200;3400" /></label>
+          <label><span id="labelFrontHeight">Ön H <em>Oluk Altı</em></span><input id="frontHeight" type="text" inputmode="text" placeholder="Örn. 2600" /></label>
+          <label><span id="labelRayCount">Ray Sayısı <b>Bir Sistem</b></span><input id="rayCount" type="text" inputmode="text" placeholder="Örn. 2 veya 2;3;2" /></label>
+          <label><span id="labelPostCount">Dikme Sayısı <b>Tüm Sistem</b></span><input id="postCount" type="text" inputmode="text" placeholder="Örn. 2 veya boş: otomatik" /></label>
+        </fieldset>
+
+        <fieldset class="options-fieldset">
+          <legend id="legendOptions">Opsiyonlar</legend>
+          <label><span>Parapet</span><select id="parapet"><option value="HAYIR">HAYIR</option><option value="EVET">EVET</option></select></label>
+          <label><span id="labelParapetHeight">Parapet H <b>*(mm)</b></span><input id="parapetHeight" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="-" /></label>
+          <label><span>Cam Kaydı</span><select id="glassTrack"><option value="HAYIR">HAYIR</option><option value="EVET">EVET</option></select></label>
+          
+          <label><span>Structure Color</span><input id="structureColor" class="upper-table-field" autocomplete="off" placeholder="-" /></label>
+          <label><span>Fabric</span><input id="fabric" class="upper-table-field" data-excel-combo="fabric" autocomplete="off" placeholder="-" /></label>
+          <label><span id="labelFabricProfiles">Fabric Profiles</span><input id="fabricProfiles" class="upper-table-field" autocomplete="off" placeholder="-" /></label>
+          <label><span>Motor</span><input id="motor" class="upper-table-field" data-excel-combo="motor" autocomplete="off" placeholder="-" /></label>
+          <label><span>Remote</span><input id="remote" class="upper-table-field" data-excel-combo="remote" autocomplete="off" placeholder="-" /></label>
+          <label><span>LED</span><input id="led" class="upper-table-field" autocomplete="off" placeholder="-" /></label>
+          <label><span>Dimmer</span><input id="dimmer" class="upper-table-field" autocomplete="off" placeholder="-" /></label>
+          <label class="span-two extras-field"><span>Extras / Notes</span><textarea id="extras" class="upper-table-field" rows="3" placeholder="-"></textarea></label>
+        </fieldset>
+
+        <fieldset>
+          <legend id="legendExtra">Ek Opsiyonlar</legend>
+          <label><span>Üçgen Doğrama</span><select id="triangleJoinery"><option value="HAYIR">HAYIR</option><option value="EVET">EVET</option></select></label>
+          <label><span id="labelWaterStandard">Su Çıkışı Standart mı?</span><select id="waterStandard"><option value="EVET">EVET</option><option value="HAYIR">HAYIR</option></select></label>
+          <div class="quick-tests">
+            <div id="quickTestsHead" class="quick-tests-head">Hızlı Testler</div>
+            <div id="quickTestsGrid" class="quick-tests-grid" aria-label="Hızlı test butonları"></div>
+          </div>
+        </fieldset>
+      </div>
+
+    </section>
+
+    <aside class="panel preview-panel">
+      <div class="preview-head">
+        <div class="preview-title">
+          <h2 id="previewTitle">Çizim Ön İzleme</h2>
+          <p id="statusText" class="sr-only">Ölçüleri girince önizleme otomatik güncellenir.</p>
+          <div class="preview-toolbar-row">
+            <div class="preview-control-row">
+              <button id="previewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Yenile</button>
+              <button id="expandPreviewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Büyüt</button>
+              <button id="fitPreviewBtn" class="secondary-btn preview-tool-btn" type="button">Çizimi Sığdır</button>
+            </div>
+            <div class="preview-filter-row" aria-label="Ölçü filtreleri">
+              <button id="showMainDims" class="preview-toggle-btn is-on" type="button" aria-pressed="true"><span class="toggle-dot" aria-hidden="true"></span><span id="showMainDimsLabel">Ana ölçüleri göster</span></button>
+              <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="preview-download-actions">
+          <button id="pdfBtn" class="secondary-btn preview-tool-btn" type="button">PDF İndir</button>
+          <div class="dxf-export-group">
+            <span id="dxfFormatBadge" class="dxf-format-badge">Modern DXF 2013</span>
+            <button id="generateBtn" class="primary-btn preview-tool-btn" type="button">DXF İndir</button>
+          </div>
+        </div>
+      </div>
+      <div id="preview" class="preview-canvas" role="img" tabindex="-1" aria-label="DXF çizim önizlemesi"></div>
+    </aside>
+  </main>
+
+<dialog id="calculatorDialog" class="modal">
+    <form method="dialog" class="modal-card">
+      <div class="modal-head">
+        <h2 id="calcTitle">Pülümür Hesaplayıcı</h2>
+        <button value="cancel" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <p id="calcSub" class="modal-sub">4 satırdan herhangi 3 tanesini doldur. Boş olan değer hesaplanır.</p>
+      <div id="calcGuide" class="calc-guide" aria-label="Calculator guide"></div>
+      <div class="calc-grid">
+        <label><span>Sistem Açısı (°)</span><input id="calcAngle" type="text" placeholder="Örn. 4.16 veya boş" /></label>
+        <label><span>Açılım *(mm)</span><input id="calcOpening" type="text" placeholder="Örn. 4500;5200 veya boş" /></label>
+        <label><span>Arka Yükseklik *(mm)</span><input id="calcRear" type="text" placeholder="Örn. 3200;3400 veya boş" /></label>
+        <label><span>Ön Yükseklik *(mm)</span><input id="calcFront" type="text" placeholder="Örn. 2600 veya boş" /></label>
+      </div>
+      <div id="calcResult" class="calc-result">Sonuç bekleniyor.</div>
+      <div class="modal-actions">
+        <button id="calcComputeBtn" type="button" class="primary-btn">Hesapla</button>
+        <button id="calcTransferBtn" type="button" class="secondary-btn">Sonucu Hücrelere Aktar</button>
+        <button id="calcClearBtn" type="button" class="soft-btn">Sıfırla</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <dialog id="helpDialog" class="modal help-modal">
+    <form method="dialog" class="modal-card help-card">
+      <div class="modal-head">
+        <h2 id="helpTitle">Yardım / Kullanım Kılavuzu</h2>
+        <button value="cancel" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <pre id="helpContent" class="help-content">Yükleniyor...</pre>
+      <div class="modal-actions">
+        <button value="cancel" type="submit" class="primary-btn">Kapat</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="blocks/filteredBlocks.js?v=8.4.1"></script>
+  <script src="peri01ExcelBridge.js?v=8.4.1"></script>
+  <script src="peri01Geometry.js?v=8.4.1"></script>
+  <script src="modernDxfTemplate.js?v=8.4.1"></script>
+  <script src="dxfModernEngine.js?v=8.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="app.js?v=8.4.1"></script>
+</body>
+</html>

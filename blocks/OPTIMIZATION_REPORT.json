@@ -1,0 +1,196 @@
+[
+  {
+    "name": "Duvar Tarama Block",
+    "removed": true
+  },
+  {
+    "name": "Kumaş Profili Sızdırmazlık Contası",
+    "oldEnt": 1,
+    "newEnt": 1,
+    "oldPts": 4,
+    "newPts": 4
+  },
+  {
+    "name": "Oluk Fitili",
+    "oldEnt": 1,
+    "newEnt": 1,
+    "oldPts": 80,
+    "newPts": 47
+  },
+  {
+    "name": "PergoRise Çatı Kayıt Profili",
+    "oldEnt": 27,
+    "newEnt": 27,
+    "oldPts": 1435,
+    "newPts": 56
+  },
+  {
+    "name": "PergoRise Çekici Araba",
+    "oldEnt": 158,
+    "newEnt": 146,
+    "oldPts": 10944,
+    "newPts": 363
+  },
+  {
+    "name": "PergoRise Dikme Alt Bağlantı Karşı Görünüş",
+    "oldEnt": 11,
+    "newEnt": 11,
+    "oldPts": 97,
+    "newPts": 30
+  },
+  {
+    "name": "PergoRise Dikme Alt Bağlantı Yan Görünüş",
+    "oldEnt": 3,
+    "newEnt": 3,
+    "oldPts": 115,
+    "newPts": 32
+  },
+  {
+    "name": "PergoRise Dikme Oluk Bağlantı Karşı Görünüş",
+    "oldEnt": 1,
+    "newEnt": 1,
+    "oldPts": 4,
+    "newPts": 4
+  },
+  {
+    "name": "PergoRise Dikme Oluk Bağlantı Üst Görünüş",
+    "oldEnt": 10,
+    "newEnt": 10,
+    "oldPts": 36,
+    "newPts": 36
+  },
+  {
+    "name": "PergoRise Dikme Oluk Bağlantı Yan Görünüş",
+    "oldEnt": 1,
+    "newEnt": 1,
+    "oldPts": 4,
+    "newPts": 4
+  },
+  {
+    "name": "PergoRise Dikme Üst Görünüş",
+    "oldEnt": 4,
+    "newEnt": 4,
+    "oldPts": 8,
+    "newPts": 8
+  },
+  {
+    "name": "PergoRise İnce Kumaş Profili",
+    "oldEnt": 56,
+    "newEnt": 56,
+    "oldPts": 540,
+    "newPts": 226
+  },
+  {
+    "name": "PergoRise Kalın Kumaş Profili Yan Görünüş",
+    "oldEnt": 2,
+    "newEnt": 2,
+    "oldPts": 1232,
+    "newPts": 301
+  },
+  {
+    "name": "PergoRise Oluk Yan Görünüş Birleştirilmiş",
+    "oldEnt": 38,
+    "newEnt": 38,
+    "oldPts": 3228,
+    "newPts": 425
+  },
+  {
+    "name": "PergoRise Oluk Yan Görünüş",
+    "oldEnt": 4,
+    "newEnt": 4,
+    "oldPts": 2139,
+    "newPts": 152
+  },
+  {
+    "name": "PergoRise Oluk Yan Kapak",
+    "oldEnt": 6,
+    "newEnt": 6,
+    "oldPts": 186,
+    "newPts": 87
+  },
+  {
+    "name": "PergoRise Oluk",
+    "oldEnt": 4,
+    "newEnt": 4,
+    "oldPts": 2283,
+    "newPts": 154
+  },
+  {
+    "name": "PergoRise Oluk-Ray Bağlantı Aparat Set",
+    "oldEnt": 26,
+    "newEnt": 26,
+    "oldPts": 820,
+    "newPts": 136
+  },
+  {
+    "name": "PergoRise Ray Arka Mekanizma Üst Görünüş",
+    "oldEnt": 8,
+    "newEnt": 8,
+    "oldPts": 100,
+    "newPts": 37
+  },
+  {
+    "name": "PergoRise Ray Arka Mekanizma Yan Görünüş",
+    "oldEnt": 117,
+    "newEnt": 117,
+    "oldPts": 2772,
+    "newPts": 507
+  },
+  {
+    "name": "PergoRise Ray Kafası Üst Görünüş",
+    "oldEnt": 5,
+    "newEnt": 5,
+    "oldPts": 392,
+    "newPts": 12
+  },
+  {
+    "name": "PergoRise Ray Kafası Yan Görünüş",
+    "oldEnt": 2,
+    "newEnt": 2,
+    "oldPts": 68,
+    "newPts": 68
+  },
+  {
+    "name": "PergoRise Ray Profili",
+    "oldEnt": 6,
+    "newEnt": 1,
+    "oldPts": 2087,
+    "newPts": 63
+  },
+  {
+    "name": "PergoRise RayÇekici Araba Set İnce",
+    "oldEnt": 221,
+    "newEnt": 204,
+    "oldPts": 13575,
+    "newPts": 651
+  },
+  {
+    "name": "PergoRise RayÇekici Araba Set Kalın",
+    "oldEnt": 167,
+    "newEnt": 150,
+    "oldPts": 14267,
+    "newPts": 730
+  },
+  {
+    "name": "RISING LOGO",
+    "removed": true
+  },
+  {
+    "name": "Trapez Tarama",
+    "removed": true
+  },
+  {
+    "name": "PergoRise Ray Duvar Bağlantı Set",
+    "oldEnt": 84,
+    "newEnt": 84,
+    "oldPts": 1233,
+    "newPts": 332
+  },
+  {
+    "name": "PergoRise Ray Kafası Ön Görünüş",
+    "oldEnt": 9,
+    "newEnt": 9,
+    "oldPts": 168,
+    "newPts": 12
+  }
+]
