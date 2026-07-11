@@ -28,7 +28,7 @@
     tr: {
       authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'E-posta veya şifre hatalı.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Güvenlik altyapısı hazır değil. Aşama 8 SQL dosyasını Supabase SQL Editor’da çalıştır.',
+      setupMissing: 'Altyapı hazır değil. v8.9.0 SQL dosyasını Supabase SQL Editor’da çalıştır.',
       resetSent: 'Şifre sıfırlama bağlantısı e-posta adresine gönderildi.', emailRequired: 'Önce e-posta adresini yaz.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
@@ -43,12 +43,12 @@
       revisionOpened: 'Geçmiş revizyon açıldı:', currentRevisionOpened: 'Güncel revizyon açıldı:', current: 'Güncel', history: 'Geçmiş',
       confirmRevision: 'Mevcut çalışma kaydedilecek ve yeni revizyon oluşturulacak.', saveBeforeRevisionFailed: 'Mevcut çalışma kaydedilemediği için revizyon oluşturulmadı.',
       readOnly: 'Salt okunur', noWritePermission: 'Bu kullanıcı yalnız görüntüleme yetkisine sahip.',
-      roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', roleViewer: 'Görüntüleyici'
+      roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.'
     },
     en: {
       authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect email or password.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Security infrastructure is not ready. Run the Stage 8 SQL file in Supabase SQL Editor.',
+      setupMissing: 'Infrastructure is not ready. Run the v8.9.0 SQL file in Supabase SQL Editor.',
       resetSent: 'A password reset link was sent to the email address.', emailRequired: 'Enter the email address first.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
@@ -63,7 +63,7 @@
       revisionOpened: 'Historical revision opened:', currentRevisionOpened: 'Current revision opened:', current: 'Current', history: 'History',
       confirmRevision: 'The current work will be saved and a new revision will be created.', saveBeforeRevisionFailed: 'The revision was not created because the current work could not be saved.',
       readOnly: 'Read only', noWritePermission: 'This user has view-only permission.',
-      roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', roleViewer: 'Viewer'
+      roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', organizationInactive: 'The company account is inactive.', licenseExpired: 'The company license has expired.', licenseNotStarted: 'The company license has not started yet.'
     }
   };
 
@@ -115,13 +115,12 @@
       system_admin: 'roleSystemAdmin',
       company_admin: 'roleCompanyAdmin',
       designer: 'roleDesigner',
-      viewer: 'roleViewer'
     };
-    return t(map[role] || 'roleViewer');
+    return t(map[role] || 'roleDesigner');
   }
 
   function refreshRoleUi() {
-    const role = currentProfile && currentProfile.role ? currentProfile.role : 'viewer';
+    const role = currentProfile && currentProfile.role ? currentProfile.role : 'designer';
     const writable = canWriteProjects();
     document.body.classList.toggle('cloud-readonly', Boolean(currentSession) && !writable);
     if (ui.cloudRoleBadge) {
@@ -179,6 +178,9 @@
   function friendlyError(error, fallbackKey) {
     const raw = String((error && error.message) || '').trim();
     if (/READ_ONLY_USER/i.test(raw)) return t('noWritePermission');
+    if (/ORGANIZATION_INACTIVE/i.test(raw)) return t('organizationInactive');
+    if (/LICENSE_EXPIRED/i.test(raw)) return t('licenseExpired');
+    if (/LICENSE_NOT_STARTED/i.test(raw)) return t('licenseNotStarted');
     if (/relation .* does not exist|column .* does not exist|function .* does not exist|permission denied|row-level security/i.test(raw)) {
       return t('setupMissing');
     }
@@ -200,11 +202,15 @@
 
     const orgResult = await client
       .from('organizations')
-      .select('id, name, slug, company_code')
+      .select('id, name, slug, company_code, is_active, license_start, license_end, max_users, enabled_products')
       .eq('id', currentProfile.organization_id)
       .single();
     if (orgResult.error) throw orgResult.error;
     currentOrganization = orgResult.data;
+    const today = new Date().toISOString().slice(0, 10);
+    if (currentOrganization.is_active === false) throw new Error('ORGANIZATION_INACTIVE');
+    if (currentOrganization.license_start && today < currentOrganization.license_start) throw new Error('LICENSE_NOT_STARTED');
+    if (currentOrganization.license_end && today > currentOrganization.license_end) throw new Error('LICENSE_EXPIRED');
 
     const displayName = currentProfile.full_name || currentProfile.username || currentSession.user.email || t('unknownUser');
     const username = currentProfile.username ? `@${currentProfile.username}` : '';
@@ -314,7 +320,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.8.0',
+      app_version: snapshot.appVersion || '8.9.0',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }

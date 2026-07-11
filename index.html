@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pülümür Automation Studio" />
   <title>Pülümür Automation Studio</title>
-  <link rel="manifest" href="manifest.webmanifest?v=8.8.0" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.0" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.8.0" />
+  <link rel="stylesheet" href="style.css?v=8.9.0" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -71,6 +71,7 @@
       <strong id="cloudUserName">Kullanıcı</strong>
       <span id="cloudCompanyCode">Firma</span>
       <span id="cloudRoleBadge" class="cloud-role-badge" data-role="designer">Tasarımcı</span>
+      <button id="adminPanelBtn" type="button" class="secondary-btn" hidden>Yönetim</button>
       <button id="logoutBtn" type="button" class="danger-btn">Çıkış</button>
     </div>
   </section>
@@ -290,6 +291,93 @@
     </div>
   </dialog>
 
+
+  <dialog id="adminPanelDialog" class="modal admin-panel-modal">
+    <div class="modal-card admin-panel-card">
+      <div class="modal-head admin-panel-head">
+        <div>
+          <h2 id="adminPanelTitle">Yönetici Paneli</h2>
+          <p id="adminPanelSubtitle">Firma, kullanıcı ve lisans yönetimi</p>
+        </div>
+        <button id="adminPanelCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+
+      <div class="admin-tabs" role="tablist">
+        <button id="adminUsersTab" type="button" class="admin-tab is-active">Kullanıcılar</button>
+        <button id="adminOrganizationsTab" type="button" class="admin-tab">Firmalar</button>
+      </div>
+
+      <section id="adminUsersPane" class="admin-pane">
+        <div class="admin-section-head">
+          <h3 id="adminUsersTitle">Kullanıcılar</h3>
+          <div class="admin-toolbar">
+            <label id="adminUserFilterOrgField" class="admin-compact-field">
+              <span data-admin-i18n="firm">Firma</span>
+              <select id="adminUserFilterOrg"></select>
+            </label>
+            <button id="adminUsersRefresh" type="button" class="soft-btn">Yenile</button>
+          </div>
+        </div>
+
+        <form id="adminInviteForm" class="admin-form-card">
+          <div class="admin-form-title">
+            <h3 id="adminInviteTitle">Yeni Kullanıcı Davet Et</h3>
+            <p data-admin-i18n="inviteHelp">Kullanıcıya şifre oluşturma bağlantısı e-posta ile gönderilir.</p>
+          </div>
+          <div class="admin-form-grid">
+            <label id="adminInviteOrgField"><span data-admin-i18n="firm">Firma</span><select id="adminInviteOrg" required></select></label>
+            <label><span data-admin-i18n="fullName">Ad Soyad</span><input id="adminInviteFullName" required autocomplete="name"></label>
+            <label><span data-admin-i18n="username">Kullanıcı Adı</span><input id="adminInviteUsername" required minlength="3" maxlength="32" pattern="[a-z0-9._-]+" autocomplete="off"></label>
+            <label><span data-admin-i18n="email">E-posta</span><input id="adminInviteEmail" type="email" required autocomplete="email"></label>
+            <label><span data-admin-i18n="role">Rol</span><select id="adminInviteRole"><option value="designer">Tasarımcı</option><option value="company_admin">Firma Yöneticisi</option></select></label>
+          </div>
+          <div class="admin-form-actions"><button id="adminInviteSubmit" type="submit" class="primary-btn">Davet Gönder</button></div>
+        </form>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr>
+              <th data-admin-i18n="userCode">Kod</th><th data-admin-i18n="fullName">Ad Soyad</th><th data-admin-i18n="username">Kullanıcı Adı</th>
+              <th data-admin-i18n="role">Rol</th><th data-admin-i18n="status">Durum</th><th data-admin-i18n="projects">Projeler</th><th data-admin-i18n="actions">İşlemler</th>
+            </tr></thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+          <p id="adminUsersEmpty" class="projects-empty">Yükleniyor…</p>
+        </div>
+      </section>
+
+      <section id="adminOrganizationsPane" class="admin-pane" hidden>
+        <div class="admin-section-head">
+          <h3 id="adminOrganizationsTitle">Firmalar</h3>
+          <button id="adminOrganizationsRefresh" type="button" class="soft-btn">Yenile</button>
+        </div>
+
+        <form id="adminOrganizationCreateForm" class="admin-form-card">
+          <div class="admin-form-title"><h3 data-admin-i18n="createFirm">Yeni Firma Oluştur</h3></div>
+          <div class="admin-form-grid admin-company-grid">
+            <label><span data-admin-i18n="firmName">Firma Adı</span><input id="adminOrganizationName" required></label>
+            <label><span data-admin-i18n="licenseEnd">Lisans Bitişi</span><input id="adminOrganizationLicenseEnd" type="date"></label>
+            <label><span data-admin-i18n="maxUsers">Kullanıcı Limiti</span><input id="adminOrganizationMaxUsers" type="number" min="1" max="9999" value="5" required></label>
+          </div>
+          <div class="admin-form-actions"><button id="adminOrganizationCreateSubmit" type="submit" class="primary-btn">Firma Oluştur</button></div>
+        </form>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-organizations-table">
+            <thead><tr>
+              <th data-admin-i18n="firmCode">Firma Kodu</th><th data-admin-i18n="firmName">Firma Adı</th><th data-admin-i18n="licenseEnd">Lisans Bitişi</th>
+              <th data-admin-i18n="maxUsers">Kullanıcı Limiti</th><th data-admin-i18n="status">Durum</th><th data-admin-i18n="projects">Projeler</th><th data-admin-i18n="actions">İşlemler</th>
+            </tr></thead>
+            <tbody id="adminOrganizationsBody"></tbody>
+          </table>
+          <p id="adminOrganizationsEmpty" class="projects-empty">Yükleniyor…</p>
+        </div>
+      </section>
+
+      <p id="adminPanelMessage" class="admin-panel-message" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <dialog id="passwordUpdateDialog" class="modal">
     <form id="passwordUpdateForm" class="modal-card">
       <div class="modal-head">
@@ -306,15 +394,16 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.8.0"></script>
-  <script src="peri01ExcelBridge.js?v=8.8.0"></script>
-  <script src="peri01Geometry.js?v=8.8.0"></script>
-  <script src="modernDxfTemplate.js?v=8.8.0"></script>
-  <script src="dxfModernEngine.js?v=8.8.0"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.0"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.0"></script>
+  <script src="peri01Geometry.js?v=8.9.0"></script>
+  <script src="modernDxfTemplate.js?v=8.9.0"></script>
+  <script src="dxfModernEngine.js?v=8.9.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.8.0"></script>
-  <script src="app.js?v=8.8.0"></script>
-  <script src="cloudProjects.js?v=8.8.0"></script>
+  <script src="supabaseConfig.js?v=8.9.0"></script>
+  <script src="app.js?v=8.9.0"></script>
+  <script src="cloudProjects.js?v=8.9.0"></script>
+  <script src="adminPanel.js?v=8.9.0"></script>
 </body>
 </html>
