@@ -10,7 +10,7 @@
     authGate: $('authGate'), loginForm: $('loginForm'), loginEmail: $('loginEmail'), loginPassword: $('loginPassword'),
     loginBtn: $('loginBtn'), forgotPasswordBtn: $('forgotPasswordBtn'), authMessage: $('authMessage'),
     cloudProjectBar: $('cloudProjectBar'), cloudProjectCode: $('cloudProjectCode'), cloudRevision: $('cloudRevision'),
-    cloudSaveState: $('cloudSaveState'), cloudUserName: $('cloudUserName'), cloudCompanyCode: $('cloudCompanyCode'),
+    cloudSaveState: $('cloudSaveState'), cloudUserName: $('cloudUserName'), cloudCompanyCode: $('cloudCompanyCode'), cloudRoleBadge: $('cloudRoleBadge'),
     newCloudProjectBtn: $('newCloudProjectBtn'), saveCloudProjectBtn: $('saveCloudProjectBtn'),
     newRevisionBtn: $('newRevisionBtn'), openCloudProjectsBtn: $('openCloudProjectsBtn'), revisionHistoryBtn: $('revisionHistoryBtn'), logoutBtn: $('logoutBtn'),
     projectsDialog: $('projectsDialog'), projectsSearch: $('projectsSearch'), projectsTableBody: $('projectsTableBody'),
@@ -28,7 +28,7 @@
     tr: {
       authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'E-posta veya şifre hatalı.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Revizyon altyapısı hazır değil. Aşama 7 SQL dosyasını Supabase SQL Editor’da çalıştır.',
+      setupMissing: 'Güvenlik altyapısı hazır değil. Aşama 8 SQL dosyasını Supabase SQL Editor’da çalıştır.',
       resetSent: 'Şifre sıfırlama bağlantısı e-posta adresine gönderildi.', emailRequired: 'Önce e-posta adresini yaz.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
@@ -41,12 +41,14 @@
       revisionRequired: 'Önce projeyi kaydet.', revisionCreating: 'Revizyon oluşturuluyor…', revisionCreated: 'Yeni revizyon oluşturuldu:',
       revisionFailed: 'Revizyon oluşturulamadı.', revisionLoading: 'Revizyonlar yükleniyor…', noRevisions: 'Revizyon bulunamadı.',
       revisionOpened: 'Geçmiş revizyon açıldı:', currentRevisionOpened: 'Güncel revizyon açıldı:', current: 'Güncel', history: 'Geçmiş',
-      confirmRevision: 'Mevcut çalışma kaydedilecek ve yeni revizyon oluşturulacak.', saveBeforeRevisionFailed: 'Mevcut çalışma kaydedilemediği için revizyon oluşturulmadı.'
+      confirmRevision: 'Mevcut çalışma kaydedilecek ve yeni revizyon oluşturulacak.', saveBeforeRevisionFailed: 'Mevcut çalışma kaydedilemediği için revizyon oluşturulmadı.',
+      readOnly: 'Salt okunur', noWritePermission: 'Bu kullanıcı yalnız görüntüleme yetkisine sahip.',
+      roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', roleViewer: 'Görüntüleyici'
     },
     en: {
       authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect email or password.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Revision infrastructure is not ready. Run the Stage 7 SQL file in Supabase SQL Editor.',
+      setupMissing: 'Security infrastructure is not ready. Run the Stage 8 SQL file in Supabase SQL Editor.',
       resetSent: 'A password reset link was sent to the email address.', emailRequired: 'Enter the email address first.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
@@ -59,7 +61,9 @@
       revisionRequired: 'Save the project first.', revisionCreating: 'Creating revision…', revisionCreated: 'New revision created:',
       revisionFailed: 'The revision could not be created.', revisionLoading: 'Loading revisions…', noRevisions: 'No revisions found.',
       revisionOpened: 'Historical revision opened:', currentRevisionOpened: 'Current revision opened:', current: 'Current', history: 'History',
-      confirmRevision: 'The current work will be saved and a new revision will be created.', saveBeforeRevisionFailed: 'The revision was not created because the current work could not be saved.'
+      confirmRevision: 'The current work will be saved and a new revision will be created.', saveBeforeRevisionFailed: 'The revision was not created because the current work could not be saved.',
+      readOnly: 'Read only', noWritePermission: 'This user has view-only permission.',
+      roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', roleViewer: 'Viewer'
     }
   };
 
@@ -102,24 +106,54 @@
       : { projectId: null, projectCode: null, revisionNo: 1 };
   }
 
+  function canWriteProjects() {
+    return Boolean(currentProfile && ['system_admin', 'company_admin', 'designer'].includes(currentProfile.role));
+  }
+
+  function roleLabel(role) {
+    const map = {
+      system_admin: 'roleSystemAdmin',
+      company_admin: 'roleCompanyAdmin',
+      designer: 'roleDesigner',
+      viewer: 'roleViewer'
+    };
+    return t(map[role] || 'roleViewer');
+  }
+
+  function refreshRoleUi() {
+    const role = currentProfile && currentProfile.role ? currentProfile.role : 'viewer';
+    const writable = canWriteProjects();
+    document.body.classList.toggle('cloud-readonly', Boolean(currentSession) && !writable);
+    if (ui.cloudRoleBadge) {
+      ui.cloudRoleBadge.dataset.role = role;
+      ui.cloudRoleBadge.textContent = roleLabel(role);
+    }
+  }
+
   function refreshProjectHeader() {
     const record = getRecord();
     if (ui.cloudProjectCode) ui.cloudProjectCode.textContent = record.projectCode || t('newProject');
     if (ui.cloudRevision) ui.cloudRevision.textContent = `R${String(record.revisionNo || 1).padStart(2, '0')}`;
 
+    const writable = canWriteProjects();
+    refreshRoleUi();
+
     if (historicalMode) {
       setSaveState(dirty ? t('historicalEdited') : t('historical'), 'history');
+    } else if (!writable) {
+      setSaveState(t('readOnly'), 'history');
     } else if (!dirty) {
       setSaveState(record.projectId ? t('saved') : t('unsaved'), record.projectId ? 'saved' : 'new');
     }
 
-    if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.disabled = historicalMode;
-    if (ui.newRevisionBtn) ui.newRevisionBtn.disabled = historicalMode || !record.projectId;
+    if (ui.newCloudProjectBtn) ui.newCloudProjectBtn.disabled = !writable;
+    if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.disabled = historicalMode || !writable;
+    if (ui.newRevisionBtn) ui.newRevisionBtn.disabled = historicalMode || !record.projectId || !writable;
     if (ui.revisionHistoryBtn) ui.revisionHistoryBtn.disabled = !record.projectId;
   }
 
   function markDirty() {
-    if (suppressDirty || !currentSession) return;
+    if (suppressDirty || !currentSession || !canWriteProjects()) return;
     dirty = true;
     setSaveState(historicalMode ? t('historicalEdited') : t('unsaved'), historicalMode ? 'history' : 'dirty');
   }
@@ -135,6 +169,7 @@
     document.body.classList.remove('auth-pending');
     if (ui.cloudProjectBar) ui.cloudProjectBar.hidden = !allowed;
     if (!allowed) {
+      document.body.classList.remove('cloud-readonly');
       currentProfile = null;
       currentOrganization = null;
       projectRows = [];
@@ -143,6 +178,7 @@
 
   function friendlyError(error, fallbackKey) {
     const raw = String((error && error.message) || '').trim();
+    if (/READ_ONLY_USER/i.test(raw)) return t('noWritePermission');
     if (/relation .* does not exist|column .* does not exist|function .* does not exist|permission denied|row-level security/i.test(raw)) {
       return t('setupMissing');
     }
@@ -176,6 +212,7 @@
     const companyCode = currentOrganization.company_code || '----';
     const userCode = currentProfile.user_code || '----';
     if (ui.cloudCompanyCode) ui.cloudCompanyCode.textContent = `${currentOrganization.name || t('unknownCompany')} · ${companyCode}.${userCode}`;
+    refreshRoleUi();
   }
 
   async function handleAuthenticated(session) {
@@ -277,7 +314,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.7.0',
+      app_version: snapshot.appVersion || '8.8.0',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -291,6 +328,10 @@
     const silent = options.silent === true;
     if (!currentSession) {
       if (!silent) window.alert(t('loginRequired'));
+      return false;
+    }
+    if (!canWriteProjects()) {
+      if (!silent) window.alert(t('noWritePermission'));
       return false;
     }
     if (historicalMode) {
@@ -394,6 +435,7 @@
   }
 
   function startNewProject() {
+    if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
     if (dirty && !window.confirm(t('confirmDiscard'))) return;
     suppressDirty = true;
     const reset = $('resetBtn');
@@ -531,6 +573,7 @@
   }
 
   function openNewRevisionDialog() {
+    if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
     const record = getRecord();
     if (!record.projectId) {
       window.alert(t('revisionRequired'));
@@ -550,6 +593,7 @@
 
   async function createNewRevision(event) {
     event.preventDefault();
+    if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
     const recordBeforeSave = getRecord();
     if (!recordBeforeSave.projectId || historicalMode) return;
     if (ui.newRevisionConfirmBtn) ui.newRevisionConfirmBtn.disabled = true;

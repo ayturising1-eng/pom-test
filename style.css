@@ -2576,7 +2576,7 @@ label em {
 /* V8.4.2: Tek doğrudan DXF indirme düğmesi */
 .preview-download-actions { align-items: center; }
 
-/* v8.7.0 - Kullanıcı girişi, bulut proje ve revizyon yönetimi */
+/* v8.8.0 - Kullanıcı girişi, firma ayrımı ve rol bazlı proje yönetimi */
 [hidden] { display: none !important; }
 body.auth-pending .app-header,
 body.auth-pending .cloud-project-bar,
@@ -2679,7 +2679,7 @@ body.auth-ready .auth-gate { display: none !important; }
   .cloud-project-identity > div:first-child { grid-column: 1 / -1; }
 }
 
-/* v8.7.0 - Revizyon yönetimi */
+/* v8.8.0 - Revizyon ve rol yönetimi */
 .cloud-project-actions { flex-wrap: wrap; justify-content: center; }
 #cloudSaveState[data-state="history"] { color: var(--blue); }
 .cloud-project-actions button:disabled,
@@ -2728,3 +2728,30 @@ body.auth-ready .auth-gate { display: none !important; }
   .revision-step-line { grid-template-columns: auto auto auto; }
   .revision-step-line span:nth-of-type(2) { grid-column: 1; }
 }
+
+
+/* v8.8.0 - Rol rozeti ve salt-okunur kullanıcı görünümü */
+.cloud-user-box { grid-template-rows: auto auto auto; }
+.cloud-user-box strong,
+.cloud-user-box > span { grid-column: 1; }
+.cloud-user-box button { grid-column: 2; grid-row: 1 / span 3; }
+.cloud-role-badge {
+  display: inline-flex !important;
+  width: max-content;
+  align-items: center;
+  margin-top: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(35, 93, 190, .10);
+  color: var(--blue) !important;
+  font-size: 10px !important;
+  letter-spacing: .2px;
+}
+.cloud-role-badge[data-role="system_admin"] { color: #7b2cbf !important; background: rgba(123,44,191,.10); }
+.cloud-role-badge[data-role="company_admin"] { color: #9a5b00 !important; background: rgba(255,174,0,.15); }
+.cloud-role-badge[data-role="designer"] { color: var(--green) !important; background: rgba(34,139,72,.11); }
+.cloud-role-badge[data-role="viewer"] { color: var(--blue) !important; background: rgba(35,93,190,.10); }
+body.cloud-readonly #cloudSaveState { color: var(--blue); }
+body.cloud-readonly .cloud-project-actions #newCloudProjectBtn,
+body.cloud-readonly .cloud-project-actions #saveCloudProjectBtn,
+body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }

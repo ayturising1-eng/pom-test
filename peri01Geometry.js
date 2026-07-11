@@ -167,7 +167,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.7.0 - CLOUD REVISION SYSTEM - 11.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.8.0 - COMPANY RLS AND ROLE ACCESS - 11.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {
