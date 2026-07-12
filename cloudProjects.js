@@ -236,10 +236,20 @@
         ? 'The PLMR_PIN_PEPPER Edge Function secret is missing.'
         : 'Edge Function içinde PLMR_PIN_PEPPER gizli değeri eksik.';
     }
-    if (/FunctionsHttpError|FunctionsFetchError|Failed to send a request|404|admin-users/i.test(raw)) {
+    if (/AUTH_REQUIRED|AUTH_INVALID|HTTP_401/i.test(raw)) {
       return language() === 'en'
-        ? 'The admin-users Edge Function is not deployed or cannot be reached.'
-        : 'admin-users Edge Function yayınlanmamış veya erişilemiyor.';
+        ? 'admin-users exists, but Verify JWT is enabled. Disable Verify JWT and deploy again.'
+        : 'admin-users bulundu ancak Verify JWT açık. Fonksiyon ayarından Verify JWT seçeneğini kapatıp yeniden Deploy et.';
+    }
+    if (/FUNCTION_NETWORK_ERROR|Failed to fetch|NetworkError/i.test(raw)) {
+      return language() === 'en'
+        ? 'The Edge Function could not be reached. Check the network and Supabase project URL.'
+        : 'Edge Function bağlantısı kurulamadı. İnternet bağlantısını ve Supabase proje adresini kontrol et.';
+    }
+    if (/HTTP_404|NOT_FOUND/i.test(raw)) {
+      return language() === 'en'
+        ? 'The admin-users Edge Function was not found. Deploy it with the exact name admin-users.'
+        : 'admin-users Edge Function bulunamadı. Fonksiyonu tam olarak admin-users adıyla Deploy et.';
     }
     if (/relation .* does not exist|column .* does not exist|function .* does not exist|permission denied|row-level security/i.test(raw)) {
       return t('setupMissing');
@@ -334,12 +344,9 @@
     if (ui.loginBtn) ui.loginBtn.disabled = true;
     setAuthMessage(t('loginBusy'), false);
     try {
-      const result = await client.functions.invoke('admin-users', {
-        body: { action: 'login', username, pin }
-      });
-      if (result.error) throw new Error(await functionErrorDetail(result.error) || 'INVALID_LOGIN');
-      if (!result.data || result.data.error) throw new Error((result.data && result.data.error) || 'INVALID_LOGIN');
-      const sessionData = result.data.session || {};
+      if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
+      const result = await window.PulumurAdminUsersApi.invoke('login', { username, pin }, { auth: false });
+      const sessionData = result.session || {};
       if (!sessionData.access_token || !sessionData.refresh_token) throw new Error('INVALID_LOGIN');
 
       const sessionResult = await client.auth.setSession({

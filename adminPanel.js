@@ -42,7 +42,7 @@
       inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
       userLimitReached: 'Firmanın kullanıcı limiti doldu.', licenseExpired: 'Firma lisansı aktif değil.', usernameExists: 'Bu kullanıcı adı zaten kullanılıyor.',
       invalidUsername: 'Kullanıcı adı biçimi uygun değil.', passwordInvalid: 'PIN kodu yalnızca 4 rakamdan oluşmalı.', passwordMismatch: 'PIN kodları aynı değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
-      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function yayınlanmamış veya erişilemiyor.',
+      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function bulunamadı. Supabase Edge Functions bölümünde admin-users adıyla Deploy et.', functionJwt: 'admin-users bulundu ancak Verify JWT açık. Fonksiyon ayarından Verify JWT seçeneğini kapatıp yeniden Deploy et.', functionNetwork: 'Edge Function bağlantısı kurulamadı. İnternet bağlantısını ve Supabase proje adresini kontrol et.', functionReady: 'admin-users Edge Function bağlantısı hazır.',
       allFirms: 'Tüm firmalar', openPanel: 'Yönetim', close: 'Kapat', activeUsers: 'aktif kullanıcı'
     },
     en: {
@@ -61,7 +61,7 @@
       inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
       userLimitReached: 'The company user limit has been reached.', licenseExpired: 'The company license is not active.', usernameExists: 'This username is already in use.',
       invalidUsername: 'The username format is invalid.', passwordInvalid: 'The PIN must contain exactly 4 digits.', passwordMismatch: 'PIN codes do not match.', lastAdmin: 'At least one active company administrator must remain.',
-      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function is not deployed or cannot be reached.',
+      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function was not found. Deploy it with the exact name admin-users.', functionJwt: 'admin-users exists, but Verify JWT is enabled. Disable Verify JWT and deploy again.', functionNetwork: 'The Edge Function could not be reached. Check the network and Supabase project URL.', functionReady: 'The admin-users Edge Function is ready.',
       allFirms: 'All companies', openPanel: 'Admin', close: 'Close', activeUsers: 'active users'
     }
   };
@@ -95,7 +95,8 @@
   }
 
   function errorMessage(error) {
-    const raw = String((error && (error.message || error.error || error.details)) || error || '').trim();
+    const raw = String((error && (error.message || error.error || error.details || error.code)) || error || '').trim();
+    const status = Number(error && error.status || 0);
     if (/ADMIN_REQUIRED|SYSTEM_ADMIN_REQUIRED|ORGANIZATION_ACCESS_DENIED/i.test(raw)) return t('adminRequired');
     if (/USER_LIMIT_REACHED/i.test(raw)) return t('userLimitReached');
     if (/LICENSE_EXPIRED|LICENSE_NOT_STARTED|ORGANIZATION_INACTIVE/i.test(raw)) return t('licenseExpired');
@@ -104,8 +105,11 @@
     if (/PIN_INVALID|PASSWORD_INVALID|PASSWORD_TOO_SHORT|PASSWORD_TOO_LONG/i.test(raw)) return t('passwordInvalid');
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
-    if (/PIN_PEPPER_MISSING|FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER Edge Function secret is missing.' : 'Edge Function içinde PLMR_PIN_PEPPER gizli değeri eksik.';
-    if (/FunctionsHttpError|FunctionsFetchError|Failed to send a request|404|admin-users/i.test(raw)) return t('functionMissing');
+    if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
+    if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw) || status === 401) return t('functionJwt');
+    if (/FUNCTION_NETWORK_ERROR|Failed to fetch|NetworkError/i.test(raw) || status === 0) return t('functionNetwork');
+    if (/HTTP_404|NOT_FOUND/i.test(raw) || status === 404) return t('functionMissing');
     if (/function .* does not exist|permission denied|relation .* does not exist/i.test(raw)) return t('setupMissing');
     return raw || t('setupMissing');
   }
@@ -316,28 +320,15 @@
     setMessage(t('loading'), false);
     try {
       const organizationId = isSystemAdmin() ? ui.inviteOrg.value : currentProfile.organization_id;
-      const result = await client.functions.invoke('admin-users', {
-        body: {
-          action: 'create',
-          organizationId,
-          fullName: ui.inviteFullName.value.trim(),
-          username: ui.inviteUsername.value.trim().toLowerCase(),
-          pin,
-          role: ui.inviteRole.value,
-          language: language()
-        }
+      if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
+      await window.PulumurAdminUsersApi.invoke('create', {
+        organizationId,
+        fullName: ui.inviteFullName.value.trim(),
+        username: ui.inviteUsername.value.trim().toLowerCase(),
+        pin,
+        role: ui.inviteRole.value,
+        language: language()
       });
-      if (result.error) {
-        let detail = '';
-        try {
-          if (result.error.context && typeof result.error.context.json === 'function') {
-            const responseBody = await result.error.context.json();
-            detail = responseBody && responseBody.error ? String(responseBody.error) : '';
-          }
-        } catch (_) {}
-        throw new Error(detail || result.error.message || 'CREATE_USER_FAILED');
-      }
-      if (result.data && result.data.error) throw new Error(result.data.error);
       ui.inviteForm.reset();
       populateOrganizationSelectors();
       setMessage(t('inviteSuccess'), false);
@@ -405,20 +396,8 @@
     }
     setBusy(true);
     try {
-      const result = await client.functions.invoke('admin-users', {
-        body: { action: 'set_pin', userId: passwordTargetUserId, pin }
-      });
-      if (result.error) {
-        let detail = '';
-        try {
-          if (result.error.context && typeof result.error.context.json === 'function') {
-            const responseBody = await result.error.context.json();
-            detail = responseBody && responseBody.error ? String(responseBody.error) : '';
-          }
-        } catch (_) {}
-        throw new Error(detail || result.error.message || 'PASSWORD_UPDATE_FAILED');
-      }
-      if (result.data && result.data.error) throw new Error(result.data.error);
+      if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
+      await window.PulumurAdminUsersApi.invoke('set_pin', { userId: passwordTargetUserId, pin });
       setMessage(t('passwordSaved'), false);
       closePasswordDialog();
     } catch (error) {
