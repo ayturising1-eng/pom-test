@@ -1,44 +1,72 @@
-const CACHE_NAME = 'pulumur-pwa-v8_9_4';
+const CACHE_NAME = 'pulumur-pwa-v8_9_5';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css?v=8.9.4',
-  './app.js?v=8.9.4',
-  './supabaseConfig.js?v=8.9.4',
-  './cloudProjects.js?v=8.9.4',
-  './adminUsersApi.js?v=8.9.4',
-  './adminPanel.js?v=8.9.4',
-  './peri01ExcelBridge.js?v=8.9.4',
-  './peri01Geometry.js?v=8.9.4',
-  './modernDxfTemplate.js?v=8.9.4',
-  './dxfModernEngine.js?v=8.9.4',
-  './blocks/filteredBlocks.js?v=8.9.4',
+  './style.css?v=8.9.5',
+  './app.js?v=8.9.5',
+  './supabaseConfig.js?v=8.9.5',
+  './cloudProjects.js?v=8.9.5',
+  './adminUsersApi.js?v=8.9.5',
+  './adminPanel.js?v=8.9.5',
+  './peri01ExcelBridge.js?v=8.9.5',
+  './peri01Geometry.js?v=8.9.5',
+  './modernDxfTemplate.js?v=8.9.5',
+  './dxfModernEngine.js?v=8.9.5',
+  './blocks/filteredBlocks.js?v=8.9.5',
   './assets/plmr-logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  './icons/favicon-64.png',
-  'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2'
+  './icons/favicon-64.png'
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(CORE_ASSETS))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
 });
 
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response && response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch (_) {
+    return (await caches.match(request)) || (request.mode === 'navigate' ? caches.match('./index.html') : Response.error());
+  }
+}
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response && response.ok) {
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, response.clone()).catch(() => {});
+  }
+  return response;
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-      const cloned = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(event.request, cloned)).catch(() => {});
-      return response;
-    }).catch(() => caches.match('./index.html')))
+  const url = new URL(event.request.url);
+  const sameOrigin = url.origin === self.location.origin;
+  const dynamicAsset = sameOrigin && (
+    event.request.mode === 'navigate' ||
+    /\.(?:html|js|css|json|webmanifest)$/i.test(url.pathname)
   );
+  event.respondWith(dynamicAsset ? networkFirst(event.request) : cacheFirst(event.request));
 });

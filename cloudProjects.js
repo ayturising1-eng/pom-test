@@ -80,6 +80,13 @@
   let revisionContext = null;
   let revisionRows = [];
 
+  // Shared auth bridge for admin operations. It exposes only the active session
+  // token in memory; nothing is written to localStorage by this bridge.
+  window.PulumurCloudAuth = Object.freeze({
+    getSession: () => currentSession,
+    getAccessToken: () => String(currentSession && currentSession.access_token || ''),
+  });
+
   const REMEMBER_KEY = 'plmr_auth_remember';
   const SESSION_ONLY_KEY = 'plmr_auth_session_only';
   const SAVED_USERNAME_KEY = 'plmr_auth_username';
@@ -313,6 +320,7 @@
 
   async function handleAuthenticated(session) {
     currentSession = session;
+    window.PulumurCurrentSession = session;
     setAuthMessage(t('authLoading'), false);
     try {
       await loadProfile();
@@ -328,6 +336,7 @@
 
   async function handleSignedOut() {
     currentSession = null;
+    window.PulumurCurrentSession = null;
     dirty = false;
     historicalMode = false;
     historicalCurrentRevision = 1;

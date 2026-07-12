@@ -42,7 +42,7 @@
       inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
       userLimitReached: 'Firmanın kullanıcı limiti doldu.', licenseExpired: 'Firma lisansı aktif değil.', usernameExists: 'Bu kullanıcı adı zaten kullanılıyor.',
       invalidUsername: 'Kullanıcı adı biçimi uygun değil.', passwordInvalid: 'PIN kodu yalnızca 4 rakamdan oluşmalı.', passwordMismatch: 'PIN kodları aynı değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
-      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function bulunamadı. Supabase Edge Functions bölümünde admin-users adıyla Deploy et.', functionJwt: 'Yönetici işlemi için oturum doğrulanamadı. Çıkış yapıp tekrar giriş yap.', functionNetwork: 'Edge Function bağlantısı kurulamadı. İnternet bağlantısını ve Supabase proje adresini kontrol et.', functionReady: 'admin-users Edge Function bağlantısı hazır.',
+      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function bulunamadı. Supabase Edge Functions bölümünde admin-users adıyla Deploy et.', functionJwt: 'Yönetici oturumu doğrulanamadı. Sayfayı güncelle; devam ederse çıkış yapıp tekrar giriş yap.', functionNetwork: 'Edge Function bağlantısı kurulamadı. İnternet bağlantısını ve Supabase proje adresini kontrol et.', functionReady: 'admin-users Edge Function bağlantısı hazır.',
       allFirms: 'Tüm firmalar', openPanel: 'Yönetim', close: 'Kapat', activeUsers: 'aktif kullanıcı'
     },
     en: {
@@ -61,7 +61,7 @@
       inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
       userLimitReached: 'The company user limit has been reached.', licenseExpired: 'The company license is not active.', usernameExists: 'This username is already in use.',
       invalidUsername: 'The username format is invalid.', passwordInvalid: 'The PIN must contain exactly 4 digits.', passwordMismatch: 'PIN codes do not match.', lastAdmin: 'At least one active company administrator must remain.',
-      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function was not found. Deploy it with the exact name admin-users.', functionJwt: 'The admin session could not be verified. Sign out and sign in again.', functionNetwork: 'The Edge Function could not be reached. Check the network and Supabase project URL.', functionReady: 'The admin-users Edge Function is ready.',
+      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function was not found. Deploy it with the exact name admin-users.', functionJwt: 'The admin session could not be verified. Refresh the page; if it continues, sign out and sign in again.', functionNetwork: 'The Edge Function could not be reached. Check the network and Supabase project URL.', functionReady: 'The admin-users Edge Function is ready.',
       allFirms: 'All companies', openPanel: 'Admin', close: 'Close', activeUsers: 'active users'
     }
   };
@@ -107,7 +107,7 @@
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
-    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return t('functionJwt');
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.5]`;
     if (/Invalid JWT|Missing authorization header/i.test(raw) || status === 401) {
       return language() === 'en'
         ? 'Authorization was rejected. Sign out and sign in again; if it continues, check the Edge Function logs.'

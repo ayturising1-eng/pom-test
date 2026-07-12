@@ -17,15 +17,20 @@
   }
 
   async function getAccessToken() {
-    // cloudProjects.js exposes the active browser client as window.PulumurSupabase.
-    // Older builds tried to read a non-existent PulumurCloudProjects.getClient(),
-    // which caused every admin action to fail locally with AUTH_REQUIRED.
-    const exportedClient = window.PulumurCloudProjects && typeof window.PulumurCloudProjects.getClient === 'function'
-      ? window.PulumurCloudProjects.getClient()
-      : null;
-    const client = exportedClient || window.PulumurSupabase || null;
-    if (!client || !client.auth) return '';
+    // 1) Prefer the session already held in memory by cloudProjects.js.
+    const bridgeToken = window.PulumurCloudAuth && typeof window.PulumurCloudAuth.getAccessToken === 'function'
+      ? window.PulumurCloudAuth.getAccessToken()
+      : '';
+    if (bridgeToken) return String(bridgeToken);
 
+    const directToken = window.PulumurCurrentSession && window.PulumurCurrentSession.access_token
+      ? String(window.PulumurCurrentSession.access_token)
+      : '';
+    if (directToken) return directToken;
+
+    // 2) Fall back to the active Supabase browser client.
+    const client = window.PulumurSupabase || null;
+    if (!client || !client.auth) return '';
     const result = await client.auth.getSession();
     if (result && result.error) throw result.error;
     return String(result && result.data && result.data.session && result.data.session.access_token || '');
@@ -71,5 +76,15 @@
     return invoke('health', {}, { auth: false });
   }
 
-  window.PulumurAdminUsersApi = Object.freeze({ invoke, health, endpoint });
+  async function diagnostics() {
+    const accessToken = await getAccessToken();
+    return {
+      endpoint,
+      hasAccessToken: Boolean(accessToken),
+      tokenLength: accessToken.length,
+      build: '8.9.5'
+    };
+  }
+
+  window.PulumurAdminUsersApi = Object.freeze({ invoke, health, diagnostics, endpoint });
 })();
