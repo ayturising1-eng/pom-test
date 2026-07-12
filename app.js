@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '8.9.5';
+  const APP_VERSION = '8.9.6';
   const PROJECT_FORMAT = 'PULUMUR_PROJECT';
   const PROJECT_SCHEMA_VERSION = 1;
 
@@ -428,7 +428,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.5').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.6').catch(() => {}), { once: true });
     }
   }
 
@@ -556,8 +556,8 @@
       applyPreviewDimensionFilter();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.5: system/company admin panel, 4-digit PIN login and license management are active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.5: sistem/firma yönetici paneli, 4 haneli PIN girişi ve lisans yönetimi aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.6: system/company admin panel, 4-digit PIN login and license management are active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.6: sistem/firma yönetici paneli, 4 haneli PIN girişi ve lisans yönetimi aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
@@ -2033,6 +2033,13 @@
       statusText.textContent = currentLanguage === 'en'
         ? `Project file downloaded: ${filename}`
         : `Proje dosyası indirildi: ${filename}`;
+      if (window.PulumurActivity) {
+        const record = getCurrentProjectRecord();
+        void window.PulumurActivity.log('project_file_download', {
+          projectId: record.projectId, projectCode: record.projectCode, revisionNo: record.revisionNo,
+          detail: { filename }
+        });
+      }
     } catch (err) {
       statusText.textContent = err.message;
       window.alert(err.message);
@@ -2143,6 +2150,13 @@
       statusText.textContent = currentLanguage === 'en'
         ? `DXF downloaded: ${nameRoot}.dxf`
         : `DXF indirildi: ${nameRoot}.dxf`;
+      if (window.PulumurActivity) {
+        const record = getCurrentProjectRecord();
+        void window.PulumurActivity.log('dxf_download', {
+          projectId: record.projectId, projectCode: record.projectCode, revisionNo: record.revisionNo,
+          detail: { filename: `${nameRoot}.dxf` }
+        });
+      }
     } catch (err) {
       statusText.textContent = currentLanguage === 'en' ? `DXF generation error: ${err.message}` : `DXF oluşturma hatası: ${err.message}`;
       window.alert(currentLanguage === 'en' ? `DXF generation error:
@@ -2301,6 +2315,13 @@ ${err.message}`);
       const nameRoot = buildNameRoot(drawing);
       downloadBlob(`${nameRoot}.pdf`, blob);
       statusText.textContent = currentLanguage === 'en' ? `PDF downloaded: ${nameRoot}.pdf` : `PDF indirildi: ${nameRoot}.pdf`;
+      if (window.PulumurActivity) {
+        const record = getCurrentProjectRecord();
+        void window.PulumurActivity.log('pdf_download', {
+          projectId: record.projectId, projectCode: record.projectCode, revisionNo: record.revisionNo,
+          detail: { filename: `${nameRoot}.pdf` }
+        });
+      }
     } catch (err) {
       statusText.textContent = currentLanguage === 'en' ? `PDF generation error: ${err.message}` : `PDF oluşturma hatası: ${err.message}`;
       window.alert(currentLanguage === 'en' ? `PDF generation error:\n${err.message}` : `PDF oluşturma hatası:\n${err.message}`);

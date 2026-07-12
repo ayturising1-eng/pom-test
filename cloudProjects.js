@@ -30,7 +30,7 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.2 Edge Function kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. v8.9.6 Edge Function kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -50,7 +50,7 @@
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.2 Edge Function setup.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.6 Edge Function setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -327,6 +327,7 @@
       setAppAccess(true);
       setAuthMessage('', false);
       refreshProjectHeader();
+      if (window.PulumurActivity) await window.PulumurActivity.identify();
     } catch (error) {
       console.error(error);
       setAppAccess(false);
@@ -389,6 +390,9 @@
       if (savePin) await storeBrowserCredential(username, pin);
 
       await handleAuthenticated(sessionResult.data.session);
+      if (window.PulumurActivity) {
+        await window.PulumurActivity.log('site_login', { detail: { remembered: remember } });
+      }
     } catch (error) {
       console.error(error);
       setAuthMessage(friendlyError(error, 'loginFailed'), true);
@@ -405,7 +409,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.2',
+      app_version: snapshot.appVersion || '8.9.6',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -484,6 +488,12 @@
         historicalCurrentRevision = synced.current_revision || 1;
         markClean();
         if (!silent) setStatus(`${t('projectCreated')} ${row.project_code}`);
+        if (window.PulumurActivity) {
+          void window.PulumurActivity.log('project_create', {
+            projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || 1,
+            detail: { project_name: finalPayload.project_name, customer_name: finalPayload.customer_name }
+          });
+        }
       } else {
         const snapshot = ProjectState.createSnapshot();
         const updatePayload = projectPayload(snapshot);
@@ -508,6 +518,12 @@
         historicalCurrentRevision = row.current_revision || record.revisionNo || 1;
         markClean();
         if (!silent) setStatus(`${t('projectUpdated')} ${row.project_code}`);
+        if (window.PulumurActivity) {
+          void window.PulumurActivity.log('project_save', {
+            projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || record.revisionNo || 1,
+            detail: { project_name: updatePayload.project_name, customer_name: updatePayload.customer_name }
+          });
+        }
       }
       return true;
     } catch (error) {
@@ -655,6 +671,12 @@
       if (ui.projectsDialog && ui.projectsDialog.open) ui.projectsDialog.close();
       if (ui.revisionsDialog && ui.revisionsDialog.open) ui.revisionsDialog.close();
       setStatus(`${t('currentRevisionOpened')} ${row.project_code} / R${String(row.current_revision || 1).padStart(2, '0')}`);
+      if (window.PulumurActivity) {
+        void window.PulumurActivity.log('project_open', {
+          projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || 1,
+          detail: { project_name: row.project_name, customer_name: row.customer_name }
+        });
+      }
     } catch (error) {
       console.error(error);
       window.alert(friendlyError(error, 'openFailed'));
@@ -713,6 +735,12 @@
       if (ui.newRevisionDialog && ui.newRevisionDialog.open) ui.newRevisionDialog.close();
       refreshProjectHeader();
       setStatus(`${t('revisionCreated')} ${row.project_code} / R${String(row.current_revision).padStart(2, '0')}`);
+      if (window.PulumurActivity) {
+        void window.PulumurActivity.log('revision_create', {
+          projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision,
+          detail: { change_note: String(ui.revisionChangeNote && ui.revisionChangeNote.value || '').trim() || null }
+        });
+      }
     } catch (error) {
       console.error(error);
       if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = friendlyError(error, 'revisionFailed');
@@ -823,6 +851,12 @@
       if (ui.projectsDialog && ui.projectsDialog.open) ui.projectsDialog.close();
       if (ui.revisionsDialog && ui.revisionsDialog.open) ui.revisionsDialog.close();
       setStatus(`${t('revisionOpened')} ${revisionContext.project_code} / R${String(row.revision_no).padStart(2, '0')}`);
+      if (window.PulumurActivity) {
+        void window.PulumurActivity.log('revision_open', {
+          projectId: revisionContext.id, projectCode: revisionContext.project_code, revisionNo: row.revision_no,
+          detail: { historical: true }
+        });
+      }
     } catch (error) {
       console.error(error);
       window.alert(friendlyError(error, 'openFailed'));
@@ -865,6 +899,10 @@
     if (ui.loginForm) ui.loginForm.addEventListener('submit', submitLogin);
     if (ui.logoutBtn) ui.logoutBtn.addEventListener('click', async () => {
       if (dirty && !window.confirm(t('confirmDiscard'))) return;
+      if (window.PulumurActivity) {
+        await window.PulumurActivity.log('site_logout');
+        await window.PulumurActivity.end();
+      }
       sessionStorage.removeItem(SESSION_ONLY_KEY);
       await client.auth.signOut({ scope: 'local' });
     });
@@ -899,6 +937,7 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
     window.PulumurSupabase = client;
+    if (window.PulumurActivity) void window.PulumurActivity.init(client);
     bindUi();
     applyLoginLanguage();
     await restoreLoginPreferences();

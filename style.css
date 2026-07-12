@@ -2929,3 +2929,94 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 @media (max-width: 520px) {
   .auth-options { grid-template-columns: 1fr; gap: 8px; }
 }
+
+/* v8.9.6 - kullanım geçmişi ve kullanıcı silme */
+.admin-activity-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(145px, .8fr)) auto;
+  align-items: end;
+  width: min(820px, 100%);
+}
+.admin-activity-toolbar input {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  padding: 7px 9px;
+}
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.admin-summary-grid article {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 5px 15px rgba(8,32,51,.05);
+}
+.admin-summary-grid span {
+  color: var(--navy);
+  font-size: 23px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+.admin-summary-grid small { color: var(--muted); font-weight: 800; }
+.admin-history-section { margin-top: 16px; }
+.admin-history-section h4 { margin: 0 0 8px; color: var(--navy); font-size: 16px; }
+.admin-history-table { min-width: 1040px; }
+.admin-history-table td { font-size: 11px; }
+.admin-detail-cell { max-width: 360px; white-space: normal; word-break: break-word; color: var(--muted); }
+.admin-action-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--ice);
+  color: var(--navy);
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.admin-delete-card { width: min(620px, calc(100vw - 24px)); }
+.admin-delete-warning {
+  margin: 16px 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(190, 30, 45, .25);
+  border-radius: 10px;
+  background: #fff5f6;
+  color: var(--red);
+  font-weight: 900;
+}
+.admin-delete-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  min-height: 0;
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+}
+.admin-delete-option input { margin-top: 4px; accent-color: var(--red); }
+.admin-delete-option span { display: grid; gap: 4px; padding: 0; }
+.admin-delete-option strong { color: var(--navy); }
+.admin-delete-option small { color: var(--muted); line-height: 1.35; }
+.admin-row-actions { min-width: 290px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .admin-activity-toolbar { grid-template-columns: 1fr 1fr; }
+  .admin-activity-toolbar .soft-btn { width: 100%; }
+  .admin-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .admin-activity-toolbar, .admin-summary-grid { grid-template-columns: 1fr; }
+}

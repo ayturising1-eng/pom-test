@@ -10,7 +10,7 @@
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.5';
+      const build = '8.9.6';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
@@ -20,10 +20,10 @@
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.5" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.6" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.5" />
+  <link rel="stylesheet" href="style.css?v=8.9.6" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -36,8 +36,8 @@
         <input id="loginUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required />
       </label>
       <label class="auth-field">
-        <span id="loginPasswordLabel">Şifre</span>
-        <input id="loginPassword" type="password" autocomplete="current-password" required />
+        <span id="loginPasswordLabel">PIN Kodu</span>
+        <input id="loginPassword" type="password" minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="current-password" required />
       </label>
       <div class="auth-options" aria-label="Giriş tercihleri">
         <label class="auth-check"><input id="rememberMe" type="checkbox" checked /><span id="rememberMeLabel">Beni hatırla</span></label>
@@ -320,6 +320,7 @@
       <div class="admin-tabs" role="tablist">
         <button id="adminUsersTab" type="button" class="admin-tab is-active">Kullanıcılar</button>
         <button id="adminOrganizationsTab" type="button" class="admin-tab">Firmalar</button>
+        <button id="adminActivityTab" type="button" class="admin-tab">Kullanım Geçmişi</button>
       </div>
 
       <section id="adminUsersPane" class="admin-pane">
@@ -343,8 +344,8 @@
             <label id="adminInviteOrgField"><span data-admin-i18n="firm">Firma</span><select id="adminInviteOrg" required></select></label>
             <label><span data-admin-i18n="fullName">Ad Soyad</span><input id="adminInviteFullName" required autocomplete="name"></label>
             <label><span data-admin-i18n="username">Kullanıcı Adı</span><input id="adminInviteUsername" required minlength="3" maxlength="32" pattern="[a-z0-9._-]+" autocomplete="off"></label>
-            <label><span data-admin-i18n="password">Şifre</span><input id="adminInvitePassword" type="password" minlength="8" maxlength="72" required autocomplete="new-password"></label>
-            <label><span data-admin-i18n="passwordAgain">Şifre Tekrar</span><input id="adminInvitePasswordConfirm" type="password" minlength="8" maxlength="72" required autocomplete="new-password"></label>
+            <label><span data-admin-i18n="password">Şifre</span><input id="adminInvitePassword" type="password" minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required autocomplete="new-password"></label>
+            <label><span data-admin-i18n="passwordAgain">Şifre Tekrar</span><input id="adminInvitePasswordConfirm" type="password" minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required autocomplete="new-password"></label>
             <label><span data-admin-i18n="role">Rol</span><select id="adminInviteRole"><option value="designer">Tasarımcı</option><option value="company_admin">Firma Yöneticisi</option></select></label>
           </div>
           <div class="admin-form-actions"><button id="adminInviteSubmit" type="submit" class="primary-btn">Kullanıcı Oluştur</button></div>
@@ -390,24 +391,84 @@
         </div>
       </section>
 
+      <section id="adminActivityPane" class="admin-pane" hidden>
+        <div class="admin-section-head">
+          <h3 id="adminActivityTitle">Kullanım Geçmişi</h3>
+          <div class="admin-toolbar admin-activity-toolbar">
+            <label id="adminActivityOrgField" class="admin-compact-field">
+              <span>Firma</span><select id="adminActivityOrg"></select>
+            </label>
+            <label class="admin-compact-field"><span>Başlangıç</span><input id="adminActivityFrom" type="date"></label>
+            <label class="admin-compact-field"><span>Bitiş</span><input id="adminActivityTo" type="date"></label>
+            <button id="adminActivityRefresh" type="button" class="soft-btn">Yenile</button>
+          </div>
+        </div>
+
+        <div class="admin-summary-grid">
+          <article><span id="adminSummaryVisits">0</span><small id="adminSummaryVisitsLabel">Ziyaret</small></article>
+          <article><span id="adminSummaryUsers">0</span><small id="adminSummaryUsersLabel">Aktif kullanıcı</small></article>
+          <article><span id="adminSummaryActions">0</span><small id="adminSummaryActionsLabel">İşlem</small></article>
+          <article><span id="adminSummaryLast">-</span><small id="adminSummaryLastLabel">Son hareket</small></article>
+        </div>
+
+        <div class="admin-history-section">
+          <h4 id="adminVisitsTitle">Ziyaret Saatleri</h4>
+          <div class="admin-table-wrap">
+            <table class="admin-table admin-history-table">
+              <thead><tr><th>Başlangıç</th><th>Son aktif</th><th>Süre</th><th>Firma</th><th>Kullanıcı</th><th>Sayfa</th><th>İşlem</th></tr></thead>
+              <tbody id="adminSessionsBody"></tbody>
+            </table>
+            <p id="adminSessionsEmpty" class="projects-empty">Yükleniyor…</p>
+          </div>
+        </div>
+
+        <div class="admin-history-section">
+          <h4 id="adminActionsTitle">Kullanıcı İşlem Geçmişi</h4>
+          <div class="admin-table-wrap">
+            <table class="admin-table admin-history-table">
+              <thead><tr><th>Tarih / Saat</th><th>Firma</th><th>Kullanıcı</th><th>İşlem</th><th>Proje</th><th>Detay</th></tr></thead>
+              <tbody id="adminActivityBody"></tbody>
+            </table>
+            <p id="adminActivityEmpty" class="projects-empty">Yükleniyor…</p>
+          </div>
+        </div>
+      </section>
+
       <p id="adminPanelMessage" class="admin-panel-message" aria-live="polite"></p>
     </div>
+  </dialog>
+
+  <dialog id="adminDeleteUserDialog" class="modal">
+    <form id="adminDeleteUserForm" class="modal-card admin-delete-card">
+      <div class="modal-head">
+        <div><h2 id="adminDeleteUserTitle">Kullanıcıyı Sil</h2><p id="adminDeleteUserName" class="modal-sub">Kullanıcı</p></div>
+        <button id="adminDeleteUserCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <p id="adminDeleteUserWarning" class="admin-delete-warning">Bu işlem kalıcıdır ve geri alınamaz.</p>
+      <label class="admin-delete-option"><input type="radio" name="adminDeleteMode" value="keep" checked><span><strong>Kullanıcıyı sil, projeleri koru</strong><small>Projeler firma hesabında kalır; kullanıcı bağlantısı kaldırılır.</small></span></label>
+      <label class="admin-delete-option"><input type="radio" name="adminDeleteMode" value="all"><span><strong>Kullanıcıyı ve oluşturduğu projeleri sil</strong><small>Test temizliği için proje ve revizyonlar da kalıcı olarak silinir.</small></span></label>
+      <p id="adminDeleteUserMessage" class="modal-sub"></p>
+      <div class="modal-actions">
+        <button id="adminDeleteUserSubmit" type="submit" class="danger-btn">Kalıcı Olarak Sil</button>
+        <button id="adminDeleteUserCancelBtn" type="button" class="soft-btn">İptal</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="adminPasswordDialog" class="modal">
     <form id="adminPasswordForm" class="modal-card" autocomplete="off">
       <div class="modal-head">
         <div>
-          <h2 id="adminPasswordTitle">Kullanıcı Şifresini Belirle</h2>
+          <h2 id="adminPasswordTitle">PIN Belirle</h2>
           <p id="adminPasswordUser" class="modal-sub">Kullanıcı</p>
         </div>
         <button id="adminPasswordCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
       </div>
       <div class="password-update-fields">
-        <label><span data-admin-i18n="newPassword">Yeni Şifre</span><input id="adminNewPassword" type="password" minlength="8" maxlength="72" autocomplete="new-password" required /></label>
-        <label><span data-admin-i18n="passwordAgain">Şifre Tekrar</span><input id="adminNewPasswordConfirm" type="password" minlength="8" maxlength="72" autocomplete="new-password" required /></label>
+        <label><span data-admin-i18n="newPassword">Yeni Şifre</span><input id="adminNewPassword" type="password" minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="new-password" required /></label>
+        <label><span data-admin-i18n="passwordAgain">Şifre Tekrar</span><input id="adminNewPasswordConfirm" type="password" minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="new-password" required /></label>
       </div>
-      <p id="adminPasswordMessage" class="modal-sub">Şifre 8–72 karakter olmalı.</p>
+      <p id="adminPasswordMessage" class="modal-sub">PIN kodu yalnızca 4 rakamdan oluşmalı.</p>
       <div class="modal-actions">
         <button id="adminPasswordSubmit" type="submit" class="primary-btn">Şifreyi Güncelle</button>
         <button id="adminPasswordCancelBtn" type="button" class="soft-btn">İptal</button>
@@ -415,17 +476,18 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.5"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.5"></script>
-  <script src="peri01Geometry.js?v=8.9.5"></script>
-  <script src="modernDxfTemplate.js?v=8.9.5"></script>
-  <script src="dxfModernEngine.js?v=8.9.5"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.6"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.6"></script>
+  <script src="peri01Geometry.js?v=8.9.6"></script>
+  <script src="modernDxfTemplate.js?v=8.9.6"></script>
+  <script src="dxfModernEngine.js?v=8.9.6"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.5"></script>
-  <script src="adminUsersApi.js?v=8.9.5"></script>
-  <script src="app.js?v=8.9.5"></script>
-  <script src="cloudProjects.js?v=8.9.5"></script>
-  <script src="adminPanel.js?v=8.9.5"></script>
+  <script src="supabaseConfig.js?v=8.9.6"></script>
+  <script src="adminUsersApi.js?v=8.9.6"></script>
+  <script src="activityTracker.js?v=8.9.6"></script>
+  <script src="app.js?v=8.9.6"></script>
+  <script src="cloudProjects.js?v=8.9.6"></script>
+  <script src="adminPanel.js?v=8.9.6"></script>
 </body>
 </html>
