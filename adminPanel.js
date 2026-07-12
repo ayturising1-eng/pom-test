@@ -12,7 +12,7 @@
     inviteFullName: $('adminInviteFullName'), inviteUsername: $('adminInviteUsername'),
     invitePassword: $('adminInvitePassword'), invitePasswordConfirm: $('adminInvitePasswordConfirm'),
     inviteRole: $('adminInviteRole'), inviteSubmit: $('adminInviteSubmit'),
-    userFilterOrgField: $('adminUserFilterOrgField'), userFilterOrg: $('adminUserFilterOrg'),
+    userFilterOrgField: $('adminUserFilterOrgField'), userFilterOrg: $('adminUserFilterOrg'), userSearch: $('adminUserSearch'),
     usersRefresh: $('adminUsersRefresh'), usersBody: $('adminUsersBody'), usersEmpty: $('adminUsersEmpty'),
     organizationsTitle: $('adminOrganizationsTitle'), organizationCreateForm: $('adminOrganizationCreateForm'),
     organizationName: $('adminOrganizationName'), organizationLicenseEnd: $('adminOrganizationLicenseEnd'),
@@ -36,14 +36,14 @@
     tr: {
       adminPanel: 'Yönetici Paneli', panelSubtitle: 'Firma, kullanıcı ve lisans yönetimi', users: 'Kullanıcılar', firms: 'Firmalar',
       inviteUser: 'Yeni Kullanıcı Oluştur', fullName: 'Ad Soyad', username: 'Kullanıcı Adı', role: 'Rol', firm: 'Firma',
-      invite: 'Kullanıcı Oluştur', refresh: 'Yenile', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
+      invite: 'Kullanıcı Oluştur', refresh: 'Yenile', search: 'Ara', searchPlaceholder: 'Firma, ad veya kullanıcı adı', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
       companyAdmin: 'Firma Yöneticisi', designer: 'Tasarımcı', systemAdmin: 'Sistem Yöneticisi', active: 'Aktif', passive: 'Pasif',
       save: 'Kaydet', password: 'PIN Belirle', passwordAgain: 'PIN Kodu Tekrar', newPassword: 'Yeni PIN Kodu', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
       createFirm: 'Yeni Firma Oluştur', firmName: 'Firma Adı', licenseEnd: 'Lisans Bitişi', maxUsers: 'Kullanıcı Limiti', create: 'Firma Oluştur',
       firmCode: 'Firma Kodu', license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
       inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'PIN kodu güncellendi.',
       firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
-      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.6 SQL ve Edge Function kurulumunu tamamla.',
+      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.7 Edge Function kurulumunu kontrol et.',
       confirmDeactivate: 'Bu kullanıcı pasifleştirilecek. Devam edilsin mi?', protectedUser: 'Bu hesap panelden değiştirilemez.',
       usernameHint: '3–32 karakter; küçük harf, rakam, nokta, tire veya alt çizgi.',
       inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
@@ -68,14 +68,14 @@
     en: {
       adminPanel: 'Admin Panel', panelSubtitle: 'Company, user and license management', users: 'Users', firms: 'Companies',
       inviteUser: 'Create New User', fullName: 'Full Name', username: 'Username', role: 'Role', firm: 'Company',
-      invite: 'Create User', refresh: 'Refresh', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
+      invite: 'Create User', refresh: 'Refresh', search: 'Search', searchPlaceholder: 'Company, name or username', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
       companyAdmin: 'Company Administrator', designer: 'Designer', systemAdmin: 'System Administrator', active: 'Active', passive: 'Inactive',
       save: 'Save', password: 'Set PIN', passwordAgain: 'Repeat PIN', newPassword: 'New PIN', noUsers: 'No users found.', loading: 'Loading…',
       createFirm: 'Create New Company', firmName: 'Company Name', licenseEnd: 'License End', maxUsers: 'User Limit', create: 'Create Company',
       firmCode: 'Company Code', license: 'License', usage: 'Usage', noFirms: 'No companies found.',
       inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'PIN updated.',
       firmCreated: 'Company created.', firmSaved: 'Company updated.', adminRequired: 'This screen is for administrators only.',
-      setupMissing: 'Admin infrastructure is not ready. Complete the v8.9.6 SQL and Edge Function setup.',
+      setupMissing: 'Admin infrastructure is not ready. Check the v8.9.7 Edge Function setup.',
       confirmDeactivate: 'This user will be deactivated. Continue?', protectedUser: 'This account cannot be changed from the panel.',
       usernameHint: '3–32 characters; lowercase letters, numbers, dot, dash or underscore.',
       inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
@@ -142,11 +142,12 @@
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_DELETE_NOT_ALLOWED/i.test(raw)) return t('selfDelete');
     if (/SYSTEM_ADMIN_PROTECTED/i.test(raw)) return t('systemAdminProtected');
+    if (/SYSTEM_ADMIN_REQUIRED/i.test(raw)) return t('adminRequired');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
-    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.6]`;
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.7]`;
     if (/Invalid JWT|Missing authorization header/i.test(raw) || status === 401) {
       return language() === 'en'
         ? 'Authorization was rejected. Sign out and sign in again; if it continues, check the Edge Function logs.'
@@ -273,6 +274,7 @@
     if (ui.passwordTitle) ui.passwordTitle.textContent = t('password');
     if (ui.passwordSubmit) ui.passwordSubmit.textContent = t('password');
     if (ui.usersRefresh) ui.usersRefresh.textContent = t('refresh');
+    if (ui.userSearch) ui.userSearch.placeholder = t('searchPlaceholder');
     if (ui.organizationsTitle) ui.organizationsTitle.textContent = t('firms');
     if (ui.organizationCreateSubmit) ui.organizationCreateSubmit.textContent = t('create');
     if (ui.organizationsRefresh) ui.organizationsRefresh.textContent = t('refresh');
@@ -322,7 +324,7 @@
     const makeOptions = (includeAll) => {
       const rows = [];
       if (includeAll) rows.push(`<option value="">${esc(t('allFirms'))}</option>`);
-      organizations.forEach(org => rows.push(`<option value="${esc(org.id)}">${esc(org.company_code || '----')} · ${esc(org.name)}</option>`));
+      organizations.forEach(org => rows.push(`<option value="${esc(org.id)}">${esc(org.name)}</option>`));
       return rows.join('');
     };
 
@@ -359,13 +361,25 @@
 
   function renderUsers() {
     if (!ui.usersBody) return;
-    ui.usersBody.innerHTML = users.map(user => {
+    const query = String(ui.userSearch && ui.userSearch.value || '').trim().toLocaleLowerCase(language() === 'en' ? 'en-US' : 'tr-TR');
+    const visibleUsers = !query ? users : users.filter(user => {
+      const haystack = [
+        user.organization_name, user.full_name, user.username, roleLabel(user.role),
+        user.is_active ? t('active') : t('passive')
+      ].map(value => String(value || '').toLocaleLowerCase(language() === 'en' ? 'en-US' : 'tr-TR')).join(' ');
+      return haystack.includes(query);
+    });
+
+    ui.usersBody.innerHTML = visibleUsers.map(user => {
       const protectedAccount = user.role === 'system_admin' || user.id === (currentUser && currentUser.id);
       const roleOptions = user.role === 'system_admin'
         ? `<option value="system_admin" selected>${esc(t('systemAdmin'))}</option>`
         : `<option value="company_admin" ${user.role === 'company_admin' ? 'selected' : ''}>${esc(t('companyAdmin'))}</option><option value="designer" ${user.role === 'designer' ? 'selected' : ''}>${esc(t('designer'))}</option>`;
+      const deleteButton = isSystemAdmin()
+        ? `<button type="button" class="danger-btn js-user-delete" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}" ${protectedAccount ? 'disabled title="' + esc(t('protectedUser')) + '"' : ''}>${esc(t('deleteUser'))}</button>`
+        : '';
       return `<tr data-user-id="${esc(user.id)}">
-        <td class="admin-code-cell">${esc(user.company_code || '----')}.${esc(user.user_code || '----')}</td>
+        <td class="admin-company-cell"><strong>${esc(user.organization_name || '-')}</strong></td>
         <td><input class="admin-inline-input js-user-fullname" value="${esc(user.full_name || '')}" ${protectedAccount ? 'disabled' : ''}><small>@${esc(user.username || '-')}</small></td>
         <td><input class="admin-inline-input js-user-username" value="${esc(user.username || '')}" ${protectedAccount ? 'disabled' : ''}></td>
         <td><select class="admin-inline-select js-user-role" ${protectedAccount ? 'disabled' : ''}>${roleOptions}</select></td>
@@ -374,13 +388,13 @@
         <td class="admin-row-actions">
           <button type="button" class="primary-btn js-user-save" ${protectedAccount ? 'disabled title="' + esc(t('protectedUser')) + '"' : ''}>${esc(t('save'))}</button>
           <button type="button" class="soft-btn js-user-password" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}">${esc(t('password'))}</button>
-          <button type="button" class="danger-btn js-user-delete" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}" ${protectedAccount ? 'disabled title="' + esc(t('protectedUser')) + '"' : ''}>${esc(t('deleteUser'))}</button>
+          ${deleteButton}
         </td>
       </tr>`;
     }).join('');
 
     if (ui.usersEmpty) {
-      ui.usersEmpty.hidden = users.length > 0;
+      ui.usersEmpty.hidden = visibleUsers.length > 0;
       ui.usersEmpty.textContent = t('noUsers');
     }
     ui.usersBody.querySelectorAll('.js-user-active').forEach(input => {
@@ -761,7 +775,7 @@
 
   function showTab(tab) {
     const organizationsTab = tab === 'organizations' && isSystemAdmin();
-    const activityTab = tab === 'activity';
+    const activityTab = tab === 'activity' && isSystemAdmin();
     const usersTab = !organizationsTab && !activityTab;
     if (ui.usersPane) ui.usersPane.hidden = !usersTab;
     if (ui.organizationsPane) ui.organizationsPane.hidden = !organizationsTab;
@@ -784,6 +798,7 @@
     }
     applyLanguage();
     if (ui.organizationsTab) ui.organizationsTab.hidden = !isSystemAdmin();
+    if (ui.activityTab) ui.activityTab.hidden = !isSystemAdmin();
     if (ui.organizationCreateForm) ui.organizationCreateForm.hidden = !isSystemAdmin();
     if (ui.inviteOrgField) ui.inviteOrgField.hidden = !isSystemAdmin();
     if (ui.userFilterOrgField) ui.userFilterOrgField.hidden = !isSystemAdmin();
@@ -830,6 +845,7 @@
     if (ui.deleteCancelBtn) ui.deleteCancelBtn.addEventListener('click', closeDeleteDialog);
     if (ui.usersRefresh) ui.usersRefresh.addEventListener('click', loadUsers);
     if (ui.userFilterOrg) ui.userFilterOrg.addEventListener('change', loadUsers);
+    if (ui.userSearch) ui.userSearch.addEventListener('input', renderUsers);
     if (ui.organizationCreateForm) ui.organizationCreateForm.addEventListener('submit', createOrganization);
     if (ui.organizationsRefresh) ui.organizationsRefresh.addEventListener('click', loadOrganizations);
     if (ui.activityRefresh) ui.activityRefresh.addEventListener('click', () => {

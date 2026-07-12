@@ -2841,6 +2841,11 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 .admin-table td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
 .admin-table th { position: sticky; top: 0; z-index: 2; background: var(--ice); color: var(--navy); font-size: 11px; letter-spacing: .15px; }
 .admin-table tbody tr:hover { background: #f7fbfb; }
+.admin-user-search-field { min-width: 230px; }
+.admin-user-search-field input { min-width: 230px; }
+.admin-company-cell { min-width: 190px; white-space: normal; }
+.admin-company-cell strong { color: var(--navy); font-size: 13px; }
+
 .admin-table small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
 .admin-code-cell { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 900; white-space: nowrap; }
 .admin-inline-input,
@@ -2890,7 +2895,8 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   .admin-tab { flex: 1; padding: 9px 8px; }
   .admin-pane { padding: 10px; }
   .admin-section-head { align-items: stretch; flex-direction: column; }
-  .admin-toolbar { display: grid; grid-template-columns: 1fr auto; }
+  .admin-toolbar { display: grid; grid-template-columns: 1fr; }
+  .admin-user-search-field, .admin-user-search-field input { min-width: 0; width: 100%; }
   .admin-compact-field { min-width: 0; }
   .admin-form-grid, .admin-company-grid { grid-template-columns: 1fr; }
   .admin-form-actions button { width: 100%; }
@@ -2930,7 +2936,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   .auth-options { grid-template-columns: 1fr; gap: 8px; }
 }
 
-/* v8.9.6 - kullanım geçmişi ve kullanıcı silme */
+/* v8.9.7 - rol bazlı yönetim paneli ve firma filtresi */
 .admin-activity-toolbar {
   display: grid;
   grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(145px, .8fr)) auto;
