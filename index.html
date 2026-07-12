@@ -10,7 +10,7 @@
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.7';
+      const build = '8.9.8';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
@@ -20,10 +20,10 @@
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.7" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.8" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.7" />
+  <link rel="stylesheet" href="style.css?v=8.9.8" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -326,17 +326,6 @@
       <section id="adminUsersPane" class="admin-pane">
         <div class="admin-section-head">
           <h3 id="adminUsersTitle">Kullanıcılar</h3>
-          <div class="admin-toolbar">
-            <label id="adminUserFilterOrgField" class="admin-compact-field">
-              <span data-admin-i18n="firm">Firma</span>
-              <select id="adminUserFilterOrg"></select>
-            </label>
-            <label class="admin-compact-field admin-user-search-field">
-              <span data-admin-i18n="search">Ara</span>
-              <input id="adminUserSearch" type="search" placeholder="Firma, ad veya kullanıcı adı">
-            </label>
-            <button id="adminUsersRefresh" type="button" class="soft-btn">Yenile</button>
-          </div>
         </div>
 
         <form id="adminInviteForm" class="admin-form-card" autocomplete="off">
@@ -356,6 +345,17 @@
         </form>
 
         <div class="admin-table-wrap">
+          <div class="admin-user-list-toolbar">
+            <label id="adminUserFilterOrgField" class="admin-compact-field admin-user-list-firm">
+              <span data-admin-i18n="firm">Firma</span>
+              <select id="adminUserFilterOrg"></select>
+            </label>
+            <label class="admin-compact-field admin-user-search-field">
+              <span data-admin-i18n="search">Ara</span>
+              <input id="adminUserSearch" type="search" placeholder="Firma, ad veya kullanıcı adı">
+            </label>
+            <button id="adminUsersRefresh" type="button" class="soft-btn">Yenile</button>
+          </div>
           <table class="admin-table">
             <thead><tr>
               <th data-admin-i18n="firm">Firma</th><th data-admin-i18n="fullName">Ad Soyad</th><th data-admin-i18n="username">Kullanıcı Adı</th>
@@ -480,18 +480,18 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.7"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.7"></script>
-  <script src="peri01Geometry.js?v=8.9.7"></script>
-  <script src="modernDxfTemplate.js?v=8.9.7"></script>
-  <script src="dxfModernEngine.js?v=8.9.7"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.8"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.8"></script>
+  <script src="peri01Geometry.js?v=8.9.8"></script>
+  <script src="modernDxfTemplate.js?v=8.9.8"></script>
+  <script src="dxfModernEngine.js?v=8.9.8"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.7"></script>
-  <script src="adminUsersApi.js?v=8.9.7"></script>
-  <script src="activityTracker.js?v=8.9.7"></script>
-  <script src="app.js?v=8.9.7"></script>
-  <script src="cloudProjects.js?v=8.9.7"></script>
-  <script src="adminPanel.js?v=8.9.7"></script>
+  <script src="supabaseConfig.js?v=8.9.8"></script>
+  <script src="adminUsersApi.js?v=8.9.8"></script>
+  <script src="activityTracker.js?v=8.9.8"></script>
+  <script src="app.js?v=8.9.8"></script>
+  <script src="cloudProjects.js?v=8.9.8"></script>
+  <script src="adminPanel.js?v=8.9.8"></script>
 </body>
 </html>

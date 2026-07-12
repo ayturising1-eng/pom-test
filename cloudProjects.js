@@ -30,7 +30,7 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.7 Edge Function kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. v8.9.8 Edge Function kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -50,7 +50,7 @@
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.7 Edge Function setup.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.8 Edge Function setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -74,6 +74,8 @@
   let projectRows = [];
   let dirty = false;
   let authBusy = false;
+  let authEpoch = 0;
+  let explicitLoginInProgress = false;
   let suppressDirty = false;
   let historicalMode = false;
   let historicalCurrentRevision = 1;
@@ -337,7 +339,11 @@
 
   async function handleSignedOut() {
     currentSession = null;
+    currentProfile = null;
+    currentOrganization = null;
     window.PulumurCurrentSession = null;
+    if (ui.cloudUserName) ui.cloudUserName.textContent = '-';
+    if (ui.cloudCompanyCode) ui.cloudCompanyCode.textContent = '-';
     dirty = false;
     historicalMode = false;
     historicalCurrentRevision = 1;
@@ -361,19 +367,31 @@
       return;
     }
     authBusy = true;
+    explicitLoginInProgress = true;
+    const loginEpoch = ++authEpoch;
     if (ui.loginBtn) ui.loginBtn.disabled = true;
     setAuthMessage(t('loginBusy'), false);
     try {
       if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
       const result = await window.PulumurAdminUsersApi.invoke('login', { username, pin }, { auth: false });
       const sessionData = result.session || {};
-      if (!sessionData.access_token || !sessionData.refresh_token) throw new Error('INVALID_LOGIN');
+      const expectedUserId = String(result.user_id || '').trim();
+      const expectedUsername = normalizeUsername(result.username || username);
+      if (!sessionData.access_token || !sessionData.refresh_token || !expectedUserId) throw new Error('INVALID_LOGIN');
+
+      await client.auth.signOut({ scope: 'local' }).catch(() => {});
+      if (loginEpoch !== authEpoch) return;
 
       const sessionResult = await client.auth.setSession({
         access_token: sessionData.access_token,
         refresh_token: sessionData.refresh_token
       });
-      if (sessionResult.error || !sessionResult.data.session) throw sessionResult.error || new Error('INVALID_LOGIN');
+      const authenticatedSession = sessionResult.data && sessionResult.data.session;
+      if (sessionResult.error || !authenticatedSession) throw sessionResult.error || new Error('INVALID_LOGIN');
+      if (String(authenticatedSession.user && authenticatedSession.user.id || '') !== expectedUserId) {
+        await client.auth.signOut({ scope: 'local' }).catch(() => {});
+        throw new Error('LOGIN_IDENTITY_MISMATCH');
+      }
 
       const remember = Boolean(ui.rememberMe && ui.rememberMe.checked);
       localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
@@ -389,7 +407,11 @@
       localStorage.setItem(SAVE_PASSWORD_KEY, savePin ? '1' : '0');
       if (savePin) await storeBrowserCredential(username, pin);
 
-      await handleAuthenticated(sessionResult.data.session);
+      await handleAuthenticated(authenticatedSession);
+      if (!currentProfile || normalizeUsername(currentProfile.username) !== expectedUsername) {
+        await client.auth.signOut({ scope: 'local' }).catch(() => {});
+        throw new Error('LOGIN_PROFILE_MISMATCH');
+      }
       if (window.PulumurActivity) {
         await window.PulumurActivity.log('site_login', { detail: { remembered: remember } });
       }
@@ -397,6 +419,7 @@
       console.error(error);
       setAuthMessage(friendlyError(error, 'loginFailed'), true);
     } finally {
+      explicitLoginInProgress = false;
       authBusy = false;
       if (ui.loginBtn) ui.loginBtn.disabled = false;
     }
@@ -409,7 +432,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.7',
+      app_version: snapshot.appVersion || '8.9.8',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -944,7 +967,9 @@
     setAuthMessage(t('authLoading'), false);
 
     client.auth.onAuthStateChange((_event, session) => {
+      const eventEpoch = authEpoch;
       window.setTimeout(async () => {
+        if (explicitLoginInProgress || eventEpoch !== authEpoch) return;
         if (session && !rememberPreference() && sessionStorage.getItem(SESSION_ONLY_KEY) !== '1') {
           await client.auth.signOut({ scope: 'local' });
           return;

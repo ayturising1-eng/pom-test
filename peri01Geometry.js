@@ -167,7 +167,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.9.7 - ROLE BASED ADMIN PANEL - 12.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.9.8 - SESSION IDENTITY + COMPANY DELETE - 12.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {

@@ -42,8 +42,8 @@
       createFirm: 'Yeni Firma Oluştur', firmName: 'Firma Adı', licenseEnd: 'Lisans Bitişi', maxUsers: 'Kullanıcı Limiti', create: 'Firma Oluştur',
       firmCode: 'Firma Kodu', license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
       inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'PIN kodu güncellendi.',
-      firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
-      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.7 Edge Function kurulumunu kontrol et.',
+      firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', firmDeleted: 'Firma ve bağlı test verileri silindi.', deleteFirm: 'Sil', deleteFirmConfirm: 'Bu firma; kullanıcıları, projeleri ve revizyonlarıyla birlikte kalıcı olarak silinecek. Devam edilsin mi?', currentFirmProtected: 'Giriş yaptığın sistem firmasını silemezsin.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
+      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.8 Edge Function kurulumunu kontrol et.',
       confirmDeactivate: 'Bu kullanıcı pasifleştirilecek. Devam edilsin mi?', protectedUser: 'Bu hesap panelden değiştirilemez.',
       usernameHint: '3–32 karakter; küçük harf, rakam, nokta, tire veya alt çizgi.',
       inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
@@ -63,7 +63,7 @@
       action_revision_open: 'Eski revizyonu açtı', action_dxf_download: 'DXF indirdi', action_pdf_download: 'PDF indirdi',
       action_project_file_download: 'Proje dosyası indirdi', action_user_create: 'Kullanıcı oluşturdu',
       action_user_update: 'Kullanıcı güncelledi', action_pin_update: 'PIN değiştirdi', action_user_delete: 'Kullanıcı sildi',
-      action_organization_create: 'Firma oluşturdu', action_organization_update: 'Firma güncelledi'
+      action_organization_create: 'Firma oluşturdu', action_organization_update: 'Firma güncelledi', action_organization_delete: 'Firma sildi'
     },
     en: {
       adminPanel: 'Admin Panel', panelSubtitle: 'Company, user and license management', users: 'Users', firms: 'Companies',
@@ -74,8 +74,8 @@
       createFirm: 'Create New Company', firmName: 'Company Name', licenseEnd: 'License End', maxUsers: 'User Limit', create: 'Create Company',
       firmCode: 'Company Code', license: 'License', usage: 'Usage', noFirms: 'No companies found.',
       inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'PIN updated.',
-      firmCreated: 'Company created.', firmSaved: 'Company updated.', adminRequired: 'This screen is for administrators only.',
-      setupMissing: 'Admin infrastructure is not ready. Check the v8.9.7 Edge Function setup.',
+      firmCreated: 'Company created.', firmSaved: 'Company updated.', firmDeleted: 'Company and its linked test data were deleted.', deleteFirm: 'Delete', deleteFirmConfirm: 'This company, its users, projects and revisions will be permanently deleted. Continue?', currentFirmProtected: 'You cannot delete the system company used by your active session.', adminRequired: 'This screen is for administrators only.',
+      setupMissing: 'Admin infrastructure is not ready. Check the v8.9.8 Edge Function setup.',
       confirmDeactivate: 'This user will be deactivated. Continue?', protectedUser: 'This account cannot be changed from the panel.',
       usernameHint: '3–32 characters; lowercase letters, numbers, dot, dash or underscore.',
       inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
@@ -95,7 +95,7 @@
       action_revision_open: 'Opened old revision', action_dxf_download: 'Downloaded DXF', action_pdf_download: 'Downloaded PDF',
       action_project_file_download: 'Downloaded project file', action_user_create: 'Created user',
       action_user_update: 'Updated user', action_pin_update: 'Changed PIN', action_user_delete: 'Deleted user',
-      action_organization_create: 'Created company', action_organization_update: 'Updated company'
+      action_organization_create: 'Created company', action_organization_update: 'Updated company', action_organization_delete: 'Deleted company'
     }
   };
 
@@ -142,12 +142,13 @@
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_DELETE_NOT_ALLOWED/i.test(raw)) return t('selfDelete');
     if (/SYSTEM_ADMIN_PROTECTED/i.test(raw)) return t('systemAdminProtected');
+    if (/CURRENT_ORGANIZATION_PROTECTED|SYSTEM_ADMIN_ORGANIZATION_PROTECTED/i.test(raw)) return t('currentFirmProtected');
     if (/SYSTEM_ADMIN_REQUIRED/i.test(raw)) return t('adminRequired');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
-    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.7]`;
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.8]`;
     if (/Invalid JWT|Missing authorization header/i.test(raw) || status === 401) {
       return language() === 'en'
         ? 'Authorization was rejected. Sign out and sign in again; if it continues, check the Edge Function logs.'
@@ -419,7 +420,10 @@
         <td><input class="admin-inline-input js-org-limit" type="number" min="1" max="9999" value="${esc(org.max_users || 1)}"><small>${esc(org.active_user_count || 0)} / ${esc(org.user_count || 0)} ${esc(t('activeUsers'))}</small></td>
         <td><label class="admin-toggle"><input class="js-org-active" type="checkbox" ${org.is_active ? 'checked' : ''}><span>${esc(org.is_active ? t('active') : t('passive'))}</span></label></td>
         <td>${esc(org.project_count || 0)}</td>
-        <td class="admin-row-actions"><button type="button" class="primary-btn js-org-save">${esc(t('save'))}</button></td>
+        <td class="admin-row-actions">
+          <button type="button" class="primary-btn js-org-save">${esc(t('save'))}</button>
+          <button type="button" class="danger-btn js-org-delete" data-org-name="${esc(org.name || '')}" ${currentProfile && org.id === currentProfile.organization_id ? 'disabled title="' + esc(t('currentFirmProtected')) + '"' : ''}>${esc(t('deleteFirm'))}</button>
+        </td>
       </tr>`;
     }).join('');
     if (ui.organizationsEmpty) {
@@ -431,6 +435,7 @@
       if (label) label.textContent = input.checked ? t('active') : t('passive');
     }));
     ui.organizationsBody.querySelectorAll('.js-org-save').forEach(button => button.addEventListener('click', () => saveOrganizationRow(button.closest('tr'))));
+    ui.organizationsBody.querySelectorAll('.js-org-delete').forEach(button => button.addEventListener('click', () => deleteOrganizationRow(button.closest('tr'), button.dataset.orgName)));
   }
 
   async function inviteUser(event) {
@@ -709,6 +714,43 @@
     activityRows = logData || [];
     renderUsageSessions();
     renderActivityRows();
+  }
+
+  async function deleteOrganizationRow(row, organizationName) {
+    if (busy || !isSystemAdmin() || !row) return;
+    const organizationId = row.dataset.organizationId;
+    if (!organizationId) return;
+    if (currentProfile && organizationId === currentProfile.organization_id) {
+      setMessage(t('currentFirmProtected'), true);
+      return;
+    }
+
+    const message = `${organizationName || t('firm')}\n\n${t('deleteFirmConfirm')}`;
+    if (!window.confirm(message)) return;
+
+    setBusy(true);
+    setMessage(t('loading'), false);
+    try {
+      if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
+      const result = await window.PulumurAdminUsersApi.invoke('delete_organization', { organizationId });
+      setMessage(t('firmDeleted'), false);
+      await Promise.all([loadOrganizations(), loadUsers()]);
+      if (window.PulumurActivity) {
+        void window.PulumurActivity.log('organization_delete', {
+          detail: {
+            target_organization_id: organizationId,
+            target_organization_name: organizationName || null,
+            deleted_user_count: result && result.deletedUserCount || 0
+          },
+          organizationId: null
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage(friendlyError(error, 'setupMissing'), true);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createOrganization(event) {
