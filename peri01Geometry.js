@@ -167,7 +167,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.9.1 - ADMIN PANEL AND USER MANAGEMENT - 12.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.9.2 - ADMIN PANEL AND 4 DIGIT PIN LOGIN - 12.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {

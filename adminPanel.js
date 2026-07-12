@@ -31,18 +31,18 @@
       inviteUser: 'Yeni Kullanıcı Oluştur', fullName: 'Ad Soyad', username: 'Kullanıcı Adı', role: 'Rol', firm: 'Firma',
       invite: 'Kullanıcı Oluştur', refresh: 'Yenile', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
       companyAdmin: 'Firma Yöneticisi', designer: 'Tasarımcı', systemAdmin: 'Sistem Yöneticisi', active: 'Aktif', passive: 'Pasif',
-      save: 'Kaydet', password: 'Şifre Belirle', passwordAgain: 'Şifre Tekrar', newPassword: 'Yeni Şifre', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
+      save: 'Kaydet', password: 'PIN Belirle', passwordAgain: 'PIN Kodu Tekrar', newPassword: 'Yeni PIN Kodu', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
       createFirm: 'Yeni Firma Oluştur', firmName: 'Firma Adı', licenseEnd: 'Lisans Bitişi', maxUsers: 'Kullanıcı Limiti', create: 'Firma Oluştur',
       firmCode: 'Firma Kodu', license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
-      inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'Şifre güncellendi.',
+      inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'PIN kodu güncellendi.',
       firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
-      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.1 SQL ve Edge Function kurulumunu tamamla.',
+      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.2 Edge Function kurulumunu tamamla.',
       confirmDeactivate: 'Bu kullanıcı pasifleştirilecek. Devam edilsin mi?', protectedUser: 'Bu hesap panelden değiştirilemez.',
       usernameHint: '3–32 karakter; küçük harf, rakam, nokta, tire veya alt çizgi.',
-      inviteHelp: 'Kullanıcı adı ve ilk şifre yönetici tarafından belirlenir.',
+      inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
       userLimitReached: 'Firmanın kullanıcı limiti doldu.', licenseExpired: 'Firma lisansı aktif değil.', usernameExists: 'Bu kullanıcı adı zaten kullanılıyor.',
-      invalidUsername: 'Kullanıcı adı biçimi uygun değil.', passwordInvalid: 'Şifre 8–72 karakter olmalı.', passwordMismatch: 'Şifreler aynı değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
-      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function bulunamadı veya yayınlanmadı.',
+      invalidUsername: 'Kullanıcı adı biçimi uygun değil.', passwordInvalid: 'PIN kodu yalnızca 4 rakamdan oluşmalı.', passwordMismatch: 'PIN kodları aynı değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
+      selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function yayınlanmamış veya erişilemiyor.',
       allFirms: 'Tüm firmalar', openPanel: 'Yönetim', close: 'Kapat', activeUsers: 'aktif kullanıcı'
     },
     en: {
@@ -50,18 +50,18 @@
       inviteUser: 'Create New User', fullName: 'Full Name', username: 'Username', role: 'Role', firm: 'Company',
       invite: 'Create User', refresh: 'Refresh', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
       companyAdmin: 'Company Administrator', designer: 'Designer', systemAdmin: 'System Administrator', active: 'Active', passive: 'Inactive',
-      save: 'Save', password: 'Set Password', passwordAgain: 'Repeat Password', newPassword: 'New Password', noUsers: 'No users found.', loading: 'Loading…',
+      save: 'Save', password: 'Set PIN', passwordAgain: 'Repeat PIN', newPassword: 'New PIN', noUsers: 'No users found.', loading: 'Loading…',
       createFirm: 'Create New Company', firmName: 'Company Name', licenseEnd: 'License End', maxUsers: 'User Limit', create: 'Create Company',
       firmCode: 'Company Code', license: 'License', usage: 'Usage', noFirms: 'No companies found.',
-      inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'Password updated.',
+      inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'PIN updated.',
       firmCreated: 'Company created.', firmSaved: 'Company updated.', adminRequired: 'This screen is for administrators only.',
-      setupMissing: 'Admin infrastructure is not ready. Complete the v8.9.1 SQL and Edge Function setup.',
+      setupMissing: 'Admin infrastructure is not ready. Complete the v8.9.2 Edge Function setup.',
       confirmDeactivate: 'This user will be deactivated. Continue?', protectedUser: 'This account cannot be changed from the panel.',
       usernameHint: '3–32 characters; lowercase letters, numbers, dot, dash or underscore.',
-      inviteHelp: 'The username and initial password are assigned by an administrator.',
+      inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
       userLimitReached: 'The company user limit has been reached.', licenseExpired: 'The company license is not active.', usernameExists: 'This username is already in use.',
-      invalidUsername: 'The username format is invalid.', passwordInvalid: 'Password must be 8–72 characters.', passwordMismatch: 'Passwords do not match.', lastAdmin: 'At least one active company administrator must remain.',
-      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function was not found or has not been deployed.',
+      invalidUsername: 'The username format is invalid.', passwordInvalid: 'The PIN must contain exactly 4 digits.', passwordMismatch: 'PIN codes do not match.', lastAdmin: 'At least one active company administrator must remain.',
+      selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function is not deployed or cannot be reached.',
       allFirms: 'All companies', openPanel: 'Admin', close: 'Close', activeUsers: 'active users'
     }
   };
@@ -101,10 +101,11 @@
     if (/LICENSE_EXPIRED|LICENSE_NOT_STARTED|ORGANIZATION_INACTIVE/i.test(raw)) return t('licenseExpired');
     if (/USERNAME_ALREADY_EXISTS|duplicate key.*username/i.test(raw)) return t('usernameExists');
     if (/USERNAME_INVALID/i.test(raw)) return t('invalidUsername');
-    if (/PASSWORD_INVALID|PASSWORD_TOO_SHORT|PASSWORD_TOO_LONG/i.test(raw)) return t('passwordInvalid');
+    if (/PIN_INVALID|PASSWORD_INVALID|PASSWORD_TOO_SHORT|PASSWORD_TOO_LONG/i.test(raw)) return t('passwordInvalid');
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
-    if (/FunctionsHttpError|Failed to send a request|404|admin-users/i.test(raw)) return t('functionMissing');
+    if (/PIN_PEPPER_MISSING|FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER Edge Function secret is missing.' : 'Edge Function içinde PLMR_PIN_PEPPER gizli değeri eksik.';
+    if (/FunctionsHttpError|FunctionsFetchError|Failed to send a request|404|admin-users/i.test(raw)) return t('functionMissing');
     if (/function .* does not exist|permission denied|relation .* does not exist/i.test(raw)) return t('setupMissing');
     return raw || t('setupMissing');
   }
@@ -301,13 +302,13 @@
   async function inviteUser(event) {
     event.preventDefault();
     if (busy || !isAdmin()) return;
-    const password = String(ui.invitePassword && ui.invitePassword.value || '');
-    const passwordConfirm = String(ui.invitePasswordConfirm && ui.invitePasswordConfirm.value || '');
-    if (password.length < 8 || password.length > 72) {
+    const pin = String(ui.invitePassword && ui.invitePassword.value || '').trim();
+    const pinConfirm = String(ui.invitePasswordConfirm && ui.invitePasswordConfirm.value || '').trim();
+    if (!/^\d{4}$/.test(pin)) {
       setMessage(t('passwordInvalid'), true);
       return;
     }
-    if (password !== passwordConfirm) {
+    if (pin !== pinConfirm) {
       setMessage(t('passwordMismatch'), true);
       return;
     }
@@ -321,7 +322,7 @@
           organizationId,
           fullName: ui.inviteFullName.value.trim(),
           username: ui.inviteUsername.value.trim().toLowerCase(),
-          password,
+          pin,
           role: ui.inviteRole.value,
           language: language()
         }
@@ -392,20 +393,20 @@
   async function submitPasswordChange(event) {
     event.preventDefault();
     if (!passwordTargetUserId || busy) return;
-    const password = String(ui.newPassword && ui.newPassword.value || '');
-    const confirm = String(ui.newPasswordConfirm && ui.newPasswordConfirm.value || '');
-    if (password.length < 8 || password.length > 72) {
+    const pin = String(ui.newPassword && ui.newPassword.value || '').trim();
+    const confirm = String(ui.newPasswordConfirm && ui.newPasswordConfirm.value || '').trim();
+    if (!/^\d{4}$/.test(pin)) {
       if (ui.passwordMessage) ui.passwordMessage.textContent = t('passwordInvalid');
       return;
     }
-    if (password !== confirm) {
+    if (pin !== confirm) {
       if (ui.passwordMessage) ui.passwordMessage.textContent = t('passwordMismatch');
       return;
     }
     setBusy(true);
     try {
       const result = await client.functions.invoke('admin-users', {
-        body: { action: 'set_password', userId: passwordTargetUserId, password }
+        body: { action: 'set_pin', userId: passwordTargetUserId, pin }
       });
       if (result.error) {
         let detail = '';
@@ -508,6 +509,12 @@
   }
 
   function bind() {
+    [ui.invitePassword, ui.invitePasswordConfirm, ui.newPassword, ui.newPasswordConfirm].forEach(input => {
+      if (!input) return;
+      input.addEventListener('input', () => {
+        input.value = input.value.replace(/\D/g, '').slice(0, 4);
+      });
+    });
     if (ui.openBtn) ui.openBtn.addEventListener('click', openPanel);
     if (ui.closeBtn) ui.closeBtn.addEventListener('click', () => ui.dialog && ui.dialog.close());
     if (ui.usersTab) ui.usersTab.addEventListener('click', () => showTab('users'));

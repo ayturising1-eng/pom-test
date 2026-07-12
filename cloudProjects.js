@@ -26,11 +26,11 @@
 
   const TEXT = {
     tr: {
-      authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'Kullanıcı adı veya şifre hatalı.',
-      loginUsername: 'Kullanıcı Adı', loginPassword: 'Şifre', rememberMe: 'Beni hatırla', savePassword: 'Şifremi kaydet',
-      authNote: 'Kullanıcı adı ve şifre firma yöneticisi tarafından tanımlanır. Şifre kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
+      authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'Kullanıcı adı veya PIN kodu hatalı.',
+      loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
+      authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.1 SQL dosyasını Supabase SQL Editor’da çalıştır.',
+      setupMissing: 'Altyapı hazır değil. v8.9.2 Edge Function kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -46,11 +46,11 @@
       roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.'
     },
     en: {
-      authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect username or password.',
-      loginUsername: 'Username', loginPassword: 'Password', rememberMe: 'Remember me', savePassword: 'Save my password',
-      authNote: 'The username and password are assigned by the company administrator. Password saving uses the browser password manager on supported devices.',
+      authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect username or PIN.',
+      loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
+      authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Run the v8.9.1 SQL file in Supabase SQL Editor.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.2 Edge Function setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -230,11 +230,32 @@
     if (/ORGANIZATION_INACTIVE/i.test(raw)) return t('organizationInactive');
     if (/LICENSE_EXPIRED/i.test(raw)) return t('licenseExpired');
     if (/LICENSE_NOT_STARTED/i.test(raw)) return t('licenseNotStarted');
+    if (/INVALID_LOGIN|Invalid login credentials/i.test(raw)) return t('loginFailed');
+    if (/PIN_PEPPER_MISSING|FUNCTION_SECRETS_MISSING/i.test(raw)) {
+      return language() === 'en'
+        ? 'The PLMR_PIN_PEPPER Edge Function secret is missing.'
+        : 'Edge Function içinde PLMR_PIN_PEPPER gizli değeri eksik.';
+    }
+    if (/FunctionsHttpError|FunctionsFetchError|Failed to send a request|404|admin-users/i.test(raw)) {
+      return language() === 'en'
+        ? 'The admin-users Edge Function is not deployed or cannot be reached.'
+        : 'admin-users Edge Function yayınlanmamış veya erişilemiyor.';
+    }
     if (/relation .* does not exist|column .* does not exist|function .* does not exist|permission denied|row-level security/i.test(raw)) {
       return t('setupMissing');
     }
-    if (/Invalid login credentials/i.test(raw)) return t('loginFailed');
     return raw || t(fallbackKey);
+  }
+
+  async function functionErrorDetail(error) {
+    if (!error) return '';
+    try {
+      if (error.context && typeof error.context.json === 'function') {
+        const payload = await error.context.json();
+        if (payload && payload.error) return String(payload.error);
+      }
+    } catch (_) {}
+    return String(error.message || error || '');
   }
 
   async function loadProfile() {
@@ -300,19 +321,12 @@
     if (ui.loginUsername && savedUsername) ui.loginUsername.value = savedUsername;
   }
 
-  async function resolveLoginEmail(username) {
-    const result = await client.rpc('resolve_login_username_v1', { p_username: username });
-    if (result.error) throw result.error;
-    const value = Array.isArray(result.data) ? result.data[0] : result.data;
-    return String(value || '').trim();
-  }
-
   async function submitLogin(event) {
     event.preventDefault();
     if (authBusy) return;
     const username = normalizeUsername(ui.loginUsername && ui.loginUsername.value);
-    const password = String(ui.loginPassword && ui.loginPassword.value || '');
-    if (!username || !password) {
+    const pin = String(ui.loginPassword && ui.loginPassword.value || '').trim();
+    if (!username || !/^\d{4}$/.test(pin)) {
       setAuthMessage(t('loginFailed'), true);
       return;
     }
@@ -320,10 +334,19 @@
     if (ui.loginBtn) ui.loginBtn.disabled = true;
     setAuthMessage(t('loginBusy'), false);
     try {
-      const email = await resolveLoginEmail(username);
-      if (!email) throw new Error('Invalid login credentials');
-      const result = await client.auth.signInWithPassword({ email, password });
-      if (result.error) throw result.error;
+      const result = await client.functions.invoke('admin-users', {
+        body: { action: 'login', username, pin }
+      });
+      if (result.error) throw new Error(await functionErrorDetail(result.error) || 'INVALID_LOGIN');
+      if (!result.data || result.data.error) throw new Error((result.data && result.data.error) || 'INVALID_LOGIN');
+      const sessionData = result.data.session || {};
+      if (!sessionData.access_token || !sessionData.refresh_token) throw new Error('INVALID_LOGIN');
+
+      const sessionResult = await client.auth.setSession({
+        access_token: sessionData.access_token,
+        refresh_token: sessionData.refresh_token
+      });
+      if (sessionResult.error || !sessionResult.data.session) throw sessionResult.error || new Error('INVALID_LOGIN');
 
       const remember = Boolean(ui.rememberMe && ui.rememberMe.checked);
       localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
@@ -335,11 +358,11 @@
         sessionStorage.setItem(SESSION_ONLY_KEY, '1');
       }
 
-      const savePassword = Boolean(ui.savePassword && ui.savePassword.checked);
-      localStorage.setItem(SAVE_PASSWORD_KEY, savePassword ? '1' : '0');
-      if (savePassword) await storeBrowserCredential(username, password);
+      const savePin = Boolean(ui.savePassword && ui.savePassword.checked);
+      localStorage.setItem(SAVE_PASSWORD_KEY, savePin ? '1' : '0');
+      if (savePin) await storeBrowserCredential(username, pin);
 
-      await handleAuthenticated(result.data.session);
+      await handleAuthenticated(sessionResult.data.session);
     } catch (error) {
       console.error(error);
       setAuthMessage(friendlyError(error, 'loginFailed'), true);
@@ -356,7 +379,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.1',
+      app_version: snapshot.appVersion || '8.9.2',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -810,6 +833,9 @@
   }
 
   function bindUi() {
+    if (ui.loginPassword) ui.loginPassword.addEventListener('input', () => {
+      ui.loginPassword.value = ui.loginPassword.value.replace(/\D/g, '').slice(0, 4);
+    });
     if (ui.loginForm) ui.loginForm.addEventListener('submit', submitLogin);
     if (ui.logoutBtn) ui.logoutBtn.addEventListener('click', async () => {
       if (dirty && !window.confirm(t('confirmDiscard'))) return;

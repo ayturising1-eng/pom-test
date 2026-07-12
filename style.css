@@ -2576,7 +2576,7 @@ label em {
 /* V8.4.2: Tek doğrudan DXF indirme düğmesi */
 .preview-download-actions { align-items: center; }
 
-/* v8.9.1 - Kullanıcı girişi, firma ayrımı ve rol bazlı proje yönetimi */
+/* v8.9.2 - Kullanıcı girişi, firma ayrımı ve rol bazlı proje yönetimi */
 [hidden] { display: none !important; }
 body.auth-pending .app-header,
 body.auth-pending .cloud-project-bar,
@@ -2679,7 +2679,7 @@ body.auth-ready .auth-gate { display: none !important; }
   .cloud-project-identity > div:first-child { grid-column: 1 / -1; }
 }
 
-/* v8.9.1 - Revizyon ve rol yönetimi */
+/* v8.9.2 - Revizyon ve rol yönetimi */
 .cloud-project-actions { flex-wrap: wrap; justify-content: center; }
 #cloudSaveState[data-state="history"] { color: var(--blue); }
 .cloud-project-actions button:disabled,
@@ -2730,7 +2730,7 @@ body.auth-ready .auth-gate { display: none !important; }
 }
 
 
-/* v8.9.1 - Rol rozeti */
+/* v8.9.2 - Rol rozeti */
 .cloud-user-box { grid-template-rows: auto auto auto; }
 .cloud-user-box strong,
 .cloud-user-box > span { grid-column: 1; }
@@ -2755,7 +2755,7 @@ body.cloud-readonly .cloud-project-actions #newCloudProjectBtn,
 body.cloud-readonly .cloud-project-actions #saveCloudProjectBtn,
 body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 
-/* v8.9.1 - Sistem ve firma yönetici paneli */
+/* v8.9.2 - Sistem ve firma yönetici paneli */
 .cloud-user-box #adminPanelBtn { grid-column: 2; grid-row: 1; align-self: end; }
 .cloud-user-box #logoutBtn { grid-column: 2; grid-row: 2 / span 2; align-self: stretch; }
 
@@ -2896,7 +2896,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   .admin-form-actions button { width: 100%; }
 }
 
-/* v8.9.1 — username login and browser-managed password preferences */
+/* v8.9.2 — username login and browser-managed PIN preferences */
 .auth-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
