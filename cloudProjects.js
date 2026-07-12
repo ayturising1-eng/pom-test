@@ -236,10 +236,20 @@
         ? 'The PLMR_PIN_PEPPER Edge Function secret is missing.'
         : 'Edge Function içinde PLMR_PIN_PEPPER gizli değeri eksik.';
     }
-    if (/AUTH_REQUIRED|AUTH_INVALID|HTTP_401/i.test(raw)) {
+    if (/AUTH_REQUIRED/i.test(raw)) {
       return language() === 'en'
-        ? 'admin-users exists, but Verify JWT is enabled. Disable Verify JWT and deploy again.'
-        : 'admin-users bulundu ancak Verify JWT açık. Fonksiyon ayarından Verify JWT seçeneğini kapatıp yeniden Deploy et.';
+        ? 'Your login session could not be found. Sign out and sign in again.'
+        : 'Oturum bilgisi bulunamadı. Çıkış yapıp tekrar giriş yap.';
+    }
+    if (/AUTH_INVALID/i.test(raw)) {
+      return language() === 'en'
+        ? 'Your login session is no longer valid. Sign out and sign in again.'
+        : 'Oturum süresi dolmuş veya geçersiz. Çıkış yapıp tekrar giriş yap.';
+    }
+    if (/Invalid JWT|Missing authorization header|HTTP_401/i.test(raw)) {
+      return language() === 'en'
+        ? 'The Edge Function rejected the authorization header. Check the function logs and session.'
+        : 'Edge Function yetkilendirme bilgisini reddetti. Fonksiyon loglarını ve oturumu kontrol et.';
     }
     if (/FUNCTION_NETWORK_ERROR|Failed to fetch|NetworkError/i.test(raw)) {
       return language() === 'en'

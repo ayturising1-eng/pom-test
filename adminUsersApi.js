@@ -17,11 +17,17 @@
   }
 
   async function getAccessToken() {
-    const client = window.PulumurCloudProjects && typeof window.PulumurCloudProjects.getClient === 'function'
+    // cloudProjects.js exposes the active browser client as window.PulumurSupabase.
+    // Older builds tried to read a non-existent PulumurCloudProjects.getClient(),
+    // which caused every admin action to fail locally with AUTH_REQUIRED.
+    const exportedClient = window.PulumurCloudProjects && typeof window.PulumurCloudProjects.getClient === 'function'
       ? window.PulumurCloudProjects.getClient()
       : null;
+    const client = exportedClient || window.PulumurSupabase || null;
     if (!client || !client.auth) return '';
+
     const result = await client.auth.getSession();
+    if (result && result.error) throw result.error;
     return String(result && result.data && result.data.session && result.data.session.access_token || '');
   }
 
