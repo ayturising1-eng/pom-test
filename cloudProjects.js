@@ -30,7 +30,7 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.9 Edge Function kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. v8.9.10 Supabase kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -43,6 +43,8 @@
       revisionOpened: 'Geçmiş revizyon açıldı:', currentRevisionOpened: 'Güncel revizyon açıldı:', current: 'Güncel', history: 'Geçmiş',
       confirmRevision: 'Mevcut çalışma kaydedilecek ve yeni revizyon oluşturulacak.', saveBeforeRevisionFailed: 'Mevcut çalışma kaydedilemediği için revizyon oluşturulmadı.',
       readOnly: 'Salt okunur', noWritePermission: 'Bu kullanıcı yalnız görüntüleme yetkisine sahip.',
+      deleteProject: 'Sil', deleteProjectConfirm: 'Bu proje ve tüm revizyonları kalıcı olarak silinecek. Devam edilsin mi?',
+      projectDeleted: 'Proje ve revizyonları silindi:', deleteProjectFailed: 'Proje silinemedi.', systemAdminRequired: 'Bu işlem yalnız Sistem Yöneticisi tarafından yapılabilir.',
       roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.'
     },
     en: {
@@ -50,7 +52,7 @@
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.9 Edge Function setup.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.10 Supabase setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -63,6 +65,8 @@
       revisionOpened: 'Historical revision opened:', currentRevisionOpened: 'Current revision opened:', current: 'Current', history: 'History',
       confirmRevision: 'The current work will be saved and a new revision will be created.', saveBeforeRevisionFailed: 'The revision was not created because the current work could not be saved.',
       readOnly: 'Read only', noWritePermission: 'This user has view-only permission.',
+      deleteProject: 'Delete', deleteProjectConfirm: 'This project and all of its revisions will be permanently deleted. Continue?',
+      projectDeleted: 'Project and revisions deleted:', deleteProjectFailed: 'The project could not be deleted.', systemAdminRequired: 'This action is available only to the System Administrator.',
       roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', organizationInactive: 'The company account is inactive.', licenseExpired: 'The company license has expired.', licenseNotStarted: 'The company license has not started yet.'
     }
   };
@@ -168,6 +172,10 @@
     return Boolean(currentProfile && ['system_admin', 'company_admin', 'designer'].includes(currentProfile.role));
   }
 
+  function isSystemAdmin() {
+    return Boolean(currentProfile && currentProfile.role === 'system_admin');
+  }
+
   function roleLabel(role) {
     const map = {
       system_admin: 'roleSystemAdmin',
@@ -236,6 +244,7 @@
   function friendlyError(error, fallbackKey) {
     const raw = String((error && error.message) || '').trim();
     if (/READ_ONLY_USER/i.test(raw)) return t('noWritePermission');
+    if (/SYSTEM_ADMIN_REQUIRED/i.test(raw)) return t('systemAdminRequired');
     if (/ORGANIZATION_INACTIVE/i.test(raw)) return t('organizationInactive');
     if (/LICENSE_EXPIRED/i.test(raw)) return t('licenseExpired');
     if (/LICENSE_NOT_STARTED/i.test(raw)) return t('licenseNotStarted');
@@ -430,7 +439,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.9',
+      app_version: snapshot.appVersion || '8.9.10',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -608,6 +617,7 @@
   function renderProjects() {
     if (!ui.projectsTableBody) return;
     const rows = filteredProjects();
+    const allowDelete = isSystemAdmin();
     ui.projectsTableBody.innerHTML = rows.map(row => `
       <tr>
         <td class="project-code-cell">${escapeHtml(row.project_code)}</td>
@@ -618,6 +628,7 @@
         <td class="project-actions-cell">
           <button type="button" class="primary-btn project-open-btn" data-project-id="${escapeHtml(row.id)}">${escapeHtml(t('open'))}</button>
           <button type="button" class="soft-btn project-revisions-btn" data-project-id="${escapeHtml(row.id)}">${escapeHtml(t('revisions'))}</button>
+          ${allowDelete ? `<button type="button" class="danger-btn project-delete-btn" data-project-id="${escapeHtml(row.id)}">${escapeHtml(t('deleteProject'))}</button>` : ''}
         </td>
       </tr>`).join('');
     if (ui.projectsEmpty) {
@@ -629,6 +640,9 @@
     });
     ui.projectsTableBody.querySelectorAll('.project-revisions-btn').forEach(button => {
       button.addEventListener('click', () => showRevisions(button.dataset.projectId));
+    });
+    ui.projectsTableBody.querySelectorAll('.project-delete-btn').forEach(button => {
+      button.addEventListener('click', () => deleteProjectById(button.dataset.projectId));
     });
   }
 
@@ -648,6 +662,47 @@
     if (result.error) throw result.error;
     projectRows = result.data || [];
     renderProjects();
+  }
+
+  async function deleteProjectById(projectId) {
+    if (!isSystemAdmin()) {
+      window.alert(t('systemAdminRequired'));
+      return;
+    }
+    const row = projectRows.find(item => String(item.id) === String(projectId));
+    if (!row) return;
+    const label = [row.project_code, row.customer_name, row.project_name].filter(Boolean).join(' · ');
+    if (!window.confirm(`${t('deleteProjectConfirm')}\n\n${label}`)) return;
+
+    try {
+      const result = await client.rpc('delete_project_v1', { p_project_id: projectId });
+      if (result.error) throw result.error;
+
+      const currentRecord = getRecord();
+      if (String(currentRecord.projectId || '') === String(projectId)) {
+        dirty = false;
+        startNewProject();
+      }
+
+      projectRows = projectRows.filter(item => String(item.id) !== String(projectId));
+      renderProjects();
+      setStatus(`${t('projectDeleted')} ${row.project_code}`);
+      if (window.PulumurActivity) {
+        void window.PulumurActivity.log('project_delete', {
+          projectId: null,
+          projectCode: row.project_code,
+          revisionNo: row.current_revision || 1,
+          detail: {
+            deleted_project_id: row.id,
+            project_name: row.project_name,
+            customer_name: row.customer_name
+          }
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(friendlyError(error, 'deleteProjectFailed'));
+    }
   }
 
   async function showProjects() {
