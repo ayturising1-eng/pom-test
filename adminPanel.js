@@ -40,10 +40,10 @@
       companyAdmin: 'Firma Yöneticisi', designer: 'Tasarımcı', systemAdmin: 'Sistem Yöneticisi', active: 'Aktif', passive: 'Pasif',
       save: 'Kaydet', password: 'PIN Belirle', passwordAgain: 'PIN Kodu Tekrar', newPassword: 'Yeni PIN Kodu', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
       createFirm: 'Yeni Firma Oluştur', firmName: 'Firma Adı', licenseEnd: 'Lisans Bitişi', maxUsers: 'Kullanıcı Limiti', create: 'Firma Oluştur',
-      firmCode: 'Firma Kodu', license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
+      license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
       inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'PIN kodu güncellendi.',
       firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', firmDeleted: 'Firma ve bağlı test verileri silindi.', deleteFirm: 'Sil', deleteFirmConfirm: 'Bu firma; kullanıcıları, projeleri ve revizyonlarıyla birlikte kalıcı olarak silinecek. Devam edilsin mi?', currentFirmProtected: 'Giriş yaptığın sistem firmasını silemezsin.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
-      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.8 Edge Function kurulumunu kontrol et.',
+      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.9 Edge Function kurulumunu kontrol et.',
       confirmDeactivate: 'Bu kullanıcı pasifleştirilecek. Devam edilsin mi?', protectedUser: 'Bu hesap panelden değiştirilemez.',
       usernameHint: '3–32 karakter; küçük harf, rakam, nokta, tire veya alt çizgi.',
       inviteHelp: 'Kullanıcı adı ve 4 haneli ilk PIN kodu yönetici tarafından belirlenir.',
@@ -72,10 +72,10 @@
       companyAdmin: 'Company Administrator', designer: 'Designer', systemAdmin: 'System Administrator', active: 'Active', passive: 'Inactive',
       save: 'Save', password: 'Set PIN', passwordAgain: 'Repeat PIN', newPassword: 'New PIN', noUsers: 'No users found.', loading: 'Loading…',
       createFirm: 'Create New Company', firmName: 'Company Name', licenseEnd: 'License End', maxUsers: 'User Limit', create: 'Create Company',
-      firmCode: 'Company Code', license: 'License', usage: 'Usage', noFirms: 'No companies found.',
+      license: 'License', usage: 'Usage', noFirms: 'No companies found.',
       inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'PIN updated.',
       firmCreated: 'Company created.', firmSaved: 'Company updated.', firmDeleted: 'Company and its linked test data were deleted.', deleteFirm: 'Delete', deleteFirmConfirm: 'This company, its users, projects and revisions will be permanently deleted. Continue?', currentFirmProtected: 'You cannot delete the system company used by your active session.', adminRequired: 'This screen is for administrators only.',
-      setupMissing: 'Admin infrastructure is not ready. Check the v8.9.8 Edge Function setup.',
+      setupMissing: 'Admin infrastructure is not ready. Check the v8.9.9 Edge Function setup.',
       confirmDeactivate: 'This user will be deactivated. Continue?', protectedUser: 'This account cannot be changed from the panel.',
       usernameHint: '3–32 characters; lowercase letters, numbers, dot, dash or underscore.',
       inviteHelp: 'The username and initial 4-digit PIN are assigned by an administrator.',
@@ -148,7 +148,7 @@
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
-    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.8]`;
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / v8.9.9]`;
     if (/Invalid JWT|Missing authorization header/i.test(raw) || status === 401) {
       return language() === 'en'
         ? 'Authorization was rejected. Sign out and sign in again; if it continues, check the Edge Function logs.'
@@ -414,7 +414,6 @@
     ui.organizationsBody.innerHTML = organizations.map(org => {
       const licenseState = org.license_end && org.license_end < new Date().toISOString().slice(0, 10) ? t('passive') : t('active');
       return `<tr data-organization-id="${esc(org.id)}">
-        <td class="admin-code-cell">${esc(org.company_code || '----')}</td>
         <td><input class="admin-inline-input js-org-name" value="${esc(org.name || '')}"></td>
         <td><input class="admin-inline-input js-org-license" type="date" value="${esc(org.license_end || '')}"><small>${esc(licenseState)}</small></td>
         <td><input class="admin-inline-input js-org-limit" type="number" min="1" max="9999" value="${esc(org.max_users || 1)}"><small>${esc(org.active_user_count || 0)} / ${esc(org.user_count || 0)} ${esc(t('activeUsers'))}</small></td>

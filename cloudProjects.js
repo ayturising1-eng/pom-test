@@ -30,7 +30,7 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.8 Edge Function kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. v8.9.9 Edge Function kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -50,7 +50,7 @@
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.8 Edge Function setup.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.9 Edge Function setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -314,9 +314,7 @@
     const displayName = currentProfile.full_name || currentProfile.username || t('unknownUser');
     const username = currentProfile.username ? `@${currentProfile.username}` : '';
     if (ui.cloudUserName) ui.cloudUserName.textContent = `${displayName}${username ? ` · ${username}` : ''}`;
-    const companyCode = currentOrganization.company_code || '----';
-    const userCode = currentProfile.user_code || '----';
-    if (ui.cloudCompanyCode) ui.cloudCompanyCode.textContent = `${currentOrganization.name || t('unknownCompany')} · ${companyCode}.${userCode}`;
+    if (ui.cloudCompanyCode) ui.cloudCompanyCode.textContent = currentOrganization.name || t('unknownCompany');
     refreshRoleUi();
   }
 
@@ -432,7 +430,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.8',
+      app_version: snapshot.appVersion || '8.9.9',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
