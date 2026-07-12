@@ -9,7 +9,8 @@
     usersPane: $('adminUsersPane'), organizationsPane: $('adminOrganizationsPane'),
     usersTitle: $('adminUsersTitle'), inviteTitle: $('adminInviteTitle'),
     inviteForm: $('adminInviteForm'), inviteOrgField: $('adminInviteOrgField'), inviteOrg: $('adminInviteOrg'),
-    inviteFullName: $('adminInviteFullName'), inviteUsername: $('adminInviteUsername'), inviteEmail: $('adminInviteEmail'),
+    inviteFullName: $('adminInviteFullName'), inviteUsername: $('adminInviteUsername'),
+    invitePassword: $('adminInvitePassword'), invitePasswordConfirm: $('adminInvitePasswordConfirm'),
     inviteRole: $('adminInviteRole'), inviteSubmit: $('adminInviteSubmit'),
     userFilterOrgField: $('adminUserFilterOrgField'), userFilterOrg: $('adminUserFilterOrg'),
     usersRefresh: $('adminUsersRefresh'), usersBody: $('adminUsersBody'), usersEmpty: $('adminUsersEmpty'),
@@ -17,45 +18,49 @@
     organizationName: $('adminOrganizationName'), organizationLicenseEnd: $('adminOrganizationLicenseEnd'),
     organizationMaxUsers: $('adminOrganizationMaxUsers'), organizationCreateSubmit: $('adminOrganizationCreateSubmit'),
     organizationsRefresh: $('adminOrganizationsRefresh'), organizationsBody: $('adminOrganizationsBody'),
-    organizationsEmpty: $('adminOrganizationsEmpty')
+    organizationsEmpty: $('adminOrganizationsEmpty'),
+    passwordDialog: $('adminPasswordDialog'), passwordForm: $('adminPasswordForm'), passwordTitle: $('adminPasswordTitle'),
+    passwordUser: $('adminPasswordUser'), passwordCloseBtn: $('adminPasswordCloseBtn'), passwordCancelBtn: $('adminPasswordCancelBtn'),
+    newPassword: $('adminNewPassword'), newPasswordConfirm: $('adminNewPasswordConfirm'),
+    passwordMessage: $('adminPasswordMessage'), passwordSubmit: $('adminPasswordSubmit')
   };
 
   const TEXT = {
     tr: {
       adminPanel: 'Yönetici Paneli', panelSubtitle: 'Firma, kullanıcı ve lisans yönetimi', users: 'Kullanıcılar', firms: 'Firmalar',
-      inviteUser: 'Yeni Kullanıcı Davet Et', fullName: 'Ad Soyad', username: 'Kullanıcı Adı', email: 'E-posta', role: 'Rol', firm: 'Firma',
-      invite: 'Davet Gönder', refresh: 'Yenile', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
+      inviteUser: 'Yeni Kullanıcı Oluştur', fullName: 'Ad Soyad', username: 'Kullanıcı Adı', role: 'Rol', firm: 'Firma',
+      invite: 'Kullanıcı Oluştur', refresh: 'Yenile', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
       companyAdmin: 'Firma Yöneticisi', designer: 'Tasarımcı', systemAdmin: 'Sistem Yöneticisi', active: 'Aktif', passive: 'Pasif',
-      save: 'Kaydet', password: 'Şifre Bağlantısı', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
+      save: 'Kaydet', password: 'Şifre Belirle', passwordAgain: 'Şifre Tekrar', newPassword: 'Yeni Şifre', noUsers: 'Kullanıcı bulunamadı.', loading: 'Yükleniyor…',
       createFirm: 'Yeni Firma Oluştur', firmName: 'Firma Adı', licenseEnd: 'Lisans Bitişi', maxUsers: 'Kullanıcı Limiti', create: 'Firma Oluştur',
       firmCode: 'Firma Kodu', license: 'Lisans', usage: 'Kullanım', noFirms: 'Firma bulunamadı.',
-      inviteSuccess: 'Kullanıcı daveti gönderildi.', userSaved: 'Kullanıcı güncellendi.', resetSent: 'Şifre bağlantısı gönderildi.',
+      inviteSuccess: 'Kullanıcı oluşturuldu.', userSaved: 'Kullanıcı güncellendi.', passwordSaved: 'Şifre güncellendi.',
       firmCreated: 'Firma oluşturuldu.', firmSaved: 'Firma güncellendi.', adminRequired: 'Bu ekran yalnız yöneticiler içindir.',
-      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.0 SQL ve Edge Function kurulumunu tamamla.',
+      setupMissing: 'Yönetici paneli altyapısı hazır değil. v8.9.1 SQL ve Edge Function kurulumunu tamamla.',
       confirmDeactivate: 'Bu kullanıcı pasifleştirilecek. Devam edilsin mi?', protectedUser: 'Bu hesap panelden değiştirilemez.',
       usernameHint: '3–32 karakter; küçük harf, rakam, nokta, tire veya alt çizgi.',
-      inviteHelp: 'Kullanıcıya şifre oluşturma bağlantısı e-posta ile gönderilir.',
+      inviteHelp: 'Kullanıcı adı ve ilk şifre yönetici tarafından belirlenir.',
       userLimitReached: 'Firmanın kullanıcı limiti doldu.', licenseExpired: 'Firma lisansı aktif değil.', usernameExists: 'Bu kullanıcı adı zaten kullanılıyor.',
-      emailExists: 'Bu e-posta zaten kayıtlı.', invalidUsername: 'Kullanıcı adı biçimi uygun değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
+      invalidUsername: 'Kullanıcı adı biçimi uygun değil.', passwordInvalid: 'Şifre 8–72 karakter olmalı.', passwordMismatch: 'Şifreler aynı değil.', lastAdmin: 'Firmada en az bir aktif firma yöneticisi kalmalı.',
       selfManagement: 'Kendi hesabını bu panelden değiştiremezsin.', functionMissing: 'admin-users Edge Function bulunamadı veya yayınlanmadı.',
       allFirms: 'Tüm firmalar', openPanel: 'Yönetim', close: 'Kapat', activeUsers: 'aktif kullanıcı'
     },
     en: {
       adminPanel: 'Admin Panel', panelSubtitle: 'Company, user and license management', users: 'Users', firms: 'Companies',
-      inviteUser: 'Invite New User', fullName: 'Full Name', username: 'Username', email: 'Email', role: 'Role', firm: 'Company',
-      invite: 'Send Invite', refresh: 'Refresh', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
+      inviteUser: 'Create New User', fullName: 'Full Name', username: 'Username', role: 'Role', firm: 'Company',
+      invite: 'Create User', refresh: 'Refresh', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
       companyAdmin: 'Company Administrator', designer: 'Designer', systemAdmin: 'System Administrator', active: 'Active', passive: 'Inactive',
-      save: 'Save', password: 'Password Link', noUsers: 'No users found.', loading: 'Loading…',
+      save: 'Save', password: 'Set Password', passwordAgain: 'Repeat Password', newPassword: 'New Password', noUsers: 'No users found.', loading: 'Loading…',
       createFirm: 'Create New Company', firmName: 'Company Name', licenseEnd: 'License End', maxUsers: 'User Limit', create: 'Create Company',
       firmCode: 'Company Code', license: 'License', usage: 'Usage', noFirms: 'No companies found.',
-      inviteSuccess: 'User invitation sent.', userSaved: 'User updated.', resetSent: 'Password link sent.',
+      inviteSuccess: 'User created.', userSaved: 'User updated.', passwordSaved: 'Password updated.',
       firmCreated: 'Company created.', firmSaved: 'Company updated.', adminRequired: 'This screen is for administrators only.',
-      setupMissing: 'Admin infrastructure is not ready. Complete the v8.9.0 SQL and Edge Function setup.',
+      setupMissing: 'Admin infrastructure is not ready. Complete the v8.9.1 SQL and Edge Function setup.',
       confirmDeactivate: 'This user will be deactivated. Continue?', protectedUser: 'This account cannot be changed from the panel.',
       usernameHint: '3–32 characters; lowercase letters, numbers, dot, dash or underscore.',
-      inviteHelp: 'A password creation link is sent to the user by email.',
+      inviteHelp: 'The username and initial password are assigned by an administrator.',
       userLimitReached: 'The company user limit has been reached.', licenseExpired: 'The company license is not active.', usernameExists: 'This username is already in use.',
-      emailExists: 'This email is already registered.', invalidUsername: 'The username format is invalid.', lastAdmin: 'At least one active company administrator must remain.',
+      invalidUsername: 'The username format is invalid.', passwordInvalid: 'Password must be 8–72 characters.', passwordMismatch: 'Passwords do not match.', lastAdmin: 'At least one active company administrator must remain.',
       selfManagement: 'You cannot change your own account from this panel.', functionMissing: 'The admin-users Edge Function was not found or has not been deployed.',
       allFirms: 'All companies', openPanel: 'Admin', close: 'Close', activeUsers: 'active users'
     }
@@ -67,6 +72,7 @@
   let organizations = [];
   let users = [];
   let busy = false;
+  let passwordTargetUserId = null;
 
   function language() {
     return $('languageSelect') && $('languageSelect').value === 'en' ? 'en' : 'tr';
@@ -94,8 +100,8 @@
     if (/USER_LIMIT_REACHED/i.test(raw)) return t('userLimitReached');
     if (/LICENSE_EXPIRED|LICENSE_NOT_STARTED|ORGANIZATION_INACTIVE/i.test(raw)) return t('licenseExpired');
     if (/USERNAME_ALREADY_EXISTS|duplicate key.*username/i.test(raw)) return t('usernameExists');
-    if (/EMAIL_ALREADY_EXISTS|already been registered|already exists|duplicate key.*email/i.test(raw)) return t('emailExists');
     if (/USERNAME_INVALID/i.test(raw)) return t('invalidUsername');
+    if (/PASSWORD_INVALID|PASSWORD_TOO_SHORT|PASSWORD_TOO_LONG/i.test(raw)) return t('passwordInvalid');
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
     if (/FunctionsHttpError|Failed to send a request|404|admin-users/i.test(raw)) return t('functionMissing');
@@ -126,7 +132,7 @@
 
   function setBusy(value) {
     busy = Boolean(value);
-    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh].forEach(button => {
+    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh, ui.passwordSubmit].forEach(button => {
       if (button) button.disabled = busy;
     });
   }
@@ -142,7 +148,7 @@
     }
     currentUser = userResult.data.user;
     const profileResult = await client.from('profiles')
-      .select('id, organization_id, username, full_name, email, role, is_active')
+      .select('id, organization_id, username, full_name, role, is_active')
       .eq('id', currentUser.id)
       .single();
     if (profileResult.error || !profileResult.data || profileResult.data.is_active !== true) {
@@ -164,6 +170,8 @@
     if (ui.usersTitle) ui.usersTitle.textContent = t('users');
     if (ui.inviteTitle) ui.inviteTitle.textContent = t('inviteUser');
     if (ui.inviteSubmit) ui.inviteSubmit.textContent = t('invite');
+    if (ui.passwordTitle) ui.passwordTitle.textContent = t('password');
+    if (ui.passwordSubmit) ui.passwordSubmit.textContent = t('password');
     if (ui.usersRefresh) ui.usersRefresh.textContent = t('refresh');
     if (ui.organizationsTitle) ui.organizationsTitle.textContent = t('firms');
     if (ui.organizationCreateSubmit) ui.organizationCreateSubmit.textContent = t('create');
@@ -240,13 +248,13 @@
       return `<tr data-user-id="${esc(user.id)}">
         <td class="admin-code-cell">${esc(user.company_code || '----')}.${esc(user.user_code || '----')}</td>
         <td><input class="admin-inline-input js-user-fullname" value="${esc(user.full_name || '')}" ${protectedAccount ? 'disabled' : ''}><small>@${esc(user.username || '-')}</small></td>
-        <td><input class="admin-inline-input js-user-username" value="${esc(user.username || '')}" ${protectedAccount ? 'disabled' : ''}><small>${esc(user.email || '-')}</small></td>
+        <td><input class="admin-inline-input js-user-username" value="${esc(user.username || '')}" ${protectedAccount ? 'disabled' : ''}></td>
         <td><select class="admin-inline-select js-user-role" ${protectedAccount ? 'disabled' : ''}>${roleOptions}</select></td>
         <td><label class="admin-toggle"><input class="js-user-active" type="checkbox" ${user.is_active ? 'checked' : ''} ${protectedAccount ? 'disabled' : ''}><span>${esc(user.is_active ? t('active') : t('passive'))}</span></label></td>
         <td>${esc(user.project_count || 0)}</td>
         <td class="admin-row-actions">
           <button type="button" class="primary-btn js-user-save" ${protectedAccount ? 'disabled title="' + esc(t('protectedUser')) + '"' : ''}>${esc(t('save'))}</button>
-          <button type="button" class="soft-btn js-user-reset" data-email="${esc(user.email || '')}">${esc(t('password'))}</button>
+          <button type="button" class="soft-btn js-user-password" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}">${esc(t('password'))}</button>
         </td>
       </tr>`;
     }).join('');
@@ -262,7 +270,7 @@
       });
     });
     ui.usersBody.querySelectorAll('.js-user-save').forEach(button => button.addEventListener('click', () => saveUserRow(button.closest('tr'))));
-    ui.usersBody.querySelectorAll('.js-user-reset').forEach(button => button.addEventListener('click', () => sendPasswordLink(button.dataset.email)));
+    ui.usersBody.querySelectorAll('.js-user-password').forEach(button => button.addEventListener('click', () => openPasswordDialog(button.dataset.userId, button.dataset.userName)));
   }
 
   function renderOrganizations() {
@@ -293,20 +301,29 @@
   async function inviteUser(event) {
     event.preventDefault();
     if (busy || !isAdmin()) return;
+    const password = String(ui.invitePassword && ui.invitePassword.value || '');
+    const passwordConfirm = String(ui.invitePasswordConfirm && ui.invitePasswordConfirm.value || '');
+    if (password.length < 8 || password.length > 72) {
+      setMessage(t('passwordInvalid'), true);
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setMessage(t('passwordMismatch'), true);
+      return;
+    }
     setBusy(true);
     setMessage(t('loading'), false);
     try {
       const organizationId = isSystemAdmin() ? ui.inviteOrg.value : currentProfile.organization_id;
       const result = await client.functions.invoke('admin-users', {
         body: {
-          action: 'invite',
+          action: 'create',
           organizationId,
           fullName: ui.inviteFullName.value.trim(),
           username: ui.inviteUsername.value.trim().toLowerCase(),
-          email: ui.inviteEmail.value.trim().toLowerCase(),
+          password,
           role: ui.inviteRole.value,
-          language: language(),
-          redirectTo: `${window.location.origin}${window.location.pathname}`
+          language: language()
         }
       });
       if (result.error) {
@@ -317,7 +334,7 @@
             detail = responseBody && responseBody.error ? String(responseBody.error) : '';
           }
         } catch (_) {}
-        throw new Error(detail || result.error.message || 'INVITE_FAILED');
+        throw new Error(detail || result.error.message || 'CREATE_USER_FAILED');
       }
       if (result.data && result.data.error) throw new Error(result.data.error);
       ui.inviteForm.reset();
@@ -356,16 +373,56 @@
     }
   }
 
-  async function sendPasswordLink(email) {
-    if (!email || busy) return;
+  function openPasswordDialog(userId, userName) {
+    if (!userId || !ui.passwordDialog) return;
+    passwordTargetUserId = userId;
+    if (ui.passwordUser) ui.passwordUser.textContent = userName || t('username');
+    if (ui.newPassword) ui.newPassword.value = '';
+    if (ui.newPasswordConfirm) ui.newPasswordConfirm.value = '';
+    if (ui.passwordMessage) ui.passwordMessage.textContent = t('passwordInvalid');
+    ui.passwordDialog.showModal();
+    window.setTimeout(() => ui.newPassword && ui.newPassword.focus(), 0);
+  }
+
+  function closePasswordDialog() {
+    passwordTargetUserId = null;
+    if (ui.passwordDialog && ui.passwordDialog.open) ui.passwordDialog.close();
+  }
+
+  async function submitPasswordChange(event) {
+    event.preventDefault();
+    if (!passwordTargetUserId || busy) return;
+    const password = String(ui.newPassword && ui.newPassword.value || '');
+    const confirm = String(ui.newPasswordConfirm && ui.newPasswordConfirm.value || '');
+    if (password.length < 8 || password.length > 72) {
+      if (ui.passwordMessage) ui.passwordMessage.textContent = t('passwordInvalid');
+      return;
+    }
+    if (password !== confirm) {
+      if (ui.passwordMessage) ui.passwordMessage.textContent = t('passwordMismatch');
+      return;
+    }
     setBusy(true);
     try {
-      const result = await client.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}${window.location.pathname}` });
-      if (result.error) throw result.error;
-      setMessage(t('resetSent'), false);
+      const result = await client.functions.invoke('admin-users', {
+        body: { action: 'set_password', userId: passwordTargetUserId, password }
+      });
+      if (result.error) {
+        let detail = '';
+        try {
+          if (result.error.context && typeof result.error.context.json === 'function') {
+            const responseBody = await result.error.context.json();
+            detail = responseBody && responseBody.error ? String(responseBody.error) : '';
+          }
+        } catch (_) {}
+        throw new Error(detail || result.error.message || 'PASSWORD_UPDATE_FAILED');
+      }
+      if (result.data && result.data.error) throw new Error(result.data.error);
+      setMessage(t('passwordSaved'), false);
+      closePasswordDialog();
     } catch (error) {
       console.error(error);
-      setMessage(errorMessage(error), true);
+      if (ui.passwordMessage) ui.passwordMessage.textContent = errorMessage(error);
     } finally {
       setBusy(false);
     }
@@ -456,6 +513,9 @@
     if (ui.usersTab) ui.usersTab.addEventListener('click', () => showTab('users'));
     if (ui.organizationsTab) ui.organizationsTab.addEventListener('click', () => showTab('organizations'));
     if (ui.inviteForm) ui.inviteForm.addEventListener('submit', inviteUser);
+    if (ui.passwordForm) ui.passwordForm.addEventListener('submit', submitPasswordChange);
+    if (ui.passwordCloseBtn) ui.passwordCloseBtn.addEventListener('click', closePasswordDialog);
+    if (ui.passwordCancelBtn) ui.passwordCancelBtn.addEventListener('click', closePasswordDialog);
     if (ui.usersRefresh) ui.usersRefresh.addEventListener('click', loadUsers);
     if (ui.userFilterOrg) ui.userFilterOrg.addEventListener('change', loadUsers);
     if (ui.organizationCreateForm) ui.organizationCreateForm.addEventListener('submit', createOrganization);

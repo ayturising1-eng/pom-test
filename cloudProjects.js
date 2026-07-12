@@ -7,8 +7,10 @@
   const supabaseFactory = window.supabase;
 
   const ui = {
-    authGate: $('authGate'), loginForm: $('loginForm'), loginEmail: $('loginEmail'), loginPassword: $('loginPassword'),
-    loginBtn: $('loginBtn'), forgotPasswordBtn: $('forgotPasswordBtn'), authMessage: $('authMessage'),
+    authGate: $('authGate'), loginForm: $('loginForm'), loginUsername: $('loginUsername'), loginPassword: $('loginPassword'),
+    rememberMe: $('rememberMe'), savePassword: $('savePassword'), loginBtn: $('loginBtn'), authMessage: $('authMessage'),
+    loginUsernameLabel: $('loginUsernameLabel'), loginPasswordLabel: $('loginPasswordLabel'),
+    rememberMeLabel: $('rememberMeLabel'), savePasswordLabel: $('savePasswordLabel'), authNote: $('authNote'),
     cloudProjectBar: $('cloudProjectBar'), cloudProjectCode: $('cloudProjectCode'), cloudRevision: $('cloudRevision'),
     cloudSaveState: $('cloudSaveState'), cloudUserName: $('cloudUserName'), cloudCompanyCode: $('cloudCompanyCode'), cloudRoleBadge: $('cloudRoleBadge'),
     newCloudProjectBtn: $('newCloudProjectBtn'), saveCloudProjectBtn: $('saveCloudProjectBtn'),
@@ -19,24 +21,22 @@
     newRevisionCancelBtn: $('newRevisionCancelBtn'), newRevisionConfirmBtn: $('newRevisionConfirmBtn'),
     revisionFromValue: $('revisionFromValue'), revisionToValue: $('revisionToValue'), revisionChangeNote: $('revisionChangeNote'),
     newRevisionMessage: $('newRevisionMessage'), revisionsDialog: $('revisionsDialog'), revisionsCloseBtn: $('revisionsCloseBtn'),
-    revisionsProjectCode: $('revisionsProjectCode'), revisionsTableBody: $('revisionsTableBody'), revisionsEmpty: $('revisionsEmpty'),
-    passwordUpdateDialog: $('passwordUpdateDialog'), passwordUpdateForm: $('passwordUpdateForm'),
-    newPassword: $('newPassword'), newPasswordConfirm: $('newPasswordConfirm'), passwordUpdateMessage: $('passwordUpdateMessage')
+    revisionsProjectCode: $('revisionsProjectCode'), revisionsTableBody: $('revisionsTableBody'), revisionsEmpty: $('revisionsEmpty')
   };
 
   const TEXT = {
     tr: {
-      authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'E-posta veya şifre hatalı.',
+      authLoading: 'Oturum kontrol ediliyor…', loginBusy: 'Giriş yapılıyor…', loginFailed: 'Kullanıcı adı veya şifre hatalı.',
+      loginUsername: 'Kullanıcı Adı', loginPassword: 'Şifre', rememberMe: 'Beni hatırla', savePassword: 'Şifremi kaydet',
+      authNote: 'Kullanıcı adı ve şifre firma yöneticisi tarafından tanımlanır. Şifre kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.0 SQL dosyasını Supabase SQL Editor’da çalıştır.',
-      resetSent: 'Şifre sıfırlama bağlantısı e-posta adresine gönderildi.', emailRequired: 'Önce e-posta adresini yaz.',
+      setupMissing: 'Altyapı hazır değil. v8.9.1 SQL dosyasını Supabase SQL Editor’da çalıştır.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
       confirmDiscard: 'Kaydedilmemiş değişiklikler var. Devam edilsin mi?', projectOpened: 'Proje açıldı:',
       projectCreated: 'Yeni proje kaydedildi:', projectUpdated: 'Proje güncellendi:', loginRequired: 'Oturum açman gerekiyor.',
-      recovery: 'Yeni şifreni belirle.', passwordMismatch: 'Şifreler aynı değil.', passwordShort: 'Şifre en az 8 karakter olmalı.',
-      passwordUpdated: 'Şifre güncellendi.', open: 'Aç', revisions: 'Revizyonlar', unknownUser: 'Kullanıcı', unknownCompany: 'Firma',
+      open: 'Aç', revisions: 'Revizyonlar', unknownUser: 'Kullanıcı', unknownCompany: 'Firma',
       historical: 'Geçmiş revizyon', historicalEdited: 'Geçmiş revizyon düzenlendi — kaydedilemez', historicalSaveBlocked: 'Geçmiş revizyon doğrudan kaydedilemez. Güncel revizyonu aç.',
       revisionRequired: 'Önce projeyi kaydet.', revisionCreating: 'Revizyon oluşturuluyor…', revisionCreated: 'Yeni revizyon oluşturuldu:',
       revisionFailed: 'Revizyon oluşturulamadı.', revisionLoading: 'Revizyonlar yükleniyor…', noRevisions: 'Revizyon bulunamadı.',
@@ -46,17 +46,17 @@
       roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.'
     },
     en: {
-      authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect email or password.',
+      authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect username or password.',
+      loginUsername: 'Username', loginPassword: 'Password', rememberMe: 'Remember me', savePassword: 'Save my password',
+      authNote: 'The username and password are assigned by the company administrator. Password saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Run the v8.9.0 SQL file in Supabase SQL Editor.',
-      resetSent: 'A password reset link was sent to the email address.', emailRequired: 'Enter the email address first.',
+      setupMissing: 'Infrastructure is not ready. Run the v8.9.1 SQL file in Supabase SQL Editor.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
       confirmDiscard: 'There are unsaved changes. Continue?', projectOpened: 'Project opened:',
       projectCreated: 'New project saved:', projectUpdated: 'Project updated:', loginRequired: 'You need to sign in.',
-      recovery: 'Set your new password.', passwordMismatch: 'Passwords do not match.', passwordShort: 'Password must be at least 8 characters.',
-      passwordUpdated: 'Password updated.', open: 'Open', revisions: 'Revisions', unknownUser: 'User', unknownCompany: 'Company',
+      open: 'Open', revisions: 'Revisions', unknownUser: 'User', unknownCompany: 'Company',
       historical: 'Historical revision', historicalEdited: 'Historical revision edited — cannot be saved', historicalSaveBlocked: 'A historical revision cannot be saved directly. Open the current revision.',
       revisionRequired: 'Save the project first.', revisionCreating: 'Creating revision…', revisionCreated: 'New revision created:',
       revisionFailed: 'The revision could not be created.', revisionLoading: 'Loading revisions…', noRevisions: 'No revisions found.',
@@ -80,12 +80,61 @@
   let revisionContext = null;
   let revisionRows = [];
 
+  const REMEMBER_KEY = 'plmr_auth_remember';
+  const SESSION_ONLY_KEY = 'plmr_auth_session_only';
+  const SAVED_USERNAME_KEY = 'plmr_auth_username';
+  const SAVE_PASSWORD_KEY = 'plmr_auth_save_password';
+
   function language() {
     return $('languageSelect') && $('languageSelect').value === 'en' ? 'en' : 'tr';
   }
 
   function t(key) {
     return (TEXT[language()] && TEXT[language()][key]) || TEXT.tr[key] || key;
+  }
+
+  function applyLoginLanguage() {
+    if (ui.loginUsernameLabel) ui.loginUsernameLabel.textContent = t('loginUsername');
+    if (ui.loginPasswordLabel) ui.loginPasswordLabel.textContent = t('loginPassword');
+    if (ui.rememberMeLabel) ui.rememberMeLabel.textContent = t('rememberMe');
+    if (ui.savePasswordLabel) ui.savePasswordLabel.textContent = t('savePassword');
+    if (ui.authNote) ui.authNote.textContent = t('authNote');
+  }
+
+  function normalizeUsername(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function rememberPreference() {
+    return localStorage.getItem(REMEMBER_KEY) !== '0';
+  }
+
+  async function storeBrowserCredential(username, password) {
+    if (!username || !password || !navigator.credentials || typeof window.PasswordCredential !== 'function') return;
+    try {
+      const credential = new window.PasswordCredential({ id: username, password, name: username });
+      await navigator.credentials.store(credential);
+    } catch (error) {
+      console.warn('Browser password manager could not store the credential.', error);
+    }
+  }
+
+  async function restoreLoginPreferences() {
+    const remember = rememberPreference();
+    if (ui.rememberMe) ui.rememberMe.checked = remember;
+    if (ui.savePassword) ui.savePassword.checked = localStorage.getItem(SAVE_PASSWORD_KEY) === '1';
+    const savedUsername = localStorage.getItem(SAVED_USERNAME_KEY) || '';
+    if (ui.loginUsername && savedUsername) ui.loginUsername.value = savedUsername;
+    if (!ui.savePassword || !ui.savePassword.checked || !navigator.credentials) return;
+    try {
+      const credential = await navigator.credentials.get({ password: true, mediation: 'optional' });
+      if (credential && credential.type === 'password') {
+        if (ui.loginUsername && !ui.loginUsername.value) ui.loginUsername.value = credential.id || '';
+        if (ui.loginPassword && !ui.loginPassword.value) ui.loginPassword.value = credential.password || '';
+      }
+    } catch (error) {
+      console.warn('Browser password manager could not restore the credential.', error);
+    }
   }
 
   function setAuthMessage(message, isError) {
@@ -193,7 +242,7 @@
     const userId = currentSession.user.id;
     const profileResult = await client
       .from('profiles')
-      .select('id, organization_id, username, email, full_name, role, language, user_code, next_project_number, is_active')
+      .select('id, organization_id, username, full_name, role, language, user_code, next_project_number, is_active')
       .eq('id', userId)
       .single();
     if (profileResult.error) throw profileResult.error;
@@ -212,7 +261,7 @@
     if (currentOrganization.license_start && today < currentOrganization.license_start) throw new Error('LICENSE_NOT_STARTED');
     if (currentOrganization.license_end && today > currentOrganization.license_end) throw new Error('LICENSE_EXPIRED');
 
-    const displayName = currentProfile.full_name || currentProfile.username || currentSession.user.email || t('unknownUser');
+    const displayName = currentProfile.full_name || currentProfile.username || t('unknownUser');
     const username = currentProfile.username ? `@${currentProfile.username}` : '';
     if (ui.cloudUserName) ui.cloudUserName.textContent = `${displayName}${username ? ` · ${username}` : ''}`;
     const companyCode = currentOrganization.company_code || '----';
@@ -247,14 +296,23 @@
     setAppAccess(false);
     setAuthMessage('', false);
     if (ui.loginPassword) ui.loginPassword.value = '';
+    const savedUsername = localStorage.getItem(SAVED_USERNAME_KEY) || '';
+    if (ui.loginUsername && savedUsername) ui.loginUsername.value = savedUsername;
+  }
+
+  async function resolveLoginEmail(username) {
+    const result = await client.rpc('resolve_login_username_v1', { p_username: username });
+    if (result.error) throw result.error;
+    const value = Array.isArray(result.data) ? result.data[0] : result.data;
+    return String(value || '').trim();
   }
 
   async function submitLogin(event) {
     event.preventDefault();
     if (authBusy) return;
-    const email = String(ui.loginEmail && ui.loginEmail.value || '').trim();
+    const username = normalizeUsername(ui.loginUsername && ui.loginUsername.value);
     const password = String(ui.loginPassword && ui.loginPassword.value || '');
-    if (!email || !password) {
+    if (!username || !password) {
       setAuthMessage(t('loginFailed'), true);
       return;
     }
@@ -262,8 +320,25 @@
     if (ui.loginBtn) ui.loginBtn.disabled = true;
     setAuthMessage(t('loginBusy'), false);
     try {
+      const email = await resolveLoginEmail(username);
+      if (!email) throw new Error('Invalid login credentials');
       const result = await client.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
+
+      const remember = Boolean(ui.rememberMe && ui.rememberMe.checked);
+      localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0');
+      if (remember) {
+        localStorage.setItem(SAVED_USERNAME_KEY, username);
+        sessionStorage.removeItem(SESSION_ONLY_KEY);
+      } else {
+        localStorage.removeItem(SAVED_USERNAME_KEY);
+        sessionStorage.setItem(SESSION_ONLY_KEY, '1');
+      }
+
+      const savePassword = Boolean(ui.savePassword && ui.savePassword.checked);
+      localStorage.setItem(SAVE_PASSWORD_KEY, savePassword ? '1' : '0');
+      if (savePassword) await storeBrowserCredential(username, password);
+
       await handleAuthenticated(result.data.session);
     } catch (error) {
       console.error(error);
@@ -274,45 +349,6 @@
     }
   }
 
-  async function requestPasswordReset() {
-    const email = String(ui.loginEmail && ui.loginEmail.value || '').trim();
-    if (!email) {
-      setAuthMessage(t('emailRequired'), true);
-      if (ui.loginEmail) ui.loginEmail.focus();
-      return;
-    }
-    try {
-      const redirectTo = `${window.location.origin}${window.location.pathname}`;
-      const result = await client.auth.resetPasswordForEmail(email, { redirectTo });
-      if (result.error) throw result.error;
-      setAuthMessage(t('resetSent'), false);
-    } catch (error) {
-      console.error(error);
-      setAuthMessage(friendlyError(error, 'loginFailed'), true);
-    }
-  }
-
-  async function submitPasswordUpdate(event) {
-    event.preventDefault();
-    const password = String(ui.newPassword && ui.newPassword.value || '');
-    const confirm = String(ui.newPasswordConfirm && ui.newPasswordConfirm.value || '');
-    if (password.length < 8) {
-      ui.passwordUpdateMessage.textContent = t('passwordShort');
-      return;
-    }
-    if (password !== confirm) {
-      ui.passwordUpdateMessage.textContent = t('passwordMismatch');
-      return;
-    }
-    const result = await client.auth.updateUser({ password });
-    if (result.error) {
-      ui.passwordUpdateMessage.textContent = friendlyError(result.error, 'loginFailed');
-      return;
-    }
-    ui.passwordUpdateMessage.textContent = t('passwordUpdated');
-    window.setTimeout(() => ui.passwordUpdateDialog && ui.passwordUpdateDialog.close(), 700);
-  }
-
   function projectPayload(snapshot) {
     const metadata = snapshot.metadata || {};
     return {
@@ -320,7 +356,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.0',
+      app_version: snapshot.appVersion || '8.9.1',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -759,7 +795,7 @@
     document.addEventListener('click', event => {
       const target = event.target && event.target.closest ? event.target.closest('button') : null;
       if (!target) return;
-      if (target.closest('#cloudProjectBar') || target.closest('#projectsDialog') || target.closest('#newRevisionDialog') || target.closest('#revisionsDialog') || target.closest('#passwordUpdateDialog') || target.closest('#authGate')) return;
+      if (target.closest('#cloudProjectBar') || target.closest('#projectsDialog') || target.closest('#newRevisionDialog') || target.closest('#revisionsDialog') || target.closest('#authGate')) return;
       if (['generateBtn', 'pdfBtn', 'previewBtn', 'fitPreviewBtn', 'expandPreviewBtn', 'helpBtn', 'installBtn', 'projectExportBtn', 'projectImportBtn'].includes(target.id)) return;
       if (target.value === 'cancel') return;
       if (target.closest('.input-panel') || target.closest('.preview-canvas') || target.closest('.modal')) {
@@ -775,10 +811,10 @@
 
   function bindUi() {
     if (ui.loginForm) ui.loginForm.addEventListener('submit', submitLogin);
-    if (ui.forgotPasswordBtn) ui.forgotPasswordBtn.addEventListener('click', requestPasswordReset);
     if (ui.logoutBtn) ui.logoutBtn.addEventListener('click', async () => {
       if (dirty && !window.confirm(t('confirmDiscard'))) return;
-      await client.auth.signOut();
+      sessionStorage.removeItem(SESSION_ONLY_KEY);
+      await client.auth.signOut({ scope: 'local' });
     });
     if (ui.newCloudProjectBtn) ui.newCloudProjectBtn.addEventListener('click', startNewProject);
     if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.addEventListener('click', () => saveCurrentProject());
@@ -792,8 +828,8 @@
     if (ui.newRevisionCloseBtn) ui.newRevisionCloseBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.newRevisionCancelBtn) ui.newRevisionCancelBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.revisionsCloseBtn) ui.revisionsCloseBtn.addEventListener('click', () => ui.revisionsDialog && ui.revisionsDialog.close());
-    if (ui.passwordUpdateForm) ui.passwordUpdateForm.addEventListener('submit', submitPasswordUpdate);
     if ($('languageSelect')) $('languageSelect').addEventListener('change', () => {
+      applyLoginLanguage();
       refreshProjectHeader();
       renderProjects();
       renderRevisions();
@@ -812,13 +848,15 @@
     });
     window.PulumurSupabase = client;
     bindUi();
+    applyLoginLanguage();
+    await restoreLoginPreferences();
     setAuthMessage(t('authLoading'), false);
 
-    client.auth.onAuthStateChange((event, session) => {
+    client.auth.onAuthStateChange((_event, session) => {
       window.setTimeout(async () => {
-        if (event === 'PASSWORD_RECOVERY' && ui.passwordUpdateDialog) {
-          ui.passwordUpdateMessage.textContent = t('recovery');
-          ui.passwordUpdateDialog.showModal();
+        if (session && !rememberPreference() && sessionStorage.getItem(SESSION_ONLY_KEY) !== '1') {
+          await client.auth.signOut({ scope: 'local' });
+          return;
         }
         if (session) await handleAuthenticated(session);
         else await handleSignedOut();
@@ -831,8 +869,14 @@
       setAuthMessage(friendlyError(sessionResult.error, 'loginFailed'), true);
       return;
     }
-    if (sessionResult.data.session) await handleAuthenticated(sessionResult.data.session);
-    else await handleSignedOut();
+    if (sessionResult.data.session && !rememberPreference() && sessionStorage.getItem(SESSION_ONLY_KEY) !== '1') {
+      await client.auth.signOut({ scope: 'local' });
+      await handleSignedOut();
+    } else if (sessionResult.data.session) {
+      await handleAuthenticated(sessionResult.data.session);
+    } else {
+      await handleSignedOut();
+    }
   }
 
   init().catch(error => {

@@ -2576,7 +2576,7 @@ label em {
 /* V8.4.2: Tek doğrudan DXF indirme düğmesi */
 .preview-download-actions { align-items: center; }
 
-/* v8.9.0 - Kullanıcı girişi, firma ayrımı ve rol bazlı proje yönetimi */
+/* v8.9.1 - Kullanıcı girişi, firma ayrımı ve rol bazlı proje yönetimi */
 [hidden] { display: none !important; }
 body.auth-pending .app-header,
 body.auth-pending .cloud-project-bar,
@@ -2679,7 +2679,7 @@ body.auth-ready .auth-gate { display: none !important; }
   .cloud-project-identity > div:first-child { grid-column: 1 / -1; }
 }
 
-/* v8.9.0 - Revizyon ve rol yönetimi */
+/* v8.9.1 - Revizyon ve rol yönetimi */
 .cloud-project-actions { flex-wrap: wrap; justify-content: center; }
 #cloudSaveState[data-state="history"] { color: var(--blue); }
 .cloud-project-actions button:disabled,
@@ -2730,7 +2730,7 @@ body.auth-ready .auth-gate { display: none !important; }
 }
 
 
-/* v8.9.0 - Rol rozeti */
+/* v8.9.1 - Rol rozeti */
 .cloud-user-box { grid-template-rows: auto auto auto; }
 .cloud-user-box strong,
 .cloud-user-box > span { grid-column: 1; }
@@ -2755,7 +2755,7 @@ body.cloud-readonly .cloud-project-actions #newCloudProjectBtn,
 body.cloud-readonly .cloud-project-actions #saveCloudProjectBtn,
 body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 
-/* v8.9.0 - Sistem ve firma yönetici paneli */
+/* v8.9.1 - Sistem ve firma yönetici paneli */
 .cloud-user-box #adminPanelBtn { grid-column: 2; grid-row: 1; align-self: end; }
 .cloud-user-box #logoutBtn { grid-column: 2; grid-row: 2 / span 2; align-self: stretch; }
 
@@ -2813,7 +2813,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 .admin-form-title { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
 .admin-form-title h3 { margin: 0; color: var(--navy); }
 .admin-form-title p { margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
-.admin-form-grid { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(3, minmax(170px, 1fr)); gap: 10px; }
 .admin-company-grid { grid-template-columns: minmax(260px, 2fr) repeat(2, minmax(170px, 1fr)); }
 .admin-form-grid label {
   display: grid;
@@ -2894,4 +2894,38 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   .admin-compact-field { min-width: 0; }
   .admin-form-grid, .admin-company-grid { grid-template-columns: 1fr; }
   .admin-form-actions button { width: 100%; }
+}
+
+/* v8.9.1 — username login and browser-managed password preferences */
+.auth-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.auth-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--ice);
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.auth-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--teal);
+}
+#adminPasswordDialog .modal-card { width: min(560px, calc(100vw - 28px)); }
+#adminPasswordMessage { min-height: 20px; }
+
+@media (max-width: 520px) {
+  .auth-options { grid-template-columns: 1fr; gap: 8px; }
 }
