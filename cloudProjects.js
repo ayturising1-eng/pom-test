@@ -30,7 +30,7 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.11 Supabase kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. v8.9.16 Supabase kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
@@ -52,7 +52,7 @@
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.11 Supabase setup.',
+      setupMissing: 'Infrastructure is not ready. Check the v8.9.16 Supabase setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
@@ -439,7 +439,7 @@
       customer_name: String(metadata.customerName || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.11',
+      app_version: snapshot.appVersion || '8.9.16',
       schema_version: Number(snapshot.schemaVersion) || 1
     };
   }
@@ -738,7 +738,7 @@
         projectCode: row.project_code,
         revisionNo: row.current_revision || 1
       };
-      ProjectState.restoreSnapshot(snapshot, { resetZoom: true });
+      ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
       ProjectState.setRecord(snapshot.record);
       historicalMode = false;
       historicalCurrentRevision = row.current_revision || 1;
@@ -918,7 +918,7 @@
         projectCode: revisionContext.project_code,
         revisionNo: Number(row.revision_no) || 1
       };
-      ProjectState.restoreSnapshot(snapshot, { resetZoom: true });
+      ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
       ProjectState.setRecord(snapshot.record);
       historicalMode = true;
       historicalCurrentRevision = currentRevision;
@@ -955,7 +955,7 @@
       const target = event.target && event.target.closest ? event.target.closest('button') : null;
       if (!target) return;
       if (target.closest('#cloudProjectBar') || target.closest('#projectsDialog') || target.closest('#newRevisionDialog') || target.closest('#revisionsDialog') || target.closest('#authGate')) return;
-      if (['generateBtn', 'pdfBtn', 'previewBtn', 'fitPreviewBtn', 'expandPreviewBtn', 'helpBtn', 'installBtn', 'projectExportBtn', 'projectImportBtn'].includes(target.id)) return;
+      if (['generateBtn', 'pdfBtn', 'previewBtn', 'fitPreviewBtn', 'expandPreviewBtn', 'helpBtn', 'installBtn', 'projectExportBtn', 'previewProjectExportBtn', 'projectImportBtn'].includes(target.id)) return;
       if (target.value === 'cancel') return;
       if (target.closest('.input-panel') || target.closest('.preview-canvas') || target.closest('.modal')) {
         window.setTimeout(markDirty, 0);

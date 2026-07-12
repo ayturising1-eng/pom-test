@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '8.9.11';
+  const APP_VERSION = '8.9.16';
   const PROJECT_FORMAT = 'PULUMUR_PROJECT';
   const PROJECT_SCHEMA_VERSION = 1;
 
@@ -37,10 +37,20 @@
   let glassTrackProfileState = { mode: 'standard', en: 100, boy: 100, et: 2 };
   let glassSupportProfileState = { left: null, right: null };
   let customFrontPostCenters = null;
+  let customSideSupportCenters = {};
+  let customSidePosts = {};
+  let frontPostProfiles = [];
   let slidingPlacements = [];
+  let sideSlidingPlacements = [];
   let pendingSlidingPlacementMeta = null;
   let guillotinePlacements = [];
+  let sideGuillotinePlacements = [];
   let pendingGuillotinePlacementMeta = null;
+  let toolboxSelectionMode = null;
+  let toolboxSelectionItems = new Map();
+  let toolboxContextMenu = null;
+  let toolboxSelectionBanner = null;
+  const projectHistory = { entries: [], index: -1, restoring: false, suspendDepth: 0, dirtyWhileSuspended: false };
   let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
   const EXCEL_COMBO_OPTIONS = {
     motor: ['-', 'RISING MOTOR', 'SOMFY RTS', 'SOMFY IO'],
@@ -80,8 +90,8 @@
 
   // V8.2.66: Ölçü -> Zone -> Profil / Ürün -> görünüş ilişkisi için UI altyapısı
   const SMART_ACTION_LABELS = {
-    tr: { resize: 'Sadece ölçüyü değiştir', addSameProfile: 'Bu aralığa aynı profilden ekle', addDifferentProfile: 'Bu aralığa farklı profil ekle', placeProduct: 'Bu alana ürün yerleştir', editProfile: 'Mevcut elemanı / profili düzenle', removeElement: 'Mevcut elemanı kaldır' },
-    en: { resize: 'Resize this dimension only', addSameProfile: 'Add same profile to this gap', addDifferentProfile: 'Add different profile to this gap', placeProduct: 'Place product in this zone', editProfile: 'Edit current element / profile', removeElement: 'Remove current element' }
+    tr: { resize: 'Sadece ölçüyü değiştir', addSameProfile: 'Bu aralığa aynı profilden ekle', addDifferentProfile: 'Bu aralığa farklı profil ekle', placeProduct: 'Bu alana ürün yerleştir', editProfile: 'Mevcut ürünü düzenle', removeElement: 'Mevcut elemanı kaldır' },
+    en: { resize: 'Resize this dimension only', addSameProfile: 'Add same profile to this gap', addDifferentProfile: 'Add different profile to this gap', placeProduct: 'Place product in this zone', editProfile: 'Edit existing product', removeElement: 'Remove current element' }
   };
   const SMART_PRODUCT_OPTIONS = [
     { id: 'sliding_glass', tr: 'Sürme Cam', en: 'Sliding Glass' },
@@ -137,8 +147,8 @@
       options_structureColor: 'Taşıyıcı Rengi', options_fabric: 'Kumaş', options_fabricProfiles: 'Kumaş Profilleri',
       options_motor: 'Motor', options_remote: 'Kumanda', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Ekstralar / Notlar',
       extra_triangleJoinery: 'Üçgen Doğrama', extra_waterStandard: 'Su Çıkışı Standart mı?', quickTestsHead: 'Hızlı Testler',
-      previewTitle: 'Çizim Ön İzleme', previewBtn: 'Önizlemeyi Yenile', expandPreviewBtn: 'Önizlemeyi Büyüt', fitPreviewBtn: 'Çizimi Sığdır', shrinkPreviewBtn: 'Önizlemeyi Küçült', showMainDimsLabel: 'Ana ölçüleri göster', showAllDimsLabel: 'Tüm ölçüleri göster',
-      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', previewProjectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç', multiProductBtn: 'Çoklu Ürün Ekleme', multiDimensionBtn: 'Çoklu Ölçü Düzenleme',
+      previewTitle: 'Çizim Ön İzleme', previewBtn: 'Önizlemeyi Yenile', expandPreviewBtn: 'Önizlemeyi Büyüt', fitPreviewBtn: 'Çizimi Sığdır', undoPreviewBtn: 'Geri Al', redoPreviewBtn: 'İleri Al', historyGroupLabel: 'Çizim geçmişi', shrinkPreviewBtn: 'Önizlemeyi Küçült', showMainDimsLabel: 'Ana ölçüleri göster', showAllDimsLabel: 'Tüm ölçüleri göster',
+      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', previewProjectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç', multiProductBtn: 'Çoklu Ürün Ekleme', multiDimensionBtn: 'Çoklu Ölçü Düzenleme', multiDeleteBtn: 'Çoklu Ürün Silme', deleteAllProductsBtn: 'Tüm Ürünleri Sil',
       calcTitle: 'Pülümür Hesaplayıcı', calcSub: '4 satırdan herhangi 3 tanesini doldur. Boş olan değer hesaplanır.',
       calcGuide: '<strong>TR</strong><ul><li>4 alandan 3 tanesini doldur.</li><li>Hesaplanacak alanı boş bırak.</li><li>Hesapla’ya bas.</li><li>Sonucu ana forma aktar.</li></ul>',
       calcWaiting: 'Sonuç bekleniyor.', calcReady: 'Sonuç', calcPoz: 'poz', calcOpenNote: 'Ana formdaki açılım / arka / ön değerleri aktarıldı. Açıyı hesaplamak için Hesapla’ya bas.',
@@ -162,8 +172,8 @@
       options_structureColor: 'Structure Color', options_fabric: 'Fabric', options_fabricProfiles: 'Fabric Profiles',
       options_motor: 'Motor', options_remote: 'Remote', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Extras / Notes',
       extra_triangleJoinery: 'Triangle Joinery', extra_waterStandard: 'Standard Water Outlet?', quickTestsHead: 'Quick Tests',
-      previewTitle: 'Drawing Preview', previewBtn: 'Refresh Preview', expandPreviewBtn: 'Expand Preview', fitPreviewBtn: 'Fit Drawing', shrinkPreviewBtn: 'Collapse Preview', showMainDimsLabel: 'Show main dimensions', showAllDimsLabel: 'Show all dimensions',
-      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', previewProjectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File', multiProductBtn: 'Multiple Product Placement', multiDimensionBtn: 'Multiple Dimension Editing',
+      previewTitle: 'Drawing Preview', previewBtn: 'Refresh Preview', expandPreviewBtn: 'Expand Preview', fitPreviewBtn: 'Fit Drawing', undoPreviewBtn: 'Undo', redoPreviewBtn: 'Redo', historyGroupLabel: 'Drawing history', shrinkPreviewBtn: 'Collapse Preview', showMainDimsLabel: 'Show main dimensions', showAllDimsLabel: 'Show all dimensions',
+      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', previewProjectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File', multiProductBtn: 'Multiple Product Placement', multiDimensionBtn: 'Multiple Dimension Editing', multiDeleteBtn: 'Delete Multiple Products', deleteAllProductsBtn: 'Delete All Products',
       calcTitle: 'Pulumur Calculator', calcSub: 'Fill any 3 of the 4 rows. The empty value will be calculated.',
       calcGuide: '<strong>EN</strong><ul><li>Fill 3 of the 4 fields.</li><li>Leave one field empty.</li><li>Click Calculate.</li><li>Transfer the result to the main form.</li></ul>',
       calcWaiting: 'Waiting for result.', calcReady: 'Result', calcPoz: 'position', calcOpenNote: 'Projection / rear H / front H values were copied from the main form. Click Calculate to calculate the angle.',
@@ -349,9 +359,13 @@
     setText('quickTestsHead', txt.quickTestsHead);
     setText('previewTitle', txt.previewTitle);
     setText('previewBtn', txt.previewBtn);
-    const expandText = (document.fullscreenElement === previewPanel || previewPanel.classList.contains('is-expanded')) ? txt.shrinkPreviewBtn : txt.expandPreviewBtn;
+    const expandText = previewPanel.classList.contains('is-expanded') ? txt.shrinkPreviewBtn : txt.expandPreviewBtn;
     setText('expandPreviewBtn', expandText);
     setText('fitPreviewBtn', txt.fitPreviewBtn);
+    setText('undoPreviewBtn', txt.undoPreviewBtn);
+    setText('redoPreviewBtn', txt.redoPreviewBtn);
+    updateHistoryControls();
+    if ($('historyControlGroup')) $('historyControlGroup').setAttribute('aria-label', txt.historyGroupLabel);
     setText('pdfBtn', txt.pdfBtn);
     setText('generateBtn', txt.generateBtn);
     setText('resetBtn', txt.resetBtn);
@@ -361,6 +375,9 @@
     setText('projectImportBtn', txt.projectImportBtn);
     setText('multiProductBtn', txt.multiProductBtn);
     setText('multiDimensionBtn', txt.multiDimensionBtn);
+    setText('multiDeleteBtn', txt.multiDeleteBtn);
+    setText('deleteAllProductsBtn', txt.deleteAllProductsBtn);
+    syncToolboxBooleanButtons();
     setText('calcTitle', txt.calcTitle);
     setText('calcSub', txt.calcSub);
     setText('calcGuide', txt.calcGuide, true);
@@ -431,7 +448,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.11').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.16').catch(() => {}), { once: true });
     }
   }
 
@@ -449,10 +466,17 @@
     glassTrackProfileState = { mode: 'standard', en: 100, boy: 100, et: 2 };
     glassSupportProfileState = { left: null, right: null };
     customFrontPostCenters = null;
+    customSideSupportCenters = {};
+    customSidePosts = {};
+    frontPostProfiles = [];
     slidingPlacements = [];
+    sideSlidingPlacements = [];
     pendingSlidingPlacementMeta = null;
     guillotinePlacements = [];
+    sideGuillotinePlacements = [];
     pendingGuillotinePlacementMeta = null;
+    toolboxSelectionMode = null;
+    toolboxSelectionItems = new Map();
     currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
     applyAutoRayPost(true);
   }
@@ -500,8 +524,198 @@
         right: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.right)
       },
       __frontPostCenters: Array.isArray(customFrontPostCenters) ? customFrontPostCenters.slice() : null,
+      __sideSupportCenters: { ...customSideSupportCenters },
+      __sidePosts: deepCloneJson(customSidePosts) || {},
+      __frontPostProfiles: deepCloneJson(frontPostProfiles) || [],
       __slidingPlacements: slidingPlacements.map(item => ({ ...item })),
-      __guillotinePlacements: guillotinePlacements.map(item => ({ ...item }))
+      __sideSlidingPlacements: sideSlidingPlacements.map(item => ({ ...item })),
+      __guillotinePlacements: guillotinePlacements.map(item => ({ ...item })),
+      __sideGuillotinePlacements: sideGuillotinePlacements.map(item => ({ ...item }))
+    });
+  }
+
+
+  function historySignature(snapshot) {
+    return JSON.stringify({
+      formData: snapshot && snapshot.formData ? snapshot.formData : {},
+      drawingState: snapshot && snapshot.drawingState ? snapshot.drawingState : {}
+    });
+  }
+
+  function createHistoryEntry() {
+    const snapshot = createProjectSnapshot();
+    snapshot.savedAt = '';
+    return { snapshot, signature: historySignature(snapshot) };
+  }
+
+  function updateHistoryControls() {
+    const undoBtn = $('undoPreviewBtn');
+    const redoBtn = $('redoPreviewBtn');
+    const canUndo = projectHistory.index > 0;
+    const canRedo = projectHistory.index >= 0 && projectHistory.index < projectHistory.entries.length - 1;
+    const step = projectHistory.index >= 0 ? projectHistory.index + 1 : 0;
+    const total = projectHistory.entries.length;
+    if (undoBtn) {
+      undoBtn.disabled = !canUndo;
+      undoBtn.setAttribute('aria-disabled', canUndo ? 'false' : 'true');
+      undoBtn.title = currentLanguage === 'en'
+        ? `Undo (Ctrl+Z) · Step ${step}/${total}`
+        : `Geri Al (Ctrl+Z) · Adım ${step}/${total}`;
+    }
+    if (redoBtn) {
+      redoBtn.disabled = !canRedo;
+      redoBtn.setAttribute('aria-disabled', canRedo ? 'false' : 'true');
+      redoBtn.title = currentLanguage === 'en'
+        ? `Redo (Ctrl+Y / Ctrl+Shift+Z) · Step ${step}/${total}`
+        : `İleri Al (Ctrl+Y / Ctrl+Shift+Z) · Adım ${step}/${total}`;
+    }
+  }
+
+  function resetProjectHistory(captureCurrent = false) {
+    projectHistory.entries = [];
+    projectHistory.index = -1;
+    projectHistory.suspendDepth = 0;
+    projectHistory.dirtyWhileSuspended = false;
+    if (captureCurrent && lastDrawing) recordProjectHistoryState({ force: true });
+    else updateHistoryControls();
+  }
+
+  function recordProjectHistoryState(options = {}) {
+    if (projectHistory.restoring) return;
+    if (projectHistory.suspendDepth > 0) {
+      projectHistory.dirtyWhileSuspended = true;
+      return;
+    }
+    let entry;
+    try { entry = createHistoryEntry(); }
+    catch (_) { return; }
+    const current = projectHistory.entries[projectHistory.index];
+    if (!options.force && current && current.signature === entry.signature) {
+      updateHistoryControls();
+      return;
+    }
+    if (projectHistory.index < projectHistory.entries.length - 1) {
+      projectHistory.entries.splice(projectHistory.index + 1);
+    }
+    projectHistory.entries.push(entry);
+    projectHistory.index = projectHistory.entries.length - 1;
+    updateHistoryControls();
+  }
+
+  function beginHistoryTransaction() {
+    projectHistory.suspendDepth += 1;
+  }
+
+  function endHistoryTransaction(commit = true) {
+    if (projectHistory.suspendDepth > 0) projectHistory.suspendDepth -= 1;
+    if (projectHistory.suspendDepth > 0) return;
+    const shouldRecord = commit && projectHistory.dirtyWhileSuspended;
+    projectHistory.dirtyWhileSuspended = false;
+    if (shouldRecord) recordProjectHistoryState();
+    else updateHistoryControls();
+  }
+
+  function clearPendingPreviewTimers() {
+    ids.forEach(id => {
+      const el = $(id);
+      if (!el || !el._previewTimer) return;
+      window.clearTimeout(el._previewTimer);
+      el._previewTimer = null;
+    });
+  }
+
+  function closeTransientPreviewEditorsForHistory() {
+    toolboxSelectionMode = null;
+    toolboxSelectionItems = new Map();
+    if (toolboxContextMenu) toolboxContextMenu.hidden = true;
+    if (toolboxSelectionBanner) toolboxSelectionBanner.hidden = true;
+    pendingSlidingPlacementMeta = null;
+    pendingGuillotinePlacementMeta = null;
+    if (previewPanel) previewPanel.querySelectorAll('.dim-edit-overlay').forEach(node => { node.hidden = true; });
+    refreshToolboxSelectionDecorations();
+  }
+
+  function snapshotForHistoryRestore(entry) {
+    const snapshot = deepCloneJson(entry.snapshot);
+    snapshot.record = deepCloneJson(currentProjectRecord);
+    snapshot.uiSettings = {
+      language: currentLanguage,
+      dimensions: {
+        main: isPreviewToggleOn($('showMainDims')),
+        all: isPreviewToggleOn($('showAllDims'))
+      }
+    };
+    return snapshot;
+  }
+
+  function restoreHistoryIndex(nextIndex, direction) {
+    const entry = projectHistory.entries[nextIndex];
+    if (!entry) return false;
+    clearPendingPreviewTimers();
+    closeTransientPreviewEditorsForHistory();
+    projectHistory.restoring = true;
+    let drawing = null;
+    try {
+      drawing = restoreProjectSnapshot(snapshotForHistoryRestore(entry), { resetZoom: false, requireValidDrawing: true });
+    } catch (err) {
+      statusText.textContent = err.message;
+      console.error(err);
+      return false;
+    } finally {
+      projectHistory.restoring = false;
+    }
+    if (!drawing) return false;
+    projectHistory.index = nextIndex;
+    updateHistoryControls();
+    const step = projectHistory.index + 1;
+    const total = projectHistory.entries.length;
+    statusText.textContent = direction === 'redo'
+      ? (currentLanguage === 'en' ? `Redone. History step ${step}/${total}.` : `İleri alındı. Geçmiş adımı ${step}/${total}.`)
+      : (currentLanguage === 'en' ? `Undone. History step ${step}/${total}.` : `Geri alındı. Geçmiş adımı ${step}/${total}.`);
+    focusPreviewCanvas();
+    return true;
+  }
+
+  function flushCurrentStateBeforeHistoryMove() {
+    if (projectHistory.restoring) return;
+    clearPendingPreviewTimers();
+    updatePreview(false);
+  }
+
+  function undoProjectHistory() {
+    flushCurrentStateBeforeHistoryMove();
+    if (projectHistory.index <= 0) {
+      updateHistoryControls();
+      return;
+    }
+    restoreHistoryIndex(projectHistory.index - 1, 'undo');
+  }
+
+  function redoProjectHistory() {
+    flushCurrentStateBeforeHistoryMove();
+    if (projectHistory.index < 0 || projectHistory.index >= projectHistory.entries.length - 1) {
+      updateHistoryControls();
+      return;
+    }
+    restoreHistoryIndex(projectHistory.index + 1, 'redo');
+  }
+
+  function bindHistoryKeyboardShortcuts() {
+    document.addEventListener('keydown', evt => {
+      if (!previewPanel || !previewPanel.classList.contains('is-expanded')) return;
+      if (!(evt.ctrlKey || evt.metaKey) || evt.altKey) return;
+      const active = document.activeElement;
+      const tag = active && active.tagName ? active.tagName.toLowerCase() : '';
+      if (active && (active.isContentEditable || ['input', 'textarea', 'select'].includes(tag))) return;
+      const key = String(evt.key || '').toLowerCase();
+      if (key === 'z') {
+        evt.preventDefault();
+        if (evt.shiftKey) redoProjectHistory();
+        else undoProjectHistory();
+      } else if (key === 'y') {
+        evt.preventDefault();
+        redoProjectHistory();
+      }
     });
   }
 
@@ -547,7 +761,7 @@
     }
   }
 
-  function updatePreview(resetZoom = true) {
+  function updatePreview(resetZoom = false) {
     try {
       applyAutoRayPost(false);
       const data = collectForm();
@@ -557,14 +771,18 @@
       lastDrawing = drawing;
       renderPreview(drawing, resetZoom);
       applyPreviewDimensionFilter();
+      syncToolboxBooleanButtons();
+      refreshToolboxSelectionDecorations();
+      recordProjectHistoryState();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.11: the expanded preview toolbox layout is active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.11: büyütülmüş önizleme toolbox düzeni aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.16: session-wide Undo/Redo history, centered bulk selectors, persistent expanded preview/zoom and per-position editable product dimensions are active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.16: oturum boyu Geri Al/İleri Al geçmişi, ortalanmış çoklu seçim kutuları, kalıcı büyük önizleme/zoom ve poz bazlı düzenlenebilir ürün ölçüleri aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
-      preview.innerHTML = `<div class="empty-state">${escapeHtml(txt.emptyPreview)}</div>`;
+      // Geçici/yanlış bir form değeri mevcut çizimi ve kullanıcının zoom/pan konumunu silmesin.
+      if (!getPreviewSvg()) preview.innerHTML = `<div class="empty-state">${escapeHtml(txt.emptyPreview)}</div>`;
       statusText.textContent = err.message;
       return null;
     }
@@ -662,10 +880,14 @@
     stage.style.height = `${Math.max(80, box.height * totalScale)}px`;
   }
 
-  function renderPreview(drawing, resetZoom = true) {
+  function renderPreview(drawing, resetZoom = false) {
     const svg = window.PulumurGeometry.renderSvg(drawing);
+    const oldStage = getPreviewStage();
+    const oldSvg = getPreviewSvg();
 
-    if (resetZoom) {
+    // KALICI ÖNİZLEME KURALI (v8.9.15+): İlk çizim veya kullanıcının açıkça
+    // “Çizimi Sığdır” komutu dışında zoom/pan yeniden hesaplanmaz.
+    if (resetZoom || !oldStage || !oldSvg) {
       preview.innerHTML = `<div class="preview-stage">${svg}</div>`;
       previewState.zoom = 1;
       preview.scrollLeft = 0;
@@ -674,15 +896,14 @@
       return;
     }
 
-    // Dinamik ölçü düzenleme: mevcut zoom/pan sahnesini bozmadan sadece SVG içeriğini yenile.
-    const oldStage = getPreviewStage();
-    const oldSvg = getPreviewSvg();
+    // Dinamik güncellemelerde mevcut zoom/pan sahnesini bozmadan sadece SVG içeriğini yenile.
     const keepLeftRatio = preview.scrollLeft / Math.max(1, preview.scrollWidth - preview.clientWidth);
     const keepTopRatio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
+    const totalScale = Math.max(0.0001, (Number(previewState.baseScale) || 1) * (Number(previewState.zoom) || 1));
+    const keepWorldCenterX = (preview.scrollLeft + preview.clientWidth / 2) / totalScale;
+    const keepWorldCenterY = (preview.scrollTop + preview.clientHeight / 2) / totalScale;
     const keepScrollLeft = preview.scrollLeft;
     const keepScrollTop = preview.scrollTop;
-    const keepStageWidth = oldStage ? oldStage.style.width : '';
-    const keepStageHeight = oldStage ? oldStage.style.height : '';
 
     if (oldStage && oldSvg) {
       const temp = document.createElement('div');
@@ -690,14 +911,17 @@
       const nextSvg = temp.firstElementChild;
       if (nextSvg) {
         oldSvg.replaceWith(nextSvg);
-        if (keepStageWidth) oldStage.style.width = keepStageWidth;
-        if (keepStageHeight) oldStage.style.height = keepStageHeight;
-        preview.scrollLeft = keepScrollLeft;
-        preview.scrollTop = keepScrollTop;
-        window.requestAnimationFrame(() => {
-          preview.scrollLeft = keepScrollLeft;
-          preview.scrollTop = keepScrollTop;
-        });
+        // Yeni çizimin viewBox ölçüsü değişse bile aynı gerçek ölçek korunur.
+        // Böylece ürün/ölçü düzenleme sonrasında kullanıcının zoom seviyesi değişmez.
+        const nextBox = getSvgViewBoxSize(nextSvg);
+        oldStage.style.width = `${Math.max(80, nextBox.width * totalScale)}px`;
+        oldStage.style.height = `${Math.max(80, nextBox.height * totalScale)}px`;
+        const restore = () => {
+          preview.scrollLeft = Math.max(0, keepWorldCenterX * totalScale - preview.clientWidth / 2);
+          preview.scrollTop = Math.max(0, keepWorldCenterY * totalScale - preview.clientHeight / 2);
+        };
+        restore();
+        window.requestAnimationFrame(restore);
         return;
       }
     }
@@ -806,6 +1030,8 @@
       canRemoveElement: hit.dataset.canRemoveElement === 'true',
       passiveReason: hit.dataset.passiveReason || '',
       profileInstanceId: hit.dataset.profileInstanceId || '',
+      sideGapIndex: Math.max(0, Number(hit.dataset.sideGapIndex || 0) || 0),
+      sidePostId: hit.dataset.sidePostId || '',
       layer: hit.dataset.layer || ''
     };
   }
@@ -822,6 +1048,635 @@
     return !!meta && meta.view === 'Front' && /^front_post_gap_\d+$/i.test(String(meta.dimId || ''));
   }
 
+  function isLeftSideSupportGapMeta(meta) {
+    if (!meta || meta.view !== 'Side' || Number(meta.index) !== 0) return false;
+    return /^side_(?:gap_0_\d+|wall_to_support_0|support_to_post_0|wall_to_post_0)$/i.test(String(meta.dimId || ''));
+  }
+
+  function currentSideSupportGeometry(meta) {
+    const d = lastDrawing && lastDrawing.input ? lastDrawing.input : null;
+    const map = d && d.sideSupportGeometry ? d.sideSupportGeometry : null;
+    const geom = map ? (map[String(Number(meta && meta.index) || 0)] || map[Number(meta && meta.index) || 0]) : null;
+    return geom && geom.exists ? geom : null;
+  }
+
+  function currentSideGap(meta) {
+    const geom = currentSideSupportGeometry(meta);
+    if (!geom || !Array.isArray(geom.gaps)) return null;
+    const idx = Math.max(0, Number(meta && meta.sideGapIndex) || 0);
+    return geom.gaps[idx] || null;
+  }
+
+  function materializeSidePosts(meta) {
+    const key = String(Number(meta && meta.index) || 0);
+    if (Object.prototype.hasOwnProperty.call(customSidePosts, key)) {
+      return Array.isArray(customSidePosts[key]) ? customSidePosts[key].map(item => ({ ...item, profile: sanitizeGlassTrackProfile(item.profile) })) : [];
+    }
+    const geom = currentSideSupportGeometry(meta);
+    const posts = geom && Array.isArray(geom.posts) ? geom.posts.map((post, i) => ({
+      id: String(post.id || `side_${key}_${i}`),
+      centerX: Number(post.centerX),
+      profile: sanitizeGlassTrackProfile(post.profile || { mode: 'standard', en: post.width || 100, boy: 100, et: 2 })
+    })) : [];
+    customSidePosts[key] = posts;
+    return posts.map(item => ({ ...item, profile: { ...item.profile } }));
+  }
+
+  function storeSidePosts(meta, posts) {
+    const key = String(Number(meta && meta.index) || 0);
+    customSidePosts[key] = posts.map(item => ({
+      id: String(item.id || `side_${key}_${Date.now()}`),
+      centerX: Number(item.centerX),
+      profile: sanitizeGlassTrackProfile(item.profile)
+    })).sort((a, b) => a.centerX - b.centerX);
+    delete customSideSupportCenters[key];
+  }
+
+  function reindexSidePlacementsAfterInsert(sideIndex, gapIndex) {
+    const shift = item => {
+      if (Number(item.sideIndex) !== Number(sideIndex)) return item;
+      const idx = Number(item.sideGapIndex ?? 0);
+      if (idx === gapIndex) return null;
+      return { ...item, sideGapIndex: idx > gapIndex ? idx + 1 : idx, sideZone: `gap_${idx > gapIndex ? idx + 1 : idx}` };
+    };
+    sideSlidingPlacements = sideSlidingPlacements.map(shift).filter(Boolean);
+    sideGuillotinePlacements = sideGuillotinePlacements.map(shift).filter(Boolean);
+  }
+
+  function resizeLeftSideSupportGap(meta, targetGap) {
+    const geom = currentSideSupportGeometry(meta);
+    const gap = currentSideGap(meta);
+    if (!geom || !gap || !Array.isArray(geom.posts) || !geom.posts.length) throw new Error(currentLanguage === 'en' ? 'No movable support post exists in this side view.' : 'Bu yan görünüşte hareket ettirilebilir destek dikmesi yok.');
+    const target = Number(targetGap);
+    if (!Number.isFinite(target) || target < 0) throw new Error(currentLanguage === 'en' ? 'Enter zero or a positive number.' : 'Sıfır veya pozitif bir sayı gir.');
+    const posts = materializeSidePosts(meta);
+    const gapIndex = Math.max(0, Math.min(posts.length, Number(meta.sideGapIndex) || 0));
+    const movingIndex = gapIndex < posts.length ? gapIndex : posts.length - 1;
+    const moving = posts[movingIndex];
+    const width = Number(moving.profile && moving.profile.en) || 100;
+    let nextCenter;
+    if (gapIndex < posts.length) nextCenter = Number(gap.left) + target + width / 2;
+    else nextCenter = Number(gap.right) - target - width / 2;
+    const leftLimit = movingIndex === 0 ? Number(geom.wallX) : posts[movingIndex - 1].centerX + (Number(posts[movingIndex - 1].profile.en) || 100) / 2;
+    const rightLimit = movingIndex === posts.length - 1 ? Number(geom.frontPostRearFace) : posts[movingIndex + 1].centerX - (Number(posts[movingIndex + 1].profile.en) || 100) / 2;
+    if (nextCenter - width / 2 < leftLimit - 0.001 || nextCenter + width / 2 > rightLimit + 0.001) {
+      throw new Error(currentLanguage === 'en' ? 'The support post would overlap another post, the wall or the front post.' : 'Destek dikmesi başka bir dikmeyle, duvarla veya ön dikmeyle üst üste gelir.');
+    }
+    moving.centerX = nextCenter;
+    storeSidePosts(meta, posts);
+  }
+
+  function addSidePostToGap(meta, profile) {
+    const geom = currentSideSupportGeometry(meta);
+    const gap = currentSideGap(meta);
+    if (!geom || !gap) throw new Error(currentLanguage === 'en' ? 'Side gap not found.' : 'Yan görünüş aralığı bulunamadı.');
+    const nextProfile = sanitizeGlassTrackProfile(profile || { mode: 'standard', en: 100, boy: 100, et: 2 });
+    const gapWidth = Number(gap.width) || (Number(gap.right) - Number(gap.left));
+    if (gapWidth + 0.001 < nextProfile.en) throw new Error(currentLanguage === 'en' ? 'The selected gap is narrower than the profile.' : 'Seçilen aralık profil genişliğinden daha dar.');
+    const posts = materializeSidePosts(meta);
+    const gapIndex = Math.max(0, Number(meta.sideGapIndex) || 0);
+    posts.push({ id: `side_${Number(meta.index) || 0}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, centerX: (Number(gap.left) + Number(gap.right)) / 2, profile: nextProfile });
+    storeSidePosts(meta, posts);
+    reindexSidePlacementsAfterInsert(Number(meta.index) || 0, gapIndex);
+  }
+
+  function deleteSidePost(sideIndex, postId) {
+    const meta = { index: Number(sideIndex) || 0 };
+    const posts = materializeSidePosts(meta);
+    const next = posts.filter(item => String(item.id) !== String(postId));
+    if (next.length === posts.length) throw new Error(currentLanguage === 'en' ? 'Support post not found.' : 'Destek dikmesi bulunamadı.');
+    storeSidePosts(meta, next);
+    sideSlidingPlacements = sideSlidingPlacements.filter(item => Number(item.sideIndex) !== Number(sideIndex));
+    sideGuillotinePlacements = sideGuillotinePlacements.filter(item => Number(item.sideIndex) !== Number(sideIndex));
+  }
+
+  function sideProductMeta(meta) {
+    const geom = currentSideSupportGeometry(meta);
+    const gap = currentSideGap(meta);
+    if (!geom || !gap) return null;
+    const gapIndex = Math.max(0, Number(meta.sideGapIndex) || 0);
+    const zoneWidth = Number(gap.width) || Math.max(0, Number(gap.right) - Number(gap.left));
+    const placementHeight = Math.max(1, Number(geom.productClearHeight || 0) - 5);
+    return {
+      ...meta,
+      placementView: 'side-left',
+      sideIndex: Number(meta.index) || 0,
+      sideGapIndex: gapIndex,
+      sideZone: `gap_${gapIndex}`,
+      value: zoneWidth,
+      placementWidth: Math.max(1, zoneWidth - 5),
+      placementHeight
+    };
+  }
+
+  function productRecordForMeta(meta) {
+    if (!meta) return null;
+    const isSide = meta.placementView === 'side-left' || (meta.view === 'Side' && isLeftSideSupportGapMeta(meta));
+    if (isSide) {
+      const sideIndex = Number(meta.sideIndex ?? meta.index) || 0;
+      const sideGapIndex = Number(meta.sideGapIndex) || 0;
+      const sideZone = String(meta.sideZone || `gap_${sideGapIndex}`);
+      const sliding = sideSlidingPlacements.find(item => Number(item.sideIndex) === sideIndex && (String(item.sideZone || '') === sideZone || Number(item.sideGapIndex) === sideGapIndex));
+      if (sliding) return { type: 'sliding_glass', placement: sliding, collection: 'sideSlidingPlacements', isSide: true };
+      const guillotine = sideGuillotinePlacements.find(item => Number(item.sideIndex) === sideIndex && (String(item.sideZone || '') === sideZone || Number(item.sideGapIndex) === sideGapIndex));
+      if (guillotine) return { type: 'guillotine_glass', placement: guillotine, collection: 'sideGuillotinePlacements', isSide: true };
+      return null;
+    }
+    const gapIndex = Number(meta.gapIndex ?? meta.index) || 0;
+    const sliding = slidingPlacements.find(item => Number(item.gapIndex) === gapIndex);
+    if (sliding) return { type: 'sliding_glass', placement: sliding, collection: 'slidingPlacements', isSide: false };
+    const guillotine = guillotinePlacements.find(item => Number(item.gapIndex) === gapIndex);
+    if (guillotine) return { type: 'guillotine_glass', placement: guillotine, collection: 'guillotinePlacements', isSide: false };
+    return null;
+  }
+
+  function findProductForMeta(meta) {
+    return productRecordForMeta(meta);
+  }
+
+  function findProductByInteraction(meta) {
+    if (!meta) return null;
+    const id = String(meta.placementId || '');
+    const all = [
+      ['sliding_glass', 'slidingPlacements', slidingPlacements],
+      ['sliding_glass', 'sideSlidingPlacements', sideSlidingPlacements],
+      ['guillotine_glass', 'guillotinePlacements', guillotinePlacements],
+      ['guillotine_glass', 'sideGuillotinePlacements', sideGuillotinePlacements]
+    ];
+    for (const [type, collection, items] of all) {
+      const placement = items.find(item => String(item.id || '') === id);
+      if (placement) return { type, collection, placement, isSide: collection.startsWith('side') };
+    }
+    return productRecordForMeta(meta);
+  }
+
+  function deleteProductRecord(record) {
+    if (!record || !record.placement) return false;
+    const id = String(record.placement.id || '');
+    const remove = items => items.filter(item => id ? String(item.id || '') !== id : item !== record.placement);
+    if (record.collection === 'slidingPlacements') slidingPlacements = remove(slidingPlacements);
+    else if (record.collection === 'sideSlidingPlacements') sideSlidingPlacements = remove(sideSlidingPlacements);
+    else if (record.collection === 'guillotinePlacements') guillotinePlacements = remove(guillotinePlacements);
+    else if (record.collection === 'sideGuillotinePlacements') sideGuillotinePlacements = remove(sideGuillotinePlacements);
+    else return false;
+    return true;
+  }
+
+  function setRadioGroupValue(overlay, name, value, fallback) {
+    let matched = false;
+    overlay.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+      el.checked = String(el.value) === String(value);
+      if (el.checked) matched = true;
+    });
+    if (!matched && fallback !== undefined) {
+      overlay.querySelectorAll(`input[name="${name}"]`).forEach(el => { el.checked = String(el.value) === String(fallback); });
+    }
+  }
+
+  function allocatePozNos(prefix, count) {
+    const source = prefix === 'S'
+      ? [...slidingPlacements, ...sideSlidingPlacements]
+      : [...guillotinePlacements, ...sideGuillotinePlacements];
+    const used = new Set(source.map(item => String(item.pozNo || '').toUpperCase()));
+    const result = [];
+    let n = 1;
+    while (result.length < count) {
+      const candidate = `${prefix}${String(n).padStart(2, '0')}`;
+      if (!used.has(candidate)) { result.push(candidate); used.add(candidate); }
+      n += 1;
+    }
+    return result;
+  }
+
+  function frontProductMeta(meta) {
+    const d = lastDrawing && lastDrawing.input ? lastDrawing.input : {};
+    const clearWidth = Math.max(1, Number(meta.value) || 1);
+    return {
+      ...meta,
+      placementView: 'front',
+      gapIndex: Number(meta.index) || 0,
+      placementWidth: Math.max(1, Number(meta.placementWidth) || clearWidth - 5),
+      placementHeight: Math.max(1, Number(meta.placementHeight) || (Number(d.frontHeight || 0) - Number(d.parapetHeight || 0) - 5))
+    };
+  }
+
+  function normalizedProductMeta(meta) {
+    if (!meta) return null;
+    if (meta.placementView === 'side-left' || isLeftSideSupportGapMeta(meta)) return sideProductMeta(meta);
+    if (meta.placementView === 'front' || isFrontPostGapMeta(meta)) return frontProductMeta(meta);
+    return null;
+  }
+
+  function interactionMetaToProductMeta(interactionMeta, record) {
+    const placement = record && record.placement ? record.placement : {};
+    if (interactionMeta.placementView === 'side-left' || record && record.isSide) {
+      const sideIndex = Number(interactionMeta.sideIndex ?? placement.sideIndex) || 0;
+      const sideGapIndex = Number(interactionMeta.sideGapIndex ?? placement.sideGapIndex) || 0;
+      const node = preview.querySelector(`[data-dim-id="side_gap_${sideIndex}_${sideGapIndex}"]`);
+      const fromDim = node ? sideProductMeta(dimensionMetaFromHit(node)) : null;
+      return fromDim || {
+        placementView: 'side-left', view: 'Side', index: sideIndex, sideIndex, sideGapIndex,
+        sideZone: String(interactionMeta.sideZone || placement.sideZone || `gap_${sideGapIndex}`),
+        value: Number(placement.width || 1) + 5, placementWidth: Number(placement.width || 1), placementHeight: Number(placement.height || 1)
+      };
+    }
+    const gapIndex = Number(interactionMeta.gapIndex ?? placement.gapIndex) || 0;
+    const node = preview.querySelector(`[data-dim-id="front_post_gap_${gapIndex + 1}"]`);
+    const fromDim = node ? dimensionMetaFromHit(node) : null;
+    return fromDim ? frontProductMeta(fromDim) : {
+      placementView: 'front', view: 'Front', index: gapIndex, gapIndex,
+      value: Number(placement.width || 1) + 5, placementWidth: Number(placement.width || 1), placementHeight: Number(placement.height || 1)
+    };
+  }
+
+  function syncToolboxBooleanButtons() {
+    const text = UI_TEXT[currentLanguage] || UI_TEXT.tr;
+    const labels = {
+      glassTrack: text.options_glassTrack,
+      triangleJoinery: text.extra_triangleJoinery,
+      waterStandard: text.extra_waterStandard
+    };
+    document.querySelectorAll('[data-boolean-field]').forEach(btn => {
+      const field = btn.dataset.booleanField;
+      const select = $(field);
+      if (!select) return;
+      const value = normalizeYesNo(select.value) === 'EVET' ? 'EVET' : 'HAYIR';
+      const labelEl = btn.querySelector('.boolean-quick-label');
+      const stateEl = btn.querySelector('.boolean-quick-state');
+      if (labelEl) labelEl.textContent = labels[field] || field;
+      if (stateEl) stateEl.textContent = BOOLEAN_CANONICAL[value][currentLanguage];
+      btn.classList.toggle('is-yes', value === 'EVET');
+      btn.classList.toggle('is-no', value !== 'EVET');
+      btn.setAttribute('aria-pressed', value === 'EVET' ? 'true' : 'false');
+    });
+  }
+
+  function toggleToolboxBoolean(field) {
+    const select = $(field);
+    if (!select) return;
+    select.value = normalizeYesNo(select.value) === 'EVET' ? 'HAYIR' : 'EVET';
+    syncToolboxBooleanButtons();
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function toolboxSelectionKey(type, meta) {
+    if (type === 'product') {
+      const id = String(meta.placementId || '').trim();
+      if (id) return `product:${id}`;
+      const view = String(meta.placementView || 'front');
+      const zone = view === 'side-left'
+        ? `${Number(meta.sideIndex) || 0}:${String(meta.sideZone || `gap_${Number(meta.sideGapIndex) || 0}`)}`
+        : String(Number(meta.gapIndex) || 0);
+      return `product:${String(meta.productType || 'product')}:${view}:${zone}`;
+    }
+    return `dimension:${String(meta.dimId || '')}`;
+  }
+
+  function isEligibleToolboxDimension(meta, mode) {
+    if (!meta) return false;
+    if (mode === 'multi-product') {
+      const productMeta = normalizedProductMeta(meta);
+      return !!productMeta && !!meta.canPlaceProduct && !productRecordForMeta(productMeta);
+    }
+    if (mode === 'multi-dimension') {
+      if (!meta.editable || !meta.canResize) return false;
+      if (isFrontPostGapMeta(meta)) {
+        const count = lastDrawing && lastDrawing.input ? Number(lastDrawing.input.postCount) || 0 : 0;
+        return count > 2;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function createToolboxMarker(hit, selected) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const host = hit.closest('g') || hit.parentNode;
+    if (!host || !host.appendChild) return;
+    const x = Number(hit.getAttribute('x') || 0);
+    const y = Number(hit.getAttribute('y') || 0);
+    const w = Math.max(1, Number(hit.getAttribute('width') || 0));
+    const h = Math.max(1, Number(hit.getAttribute('height') || 0));
+    const size = Math.max(110, Math.min(220, Math.max(110, Math.min(w, h) * 0.22)));
+    // Çoklu seçim kutusu ölçünün/ürünün tam orta noktasında gösterilir.
+    const markerX = x + (w - size) / 2;
+    const markerY = y + (h - size) / 2;
+    const marker = document.createElementNS(ns, 'g');
+    marker.setAttribute('class', `toolbox-selection-marker${selected ? ' is-selected' : ''}`);
+    marker.setAttribute('pointer-events', 'none');
+    const rect = document.createElementNS(ns, 'rect');
+    rect.setAttribute('x', String(markerX)); rect.setAttribute('y', String(markerY));
+    rect.setAttribute('width', String(size)); rect.setAttribute('height', String(size));
+    rect.setAttribute('rx', String(size * 0.18)); rect.setAttribute('ry', String(size * 0.18));
+    const check = document.createElementNS(ns, 'path');
+    check.setAttribute('d', `M ${markerX + size * 0.25} ${markerY + size * 0.58} L ${markerX + size * 0.48} ${markerY + size * 0.82} L ${markerX + size * 0.88} ${markerY + size * 0.30}`);
+    marker.append(rect, check);
+    host.appendChild(marker);
+  }
+
+  function refreshToolboxSelectionDecorations() {
+    preview.querySelectorAll('.toolbox-selection-marker').forEach(node => node.remove());
+    preview.querySelectorAll('.toolbox-selectable,.toolbox-selected').forEach(node => node.classList.remove('toolbox-selectable', 'toolbox-selected'));
+    preview.classList.toggle('toolbox-selection-active', !!toolboxSelectionMode);
+    updateToolboxSelectionBanner();
+    ['multiProductBtn','multiDimensionBtn','multiDeleteBtn'].forEach(id => {
+      const btn = $(id); if (btn) btn.classList.toggle('is-active-command',
+        (id === 'multiProductBtn' && toolboxSelectionMode === 'multi-product') ||
+        (id === 'multiDimensionBtn' && toolboxSelectionMode === 'multi-dimension') ||
+        (id === 'multiDeleteBtn' && toolboxSelectionMode === 'multi-delete'));
+    });
+    if (!toolboxSelectionMode) return;
+    if (toolboxSelectionMode === 'multi-delete') {
+      preview.querySelectorAll('[data-interaction-type="productEditor"]').forEach(hit => {
+        const meta = previewInteractionMetaFromHit(hit);
+        const key = toolboxSelectionKey('product', meta);
+        hit.classList.add('toolbox-selectable');
+        if (toolboxSelectionItems.has(key)) hit.classList.add('toolbox-selected');
+        createToolboxMarker(hit, toolboxSelectionItems.has(key));
+      });
+      return;
+    }
+    preview.querySelectorAll('.editable-dimension').forEach(group => {
+      const meta = dimensionMetaFromHit(group);
+      if (!isEligibleToolboxDimension(meta, toolboxSelectionMode)) return;
+      const key = toolboxSelectionKey('dimension', meta);
+      const hit = group.querySelector('.editable-dimension-hit') || group;
+      group.classList.add('toolbox-selectable');
+      if (toolboxSelectionItems.has(key)) group.classList.add('toolbox-selected');
+      createToolboxMarker(hit, toolboxSelectionItems.has(key));
+    });
+  }
+
+  function selectionMetaFromTarget(target) {
+    if (!toolboxSelectionMode || !target || !target.closest) return null;
+    if (toolboxSelectionMode === 'multi-delete') {
+      const hit = target.closest('[data-interaction-type="productEditor"]');
+      if (!hit) return null;
+      const meta = previewInteractionMetaFromHit(hit);
+      return { type: 'product', meta, key: toolboxSelectionKey('product', meta) };
+    }
+    const group = target.closest('.editable-dimension');
+    if (!group) return null;
+    const meta = dimensionMetaFromHit(group);
+    if (!isEligibleToolboxDimension(meta, toolboxSelectionMode)) return null;
+    return { type: 'dimension', meta, key: toolboxSelectionKey('dimension', meta) };
+  }
+
+  function toggleToolboxSelectionFromHit(target) {
+    const candidate = selectionMetaFromTarget(target);
+    if (!candidate) return;
+    if (toolboxSelectionItems.has(candidate.key)) toolboxSelectionItems.delete(candidate.key);
+    else toolboxSelectionItems.set(candidate.key, candidate.meta);
+    refreshToolboxSelectionDecorations();
+    const count = toolboxSelectionItems.size;
+    statusText.textContent = currentLanguage === 'en' ? `${count} item(s) selected. Press Enter or right-click to finish.` : `${count} öğe seçildi. Bitirmek için Enter'a bas veya sağ tıkla.`;
+  }
+
+  function hideToolboxContextMenu() {
+    if (toolboxContextMenu) toolboxContextMenu.hidden = true;
+  }
+
+  function ensureToolboxSelectionBanner() {
+    if (toolboxSelectionBanner) return toolboxSelectionBanner;
+    toolboxSelectionBanner = document.createElement('div');
+    toolboxSelectionBanner.className = 'toolbox-selection-banner';
+    toolboxSelectionBanner.hidden = true;
+    toolboxSelectionBanner.innerHTML = `<span class="toolbox-selection-banner-text"></span><span class="toolbox-selection-banner-actions"><button type="button" data-action="finish">Tamam / Enter</button><button type="button" data-action="cancel">İptal / Esc</button></span>`;
+    const host = previewPanel.querySelector('.preview-workspace') || previewPanel;
+    host.appendChild(toolboxSelectionBanner);
+    toolboxSelectionBanner.addEventListener('click', evt => {
+      const action = evt.target && evt.target.dataset ? evt.target.dataset.action : '';
+      if (action === 'finish') finishToolboxSelection();
+      else if (action === 'cancel') cancelToolboxSelection(currentLanguage === 'en' ? 'Selection cancelled.' : 'Seçim iptal edildi.');
+    });
+    return toolboxSelectionBanner;
+  }
+
+  function updateToolboxSelectionBanner() {
+    const banner = ensureToolboxSelectionBanner();
+    if (!toolboxSelectionMode) { banner.hidden = true; return; }
+    const count = toolboxSelectionItems.size;
+    const modeText = {
+      'multi-product': currentLanguage === 'en' ? 'Select product placement dimensions.' : 'Ürün eklenecek ölçüleri seç.',
+      'multi-dimension': currentLanguage === 'en' ? 'Select dimensions to edit.' : 'Düzenlenecek ölçüleri seç.',
+      'multi-delete': currentLanguage === 'en' ? 'Select products to delete.' : 'Silinecek ürünleri seç.'
+    }[toolboxSelectionMode] || '';
+    const countText = currentLanguage === 'en' ? `${count} selected` : `${count} seçili`;
+    banner.querySelector('.toolbox-selection-banner-text').textContent = `${modeText} ${countText}`;
+    const buttons = banner.querySelectorAll('button');
+    if (buttons[0]) buttons[0].textContent = currentLanguage === 'en' ? 'Finish / Enter' : 'Tamam / Enter';
+    if (buttons[1]) buttons[1].textContent = currentLanguage === 'en' ? 'Cancel / Esc' : 'İptal / Esc';
+    banner.hidden = false;
+  }
+
+  function ensureToolboxContextMenu() {
+    if (toolboxContextMenu) return toolboxContextMenu;
+    toolboxContextMenu = document.createElement('div');
+    toolboxContextMenu.className = 'toolbox-context-menu';
+    toolboxContextMenu.hidden = true;
+    toolboxContextMenu.innerHTML = `<button type="button" data-action="finish">Tamam / Enter</button><button type="button" data-action="cancel">İptal / Escape</button>`;
+    document.body.appendChild(toolboxContextMenu);
+    toolboxContextMenu.addEventListener('click', evt => {
+      const action = evt.target && evt.target.dataset ? evt.target.dataset.action : '';
+      if (action === 'finish') finishToolboxSelection();
+      else if (action === 'cancel') cancelToolboxSelection();
+    });
+    document.addEventListener('mousedown', evt => { if (toolboxContextMenu && !toolboxContextMenu.contains(evt.target)) hideToolboxContextMenu(); });
+    return toolboxContextMenu;
+  }
+
+  function showToolboxContextMenu(x, y) {
+    const menu = ensureToolboxContextMenu();
+    const buttons = menu.querySelectorAll('button');
+    if (buttons[0]) buttons[0].textContent = currentLanguage === 'en' ? 'Finish / Enter' : 'Tamam / Enter';
+    if (buttons[1]) buttons[1].textContent = currentLanguage === 'en' ? 'Cancel / Escape' : 'İptal / Escape';
+    menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 210, x))}px`;
+    menu.style.top = `${Math.max(8, Math.min(window.innerHeight - 110, y))}px`;
+    menu.hidden = false;
+  }
+
+  function startToolboxSelection(mode) {
+    if (toolboxSelectionMode === mode) {
+      cancelToolboxSelection(currentLanguage === 'en' ? 'Selection cancelled.' : 'Seçim iptal edildi.');
+      return;
+    }
+    if (!lastDrawing) updatePreview(false);
+    if (!lastDrawing) return;
+    toolboxSelectionMode = mode;
+    toolboxSelectionItems = new Map();
+    hideToolboxContextMenu();
+    refreshToolboxSelectionDecorations();
+    const messages = {
+      'multi-product': currentLanguage === 'en' ? 'Select product placement dimensions, then press Enter or right-click.' : 'Ürün eklenecek ölçüleri seç; sonra Enter’a bas veya sağ tıkla.',
+      'multi-dimension': currentLanguage === 'en' ? 'Select dimensions to edit, then press Enter or right-click.' : 'Düzenlenecek ölçüleri seç; sonra Enter’a bas veya sağ tıkla.',
+      'multi-delete': currentLanguage === 'en' ? 'Select products to delete, then press Enter or right-click.' : 'Silinecek ürünleri seç; sonra Enter’a bas veya sağ tıkla.'
+    };
+    statusText.textContent = messages[mode] || '';
+    focusPreviewCanvas();
+  }
+
+  function cancelToolboxSelection(message = '') {
+    toolboxSelectionMode = null;
+    toolboxSelectionItems = new Map();
+    hideToolboxContextMenu();
+    refreshToolboxSelectionDecorations();
+    if (message) statusText.textContent = message;
+  }
+
+  function ensureBulkProductChooser() {
+    let overlay = $('bulkProductChooserOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'bulkProductChooserOverlay';
+    overlay.className = 'dim-edit-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML = `<form class="dim-edit-card bulk-product-chooser-card"><div class="dim-edit-title" id="bulkProductChooserTitle">Çoklu Ürün Ekleme</div><div id="bulkProductChooserRows" class="bulk-selection-list"></div><label class="dim-edit-label"><span id="bulkProductTypeLabel">Ürün</span><select id="bulkProductType"><option value="sliding_glass">Sürme Cam</option><option value="guillotine_glass">Giyotin Cam</option></select></label><div class="dim-edit-actions"><button id="bulkProductChooserCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div></form>`;
+    previewPanel.appendChild(overlay);
+    overlay.querySelector('#bulkProductChooserCancel').addEventListener('click', () => { overlay.hidden = true; });
+    overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) overlay.hidden = true; });
+    overlay.querySelector('form').addEventListener('submit', evt => {
+      evt.preventDefault();
+      const metas = Array.isArray(overlay._metas) ? overlay._metas : [];
+      const product = overlay.querySelector('#bulkProductType').value;
+      overlay.hidden = true;
+      if (product === 'guillotine_glass') showGuillotineDetailsOverlay({ batchMetas: metas, bulk: true });
+      else showSlidingDetailsOverlay({ batchMetas: metas, bulk: true });
+    });
+    return overlay;
+  }
+
+  function showBulkProductChooser(metas) {
+    const overlay = ensureBulkProductChooser();
+    overlay._metas = metas.map(meta => ({ ...meta }));
+    const isEn = currentLanguage === 'en';
+    overlay.querySelector('#bulkProductChooserTitle').textContent = isEn ? 'Multiple Product Placement' : 'Çoklu Ürün Ekleme';
+    overlay.querySelector('#bulkProductTypeLabel').textContent = isEn ? 'Product' : 'Ürün';
+    overlay.querySelector('#bulkProductChooserCancel').textContent = isEn ? 'Cancel' : 'İptal';
+    const options = overlay.querySelectorAll('#bulkProductType option');
+    if (options[0]) options[0].textContent = isEn ? 'Sliding Glass' : 'Sürme Cam';
+    if (options[1]) options[1].textContent = isEn ? 'Guillotine' : 'Giyotin Cam';
+    overlay.querySelector('#bulkProductChooserRows').innerHTML = metas.map((meta, i) => `<div><b>${i + 1}.</b> ${escapeHtml(viewLabel(meta.view))} · ${escapeHtml(meta.label || '')} · ${Math.round(Number(meta.placementWidth || 0))} × ${Math.round(Number(meta.placementHeight || 0))} mm</div>`).join('');
+    overlay.hidden = false;
+    window.setTimeout(() => overlay.querySelector('#bulkProductType').focus({ preventScroll: true }), 20);
+  }
+
+  function captureBulkEditState() {
+    return createProjectSnapshot();
+  }
+
+  function applyDimensionValueForBulk(meta, value) {
+    if (isLeftSideSupportGapMeta(meta)) resizeLeftSideSupportGap(meta, value);
+    else if (isFrontPostGapMeta(meta)) resizeFrontPostGap(meta, value);
+    else {
+      if (!meta.canResize || String(meta.field || '').startsWith('__')) throw new Error(currentLanguage === 'en' ? `${meta.label}: not directly editable.` : `${meta.label}: doğrudan düzenlenebilir değil.`);
+      updateEditableListValue(meta.field, meta.index, String(value), true);
+    }
+    const drawing = updatePreview(false);
+    if (!drawing) throw new Error(statusText.textContent || (currentLanguage === 'en' ? 'Drawing could not be rebuilt.' : 'Çizim yeniden oluşturulamadı.'));
+  }
+
+  function ensureBulkDimensionOverlay() {
+    let overlay = $('bulkDimensionOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'bulkDimensionOverlay';
+    overlay.className = 'dim-edit-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML = `<form class="dim-edit-card bulk-dimension-card"><div class="dim-edit-title" id="bulkDimensionTitle">Çoklu Ölçü Düzenleme</div><div id="bulkDimensionRows" class="bulk-selection-list"></div><label class="dim-edit-label"><span id="bulkDimensionValueLabel">Yeni ölçü *(mm)</span><input id="bulkDimensionValue" type="text" inputmode="numeric" autocomplete="off"></label><div id="bulkDimensionError" class="dim-edit-error"></div><div class="dim-edit-actions"><button id="bulkDimensionCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div></form>`;
+    previewPanel.appendChild(overlay);
+    const input = overlay.querySelector('#bulkDimensionValue');
+    input.addEventListener('input', () => { input.value = String(input.value || '').replace(/[^0-9]/g, ''); overlay.querySelector('#bulkDimensionError').textContent = ''; });
+    overlay.querySelector('#bulkDimensionCancel').addEventListener('click', () => { overlay.hidden = true; });
+    overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) overlay.hidden = true; });
+    overlay.querySelector('form').addEventListener('submit', evt => {
+      evt.preventDefault();
+      const metas = Array.isArray(overlay._metas) ? overlay._metas : [];
+      const value = Number(input.value || 0);
+      const error = overlay.querySelector('#bulkDimensionError');
+      if (!(value > 0)) { error.textContent = currentLanguage === 'en' ? 'Enter a positive number.' : 'Pozitif bir sayı gir.'; return; }
+      const rollback = captureBulkEditState();
+      suppressFormPreviewUpdate = true;
+      beginHistoryTransaction();
+      let commitHistory = false;
+      try {
+        metas.forEach(meta => applyDimensionValueForBulk(meta, value));
+        overlay.hidden = true;
+        commitHistory = true;
+        statusText.textContent = currentLanguage === 'en' ? `${metas.length} dimensions updated.` : `${metas.length} ölçü güncellendi.`;
+      } catch (err) {
+        projectHistory.restoring = true;
+        try { restoreProjectSnapshot(rollback, { resetZoom: false }); } catch (_) {}
+        finally { projectHistory.restoring = false; }
+        error.textContent = err.message;
+      } finally {
+        suppressFormPreviewUpdate = false;
+        endHistoryTransaction(commitHistory);
+      }
+    });
+    return overlay;
+  }
+
+  function showBulkDimensionOverlay(metas) {
+    const overlay = ensureBulkDimensionOverlay();
+    const isEn = currentLanguage === 'en';
+    overlay._metas = metas.map(meta => ({ ...meta }));
+    overlay.querySelector('#bulkDimensionTitle').textContent = isEn ? 'Multiple Dimension Editing' : 'Çoklu Ölçü Düzenleme';
+    overlay.querySelector('#bulkDimensionValueLabel').textContent = isEn ? 'New dimension *(mm)' : 'Yeni ölçü *(mm)';
+    overlay.querySelector('#bulkDimensionCancel').textContent = isEn ? 'Cancel' : 'İptal';
+    overlay.querySelector('#bulkDimensionRows').innerHTML = metas.map((meta, i) => `<div><b>${i + 1}.</b> ${escapeHtml(viewLabel(meta.view))} · ${escapeHtml(meta.label || '')} · ${escapeHtml(String(meta.value || ''))} mm</div>`).join('');
+    overlay.querySelector('#bulkDimensionValue').value = '';
+    overlay.querySelector('#bulkDimensionError').textContent = '';
+    overlay.hidden = false;
+    window.setTimeout(() => overlay.querySelector('#bulkDimensionValue').focus({ preventScroll: true }), 20);
+  }
+
+  function finishToolboxSelection() {
+    hideToolboxContextMenu();
+    if (!toolboxSelectionMode) return;
+    if (!toolboxSelectionItems.size) {
+      statusText.textContent = currentLanguage === 'en' ? 'Select at least one item.' : 'En az bir öğe seç.';
+      return;
+    }
+    const mode = toolboxSelectionMode;
+    const items = Array.from(toolboxSelectionItems.values());
+    cancelToolboxSelection();
+    if (mode === 'multi-product') {
+      const metas = items.map(normalizedProductMeta).filter(Boolean);
+      showBulkProductChooser(metas);
+      return;
+    }
+    if (mode === 'multi-dimension') {
+      showBulkDimensionOverlay(items);
+      return;
+    }
+    if (mode === 'multi-delete') {
+      const records = items.map(findProductByInteraction).filter(Boolean);
+      const ok = window.confirm(currentLanguage === 'en' ? `Delete ${records.length} selected product(s)?` : `${records.length} seçili ürün silinsin mi?`);
+      if (!ok) return;
+      records.forEach(deleteProductRecord);
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? `${records.length} products deleted.` : `${records.length} ürün silindi.`;
+    }
+  }
+
+  function deleteAllProducts() {
+    if (toolboxSelectionMode) cancelToolboxSelection();
+    const count = slidingPlacements.length + sideSlidingPlacements.length + guillotinePlacements.length + sideGuillotinePlacements.length + (normalizeYesNo($('triangleJoinery') && $('triangleJoinery').value) === 'EVET' ? 1 : 0);
+    if (!count) {
+      statusText.textContent = currentLanguage === 'en' ? 'There are no added products to delete.' : 'Silinecek eklenmiş ürün yok.';
+      return;
+    }
+    if (!window.confirm(currentLanguage === 'en' ? 'Delete all sliding, guillotine and triangle joinery products?' : 'Tüm sürme, giyotin ve üçgen doğrama ürünleri silinsin mi?')) return;
+    slidingPlacements = [];
+    sideSlidingPlacements = [];
+    guillotinePlacements = [];
+    sideGuillotinePlacements = [];
+    if ($('triangleJoinery')) $('triangleJoinery').value = 'HAYIR';
+    syncToolboxBooleanButtons();
+    updatePreview(false);
+    statusText.textContent = currentLanguage === 'en' ? 'All added products were deleted.' : 'Sonradan eklenen tüm ürünler silindi.';
+  }
+
   function currentFrontPostCenters() {
     const fromDrawing = lastDrawing && lastDrawing.input && Array.isArray(lastDrawing.input.postCenterXs)
       ? lastDrawing.input.postCenterXs.map(Number)
@@ -832,8 +1687,77 @@
     return fromDrawing;
   }
 
+
+  function currentFrontPostProfiles(count = null) {
+    const n = count == null ? currentFrontPostCenters().length : Math.max(0, Number(count) || 0);
+    return Array.from({ length: n }, (_, i) => frontPostProfiles[i] ? sanitizeGlassTrackProfile(frontPostProfiles[i]) : null);
+  }
+
+  function frontPostWidthAt(index) {
+    const d = lastDrawing && lastDrawing.input ? lastDrawing.input : {};
+    const widths = Array.isArray(d.frontPostWidths) ? d.frontPostWidths : [];
+    return Math.max(1, Number(widths[index]) || 100);
+  }
+
+  function shiftFrontPlacementsAfterInsert(gapIndex) {
+    const shift = item => {
+      const idx = Number(item.gapIndex) || 0;
+      if (idx === gapIndex) return null;
+      return { ...item, gapIndex: idx > gapIndex ? idx + 1 : idx };
+    };
+    slidingPlacements = slidingPlacements.map(shift).filter(Boolean);
+    guillotinePlacements = guillotinePlacements.map(shift).filter(Boolean);
+  }
+
+  function insertFrontPostInGap(meta, profile = null) {
+    const centers = currentFrontPostCenters();
+    const gapIndex = Math.max(0, Number(meta.index) || 0);
+    if (gapIndex >= centers.length - 1) throw new Error(currentLanguage === 'en' ? 'Front post gap not found.' : 'Ön dikme aralığı bulunamadı.');
+    const leftFace = centers[gapIndex] + frontPostWidthAt(gapIndex) / 2;
+    const rightFace = centers[gapIndex + 1] - frontPostWidthAt(gapIndex + 1) / 2;
+    const nextProfile = profile ? sanitizeGlassTrackProfile(profile) : null;
+    const nextWidth = nextProfile ? nextProfile.en : 100;
+    if (rightFace - leftFace + 0.001 < nextWidth) throw new Error(currentLanguage === 'en' ? 'The selected gap is narrower than the post profile.' : 'Seçilen aralık dikme profilinden daha dar.');
+    const center = (leftFace + rightFace) / 2;
+    centers.splice(gapIndex + 1, 0, center);
+    const profiles = currentFrontPostProfiles(centers.length - 1);
+    profiles.splice(gapIndex + 1, 0, nextProfile);
+    customFrontPostCenters = centers;
+    frontPostProfiles = profiles;
+    const postEl = $('postCount');
+    if (postEl) { postEl.value = String(centers.length); postEl.dataset.userEdited = 'true'; }
+    shiftFrontPlacementsAfterInsert(gapIndex);
+  }
+
+  function deleteFrontPost(postIndex) {
+    const centers = currentFrontPostCenters();
+    const idx = Math.max(0, Number(postIndex) || 0);
+    if (centers.length <= 2) throw new Error(currentLanguage === 'en' ? 'At least two front posts must remain.' : 'En az iki ön dikme kalmalıdır.');
+    if (idx >= centers.length) throw new Error(currentLanguage === 'en' ? 'Front post not found.' : 'Ön dikme bulunamadı.');
+    centers.splice(idx, 1);
+    const profiles = currentFrontPostProfiles(centers.length + 1);
+    profiles.splice(idx, 1);
+    const d = lastDrawing && lastDrawing.input ? lastDrawing.input : {};
+    if (centers.length) {
+      if (Number.isFinite(Number(d.solX))) centers[0] = Number(d.solX);
+      if (Number.isFinite(Number(d.sagX))) centers[centers.length - 1] = Number(d.sagX);
+    }
+    const remap = item => {
+      const gap = Number(item.gapIndex) || 0;
+      const leftAdjacent = Math.max(0, idx - 1);
+      if (gap === leftAdjacent || gap === idx) return null;
+      return { ...item, gapIndex: gap > idx ? gap - 1 : gap };
+    };
+    slidingPlacements = slidingPlacements.map(remap).filter(Boolean);
+    guillotinePlacements = guillotinePlacements.map(remap).filter(Boolean);
+    customFrontPostCenters = centers;
+    frontPostProfiles = profiles;
+    const postEl = $('postCount');
+    if (postEl) { postEl.value = String(centers.length); postEl.dataset.userEdited = 'true'; }
+  }
+
   function nextSlidingPozNo() {
-    const used = new Set(slidingPlacements.map(item => String(item.pozNo || '').toUpperCase()));
+    const used = new Set([...slidingPlacements, ...sideSlidingPlacements].map(item => String(item.pozNo || '').toUpperCase()));
     let n = 1;
     while (used.has(`S${String(n).padStart(2, '0')}`)) n += 1;
     return `S${String(n).padStart(2, '0')}`;
@@ -855,18 +1779,21 @@
       throw new Error(currentLanguage === 'en' ? 'The gap cannot be resized in a two-post system because the first and last posts are fixed.' : 'İki dikmeli sistemde ilk ve son dikme sabit olduğu için aralık değiştirilemez.');
     }
     if (gapIndex >= centers.length - 1) throw new Error(currentLanguage === 'en' ? 'Post gap not found.' : 'Dikme aralığı bulunamadı.');
-    const minCenterDistance = 101;
     const isLastGap = gapIndex === centers.length - 2;
+    const leftWidth = frontPostWidthAt(gapIndex);
+    const rightWidth = frontPostWidthAt(gapIndex + 1);
     if (isLastGap) {
-      const nextX = centers[gapIndex + 1] - 100 - targetGap;
-      if (gapIndex > 0 && nextX - centers[gapIndex - 1] < minCenterDistance) {
-        throw new Error(currentLanguage === 'en' ? 'The entered dimension overlaps the previous post.' : 'Girilen ölçü bir önceki dikmeyle çakışmaya neden oluyor.');
+      const nextX = centers[gapIndex + 1] - rightWidth / 2 - targetGap - leftWidth / 2;
+      if (gapIndex > 0) {
+        const previousRight = centers[gapIndex - 1] + frontPostWidthAt(gapIndex - 1) / 2;
+        if (nextX - leftWidth / 2 < previousRight - 0.001) throw new Error(currentLanguage === 'en' ? 'The entered dimension overlaps the previous post.' : 'Girilen ölçü bir önceki dikmeyle çakışmaya neden oluyor.');
       }
       centers[gapIndex] = nextX;
     } else {
-      const nextX = centers[gapIndex] + 100 + targetGap;
-      if (gapIndex + 2 < centers.length && centers[gapIndex + 2] - nextX < minCenterDistance) {
-        throw new Error(currentLanguage === 'en' ? 'The entered dimension overlaps the next post.' : 'Girilen ölçü bir sonraki dikmeyle çakışmaya neden oluyor.');
+      const nextX = centers[gapIndex] + leftWidth / 2 + targetGap + rightWidth / 2;
+      if (gapIndex + 2 < centers.length) {
+        const nextLeft = centers[gapIndex + 2] - frontPostWidthAt(gapIndex + 2) / 2;
+        if (nextX + rightWidth / 2 > nextLeft + 0.001) throw new Error(currentLanguage === 'en' ? 'The entered dimension overlaps the next post.' : 'Girilen ölçü bir sonraki dikmeyle çakışmaya neden oluyor.');
       }
       centers[gapIndex + 1] = nextX;
     }
@@ -879,6 +1806,40 @@
     guillotinePlacements = guillotinePlacements.map(item => Number(item.gapIndex) === gapIndex
       ? { ...item, width: Math.max(1, targetGap - 5) }
       : item);
+  }
+
+  function placementIsSide(meta) {
+    return !!meta && meta.placementView === 'side-left';
+  }
+
+  function placementMetasFromPending(meta) {
+    return Array.isArray(meta && meta.batchMetas) ? meta.batchMetas : (meta ? [meta] : []);
+  }
+
+  function storeSlidingPlacement(placement) {
+    const isSide = placement.placementView === 'side-left';
+    if (isSide) {
+      sideSlidingPlacements = sideSlidingPlacements.filter(item => !(Number(item.sideIndex) === Number(placement.sideIndex) && String(item.sideZone) === String(placement.sideZone)) && String(item.id || '') !== String(placement.id || ''));
+      sideGuillotinePlacements = sideGuillotinePlacements.filter(item => !(Number(item.sideIndex) === Number(placement.sideIndex) && String(item.sideZone) === String(placement.sideZone)));
+      sideSlidingPlacements.push(placement);
+    } else {
+      slidingPlacements = slidingPlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex) && String(item.id || '') !== String(placement.id || ''));
+      guillotinePlacements = guillotinePlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
+      slidingPlacements.push(placement);
+    }
+  }
+
+  function storeGuillotinePlacement(placement) {
+    const isSide = placement.placementView === 'side-left';
+    if (isSide) {
+      sideGuillotinePlacements = sideGuillotinePlacements.filter(item => !(Number(item.sideIndex) === Number(placement.sideIndex) && String(item.sideZone) === String(placement.sideZone)) && String(item.id || '') !== String(placement.id || ''));
+      sideSlidingPlacements = sideSlidingPlacements.filter(item => !(Number(item.sideIndex) === Number(placement.sideIndex) && String(item.sideZone) === String(placement.sideZone)));
+      sideGuillotinePlacements.push(placement);
+    } else {
+      guillotinePlacements = guillotinePlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex) && String(item.id || '') !== String(placement.id || ''));
+      slidingPlacements = slidingPlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
+      guillotinePlacements.push(placement);
+    }
   }
 
   function ensureSlidingDetailsOverlay() {
@@ -929,14 +1890,16 @@
           </section>
           <div class="sliding-auto-fields">
             <label class="sliding-summary-field sliding-poz-field"><span data-sliding-text="pozNo">Position No.</span><input id="slidingPozNo" type="text" readonly></label>
-            <label class="sliding-summary-field"><span><span data-sliding-text="width">Width *</span> <small>(mm)</small></span><input id="slidingWidth" type="text" readonly></label>
-            <label class="sliding-summary-field"><span><span data-sliding-text="height">Height *</span> <small>(mm)</small></span><input id="slidingHeight" type="text" readonly></label>
+            <label class="sliding-summary-field"><span><span data-sliding-text="width">Width *</span> <small>(mm)</small></span><input id="slidingWidth" type="text" inputmode="numeric" autocomplete="off"></label>
+            <label class="sliding-summary-field"><span><span data-sliding-text="height">Height *</span> <small>(mm)</small></span><input id="slidingHeight" type="text" inputmode="numeric" autocomplete="off"></label>
             <label class="sliding-summary-field sliding-panel-field"><span data-sliding-text="panelCount">Panel Count</span><input id="slidingPanelCount" type="text" readonly></label>
           </div>
+          <div id="slidingBatchList" class="bulk-selection-list product-batch-list" hidden></div>
         </div>
         <input id="slidingQuantity" type="hidden" value="1">
         <div id="slidingDetailsError" class="dim-edit-error sliding-details-error" aria-live="polite"></div>
         <div class="dim-edit-actions sliding-details-actions">
+          <button id="slidingDetailsDelete" type="button" class="dim-edit-delete" hidden>Mevcut Ürünü Sil</button>
           <button id="slidingDetailsCancel" type="button" class="dim-edit-cancel" data-sliding-text="cancel">Cancel</button>
           <button type="submit" class="dim-edit-apply" data-sliding-text="confirm">Confirm</button>
         </div>
@@ -964,12 +1927,39 @@
       if (!lowEActive && lowE.checked) overlay.querySelector('input[name="slidingColor"][value="TRANSPARENT"]').checked = true;
       const color = checkedValue('slidingColor');
       overlay.querySelector('#slidingOtherRow').hidden = color !== 'OTHER';
+      const openingType = checkedValue('slidingOpening');
       const width = Number(overlay.querySelector('#slidingWidth').value) || 1;
-      overlay.querySelector('#slidingPanelCount').value = String(slidingPanelCount(width, checkedValue('slidingOpening')));
+      overlay.querySelector('#slidingPanelCount').value = String(slidingPanelCount(width, openingType));
+      const batchList = overlay.querySelector('#slidingBatchList');
+      if (batchList) {
+        batchList.querySelectorAll('.product-batch-row').forEach(row => {
+          const widthInput = row.querySelector('[data-batch-field="width"]');
+          const panelInput = row.querySelector('[data-batch-field="panel"]');
+          if (widthInput && panelInput) panelInput.value = String(slidingPanelCount(Number(widthInput.value) || 1, openingType));
+        });
+      }
       error.textContent = '';
     };
 
     overlay.querySelectorAll('input[type="radio"]').forEach(radio => radio.addEventListener('change', refreshRules));
+    const cleanDimensionInput = input => {
+      const clean = String(input.value || '').replace(/[^0-9]/g, '');
+      if (input.value !== clean) input.value = clean;
+      error.textContent = '';
+    };
+    [overlay.querySelector('#slidingWidth'), overlay.querySelector('#slidingHeight')].forEach(input => {
+      input.addEventListener('input', () => { cleanDimensionInput(input); refreshRules(); });
+    });
+    overlay.querySelector('#slidingBatchList').addEventListener('input', evt => {
+      const input = evt.target && evt.target.matches && evt.target.matches('[data-batch-field="width"],[data-batch-field="height"]') ? evt.target : null;
+      if (!input) return;
+      cleanDimensionInput(input);
+      if (input.dataset.batchField === 'width') {
+        const row = input.closest('.product-batch-row');
+        const panel = row && row.querySelector('[data-batch-field="panel"]');
+        if (panel) panel.value = String(slidingPanelCount(Number(input.value) || 1, checkedValue('slidingOpening')));
+      }
+    });
     otherInput.addEventListener('input', () => { error.textContent = ''; });
 
     const close = () => {
@@ -979,6 +1969,15 @@
     };
     overlay.querySelector('#slidingDetailsCancel').addEventListener('click', close);
     overlay.querySelector('#slidingDetailsClose').addEventListener('click', close);
+    overlay.querySelector('#slidingDetailsDelete').addEventListener('click', () => {
+      const record = pendingSlidingPlacementMeta && pendingSlidingPlacementMeta.editRecord;
+      if (!record) return;
+      if (!window.confirm(currentLanguage === 'en' ? 'Delete this existing sliding product?' : 'Bu mevcut sürme ürünü silinsin mi?')) return;
+      deleteProductRecord(record);
+      close();
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Existing product deleted.' : 'Mevcut ürün silindi.';
+    });
     overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) close(); });
     overlay.addEventListener('keydown', evt => { if (evt.key === 'Escape') { evt.preventDefault(); close(); } });
 
@@ -996,68 +1995,129 @@
         }
       }
       const meta = pendingSlidingPlacementMeta;
-      const width = Math.max(1, Number(overlay.querySelector('#slidingWidth').value) || 1);
-      const height = Math.max(1, Number(overlay.querySelector('#slidingHeight').value) || 1);
+      const metas = placementMetasFromPending(meta);
       const openingType = checkedValue('slidingOpening');
-      const placement = {
-        id: `sliding_${Date.now()}_${meta.index}`,
-        gapIndex: Number(meta.index) || 0,
-        series: checkedValue('slidingSeries'),
-        type: checkedValue('slidingType'),
-        openingType,
-        glassThickness: checkedValue('slidingThickness'),
-        glassColor,
-        width,
-        height,
-        panelCount: slidingPanelCount(width, openingType),
-        quantity: Math.round(qty),
-        pozNo: overlay.querySelector('#slidingPozNo').value,
-        leftPostStandard: true
-      };
-      slidingPlacements = slidingPlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
-      guillotinePlacements = guillotinePlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
-      slidingPlacements.push(placement);
+      const editRecord = meta.editRecord || null;
+      const pozNos = Array.isArray(meta.batchPozNos) ? meta.batchPozNos : [editRecord ? editRecord.placement.pozNo : overlay.querySelector('#slidingPozNo').value];
+      const dimensionInputs = metas.map((item, index) => {
+        const widthInput = index === 0
+          ? overlay.querySelector('#slidingWidth')
+          : overlay.querySelector(`#slidingBatchList [data-batch-index="${index}"][data-batch-field="width"]`);
+        const heightInput = index === 0
+          ? overlay.querySelector('#slidingHeight')
+          : overlay.querySelector(`#slidingBatchList [data-batch-index="${index}"][data-batch-field="height"]`);
+        const width = Number(widthInput && widthInput.value);
+        const height = Number(heightInput && heightInput.value);
+        if (!(width > 0) || !(height > 0)) return { invalid: true, input: !(width > 0) ? widthInput : heightInput, index };
+        return { width, height };
+      });
+      const invalidDimension = dimensionInputs.find(item => item.invalid);
+      if (invalidDimension) {
+        const poz = String(pozNos[invalidDimension.index] || '');
+        error.textContent = currentLanguage === 'en' ? `Enter positive width and height values for ${poz}.` : `${poz} için pozitif genişlik ve yükseklik gir.`;
+        if (invalidDimension.input) invalidDimension.input.focus();
+        return;
+      }
+      const placements = metas.map((item, index) => {
+        const isSidePlacement = placementIsSide(item);
+        const width = dimensionInputs[index].width;
+        const height = dimensionInputs[index].height;
+        const existing = editRecord && index === 0 ? editRecord.placement : null;
+        return {
+          id: existing && existing.id ? existing.id : (isSidePlacement ? `sliding_side_${Date.now()}_${index}_${item.sideIndex}_${item.sideZone}` : `sliding_${Date.now()}_${index}_${item.index}`),
+          gapIndex: Number(item.index) || 0,
+          placementView: isSidePlacement ? 'side-left' : 'front',
+          sideIndex: isSidePlacement ? (Number(item.sideIndex) || 0) : null,
+          sideZone: isSidePlacement ? String(item.sideZone || '') : '',
+          sideGapIndex: isSidePlacement ? (Number(item.sideGapIndex) || 0) : null,
+          series: checkedValue('slidingSeries'),
+          type: checkedValue('slidingType'),
+          openingType,
+          glassThickness: checkedValue('slidingThickness'),
+          glassColor,
+          width,
+          height,
+          panelCount: slidingPanelCount(width, openingType),
+          quantity: Math.round(qty),
+          pozNo: String(pozNos[index] || pozNos[0] || nextSlidingPozNo()),
+          leftPostStandard: isSidePlacement ? true : !frontPostProfiles[Number(item.index) || 0]
+        };
+      });
+      placements.forEach(storeSlidingPlacement);
       overlay.hidden = true;
       pendingSlidingPlacementMeta = null;
       suppressFormPreviewUpdate = true;
       try { updatePreview(false); }
       finally { window.setTimeout(() => { suppressFormPreviewUpdate = false; }, 450); }
-      const slidingTxt = SLIDING_UI_TEXT[currentLanguage] || SLIDING_UI_TEXT.tr;
-      statusText.textContent = slidingTxt.placed(placement.pozNo, placement.gapIndex + 1, placement.gapIndex + 2);
+      if (editRecord) statusText.textContent = currentLanguage === 'en' ? `${placements[0].pozNo} updated.` : `${placements[0].pozNo} güncellendi.`;
+      else if (placements.length > 1) statusText.textContent = currentLanguage === 'en' ? `${placements.length} sliding products placed.` : `${placements.length} sürme ürün yerleştirildi.`;
+      else {
+        const placement = placements[0];
+        const slidingTxt = SLIDING_UI_TEXT[currentLanguage] || SLIDING_UI_TEXT.tr;
+        statusText.textContent = placement.placementView === 'side-left'
+          ? (currentLanguage === 'en' ? `${placement.pozNo} placed in the left side view.` : `${placement.pozNo} sol yan görünüşe yerleştirildi.`)
+          : slidingTxt.placed(placement.pozNo, placement.gapIndex + 1, placement.gapIndex + 2);
+      }
     });
     return overlay;
   }
 
-  function showSlidingDetailsOverlay(meta) {
+  function showSlidingDetailsOverlay(meta, options = {}) {
     const overlay = ensureSlidingDetailsOverlay();
     translateSlidingDetailsOverlay(overlay);
-    pendingSlidingPlacementMeta = { ...meta };
-    const gap = Math.max(1, Number(meta.value) || 1);
-    const width = Math.max(1, gap - 5);
+    const batchMetas = Array.isArray(meta && meta.batchMetas) ? meta.batchMetas.map(normalizedProductMeta).filter(Boolean) : null;
+    const baseMeta = batchMetas && batchMetas.length ? batchMetas[0] : normalizedProductMeta(meta) || { ...meta };
+    const record = options.editExisting || meta.editProduct || meta.placementId ? (meta.placementId ? findProductByInteraction(meta) : productRecordForMeta(baseMeta)) : null;
+    const existing = record && record.type === 'sliding_glass' ? record.placement : null;
+    pendingSlidingPlacementMeta = { ...baseMeta, batchMetas: batchMetas || undefined, editRecord: existing ? record : null };
+    const allMetas = batchMetas || [baseMeta];
+    const gap = Math.max(1, Number(baseMeta.value) || 1);
+    const width = Math.max(1, Number(baseMeta.placementWidth) || (gap - 5));
     const d = lastDrawing && lastDrawing.input ? lastDrawing.input : {};
-    const height = Math.max(1, Number(d.frontHeight || 0) - Number(d.parapetHeight || 0) - 5);
-    overlay.querySelectorAll('input[name="slidingSeries"]').forEach(el => { el.checked = el.value === 'A SERIES'; });
-    overlay.querySelectorAll('input[name="slidingType"]').forEach(el => { el.checked = el.value === 'WITH THRESHOLD'; });
-    overlay.querySelectorAll('input[name="slidingOpening"]').forEach(el => { el.checked = el.value === 'SIDE OPENING'; });
-    overlay.querySelectorAll('input[name="slidingThickness"]').forEach(el => { el.checked = el.value === '10 MM'; });
-    overlay.querySelectorAll('input[name="slidingColor"]').forEach(el => { el.checked = el.value === 'TRANSPARENT'; });
-    overlay.querySelector('#slidingOtherColor').value = '';
-    overlay.querySelector('#slidingOtherRow').hidden = true;
-    overlay.querySelector('#slidingWidth').value = String(Math.round(width));
-    overlay.querySelector('#slidingHeight').value = String(Math.round(height));
-    overlay.querySelector('#slidingPanelCount').value = String(slidingPanelCount(width, 'SIDE OPENING'));
+    const height = Math.max(1, Number(baseMeta.placementHeight) || (Number(d.frontHeight || 0) - Number(d.parapetHeight || 0) - 5));
+    setRadioGroupValue(overlay, 'slidingSeries', existing && existing.series, 'A SERIES');
+    setRadioGroupValue(overlay, 'slidingType', existing && existing.type, 'WITH THRESHOLD');
+    setRadioGroupValue(overlay, 'slidingOpening', existing && existing.openingType, 'SIDE OPENING');
+    setRadioGroupValue(overlay, 'slidingThickness', existing && existing.glassThickness, '10 MM');
+    const knownColors = ['TRANSPARENT','GREY','BRONZE','LOW-E GLASS'];
+    const existingColor = existing ? String(existing.glassColor || 'TRANSPARENT') : 'TRANSPARENT';
+    setRadioGroupValue(overlay, 'slidingColor', knownColors.includes(existingColor) ? existingColor : (existing ? 'OTHER' : 'TRANSPARENT'), 'TRANSPARENT');
+    overlay.querySelector('#slidingOtherColor').value = knownColors.includes(existingColor) ? '' : existingColor;
+    overlay.querySelector('#slidingOtherRow').hidden = knownColors.includes(existingColor);
+    overlay.querySelector('#slidingWidth').value = String(Math.round(existing ? existing.width : width));
+    overlay.querySelector('#slidingHeight').value = String(Math.round(existing ? existing.height : height));
+    overlay.querySelector('#slidingPanelCount').value = String(slidingPanelCount(existing ? existing.width : width, existing ? existing.openingType : 'SIDE OPENING'));
     overlay.querySelector('#slidingQuantity').value = '1';
-    const existingPlacement = slidingPlacements.find(item => Number(item.gapIndex) === Number(meta.index));
-    overlay.querySelector('#slidingPozNo').value = existingPlacement ? existingPlacement.pozNo : nextSlidingPozNo();
+    const pozNos = batchMetas ? allocatePozNos('S', batchMetas.length) : [existing ? existing.pozNo : nextSlidingPozNo()];
+    pendingSlidingPlacementMeta.batchPozNos = pozNos;
+    overlay.querySelector('#slidingPozNo').value = pozNos[0];
+    const batchList = overlay.querySelector('#slidingBatchList');
+    const slidingTxt = SLIDING_UI_TEXT[currentLanguage] || SLIDING_UI_TEXT.tr;
+    batchList.hidden = !(batchMetas && batchMetas.length > 1);
+    batchList.innerHTML = batchMetas && batchMetas.length > 1 ? batchMetas.slice(1).map((item, offset) => {
+      const index = offset + 1;
+      const itemWidth = Math.max(1, Math.round(Number(item.placementWidth) || 1));
+      const itemHeight = Math.max(1, Math.round(Number(item.placementHeight) || 1));
+      return `<div class="product-batch-row product-batch-row-sliding" data-batch-index="${index}">
+        <label class="product-batch-field product-batch-poz"><span>${escapeHtml(slidingTxt.pozNo)}</span><input type="text" value="${escapeHtml(pozNos[index])}" readonly></label>
+        <label class="product-batch-field"><span>${escapeHtml(slidingTxt.width)} <small>(mm)</small></span><input type="text" inputmode="numeric" autocomplete="off" data-batch-index="${index}" data-batch-field="width" value="${itemWidth}"></label>
+        <label class="product-batch-field"><span>${escapeHtml(slidingTxt.height)} <small>(mm)</small></span><input type="text" inputmode="numeric" autocomplete="off" data-batch-index="${index}" data-batch-field="height" value="${itemHeight}"></label>
+        <label class="product-batch-field product-batch-panel"><span>${escapeHtml(slidingTxt.panelCount)}</span><input type="text" data-batch-index="${index}" data-batch-field="panel" value="${slidingPanelCount(itemWidth, existing ? existing.openingType : 'SIDE OPENING')}" readonly></label>
+      </div>`;
+    }).join('') : '';
+    const deleteBtn = overlay.querySelector('#slidingDetailsDelete');
+    deleteBtn.hidden = !existing;
+    deleteBtn.textContent = currentLanguage === 'en' ? 'Delete Existing Product' : 'Mevcut Ürünü Sil';
     overlay.querySelector('#slidingDetailsError').textContent = '';
     overlay.hidden = false;
-    overlay.querySelector('input[name="slidingSeries"]:checked').dispatchEvent(new Event('change', { bubbles: true }));
-    window.setTimeout(() => overlay.querySelector('input[name="slidingSeries"]:checked').focus({ preventScroll: true }), 20);
+    const active = overlay.querySelector('input[name="slidingSeries"]:checked');
+    if (active) active.dispatchEvent(new Event('change', { bubbles: true }));
+    window.setTimeout(() => { const first = overlay.querySelector('input[name="slidingSeries"]:checked'); if (first) first.focus({ preventScroll: true }); }, 20);
   }
 
 
   function nextGuillotinePozNo() {
-    const used = new Set(guillotinePlacements.map(item => String(item.pozNo || '').toUpperCase()));
+    const used = new Set([...guillotinePlacements, ...sideGuillotinePlacements].map(item => String(item.pozNo || '').toUpperCase()));
     let n = 1;
     while (used.has(`G${String(n).padStart(2, '0')}`)) n += 1;
     return `G${String(n).padStart(2, '0')}`;
@@ -1139,12 +2199,14 @@
           </section>
           <div class="sliding-auto-fields guillotine-auto-fields">
             <label class="sliding-summary-field sliding-poz-field"><span data-guillotine-text="pozNo">Position No.</span><input id="guillotinePozNo" type="text" readonly></label>
-            <label class="sliding-summary-field"><span><span data-guillotine-text="width">Width *</span> <small>(mm)</small></span><input id="guillotineWidth" type="text" readonly></label>
-            <label class="sliding-summary-field"><span><span data-guillotine-text="height">Height *</span> <small>(mm)</small></span><input id="guillotineHeight" type="text" readonly></label>
+            <label class="sliding-summary-field"><span><span data-guillotine-text="width">Width *</span> <small>(mm)</small></span><input id="guillotineWidth" type="text" inputmode="numeric" autocomplete="off"></label>
+            <label class="sliding-summary-field"><span><span data-guillotine-text="height">Height *</span> <small>(mm)</small></span><input id="guillotineHeight" type="text" inputmode="numeric" autocomplete="off"></label>
           </div>
+          <div id="guillotineBatchList" class="bulk-selection-list product-batch-list" hidden></div>
         </div>
         <div id="guillotineDetailsError" class="dim-edit-error sliding-details-error" aria-live="polite"></div>
         <div class="dim-edit-actions sliding-details-actions">
+          <button id="guillotineDetailsDelete" type="button" class="dim-edit-delete" hidden>Mevcut Ürünü Sil</button>
           <button id="guillotineDetailsCancel" type="button" class="dim-edit-cancel" data-guillotine-text="cancel">Cancel</button>
           <button type="submit" class="dim-edit-apply" data-guillotine-text="confirm">Confirm</button>
         </div>
@@ -1180,10 +2242,31 @@
       error.textContent = '';
     };
     overlay.querySelectorAll('input[type="radio"]').forEach(radio => radio.addEventListener('change', refreshRules));
+    const cleanDimensionInput = input => {
+      const clean = String(input.value || '').replace(/[^0-9]/g, '');
+      if (input.value !== clean) input.value = clean;
+      error.textContent = '';
+    };
+    [overlay.querySelector('#guillotineWidth'), overlay.querySelector('#guillotineHeight')].forEach(input => {
+      input.addEventListener('input', () => cleanDimensionInput(input));
+    });
+    overlay.querySelector('#guillotineBatchList').addEventListener('input', evt => {
+      const input = evt.target && evt.target.matches && evt.target.matches('[data-batch-field="width"],[data-batch-field="height"]') ? evt.target : null;
+      if (input) cleanDimensionInput(input);
+    });
     otherInput.addEventListener('input', () => { error.textContent = ''; });
     const close = () => { overlay.hidden = true; pendingGuillotinePlacementMeta = null; focusPreviewCanvas(); };
     overlay.querySelector('#guillotineDetailsCancel').addEventListener('click', close);
     overlay.querySelector('#guillotineDetailsClose').addEventListener('click', close);
+    overlay.querySelector('#guillotineDetailsDelete').addEventListener('click', () => {
+      const record = pendingGuillotinePlacementMeta && pendingGuillotinePlacementMeta.editRecord;
+      if (!record) return;
+      if (!window.confirm(currentLanguage === 'en' ? 'Delete this existing guillotine product?' : 'Bu mevcut giyotin ürünü silinsin mi?')) return;
+      deleteProductRecord(record);
+      close();
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Existing product deleted.' : 'Mevcut ürün silindi.';
+    });
     overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) close(); });
     overlay.addEventListener('keydown', evt => { if (evt.key === 'Escape') { evt.preventDefault(); close(); } });
     form.addEventListener('submit', evt => {
@@ -1199,64 +2282,131 @@
         }
       }
       const meta = pendingGuillotinePlacementMeta;
-      const placement = {
-        id: `guillotine_${Date.now()}_${meta.index}`,
-        gapIndex: Number(meta.index) || 0,
-        series: checkedValue('guillotineSeries'),
-        type: checkedValue('guillotineType'),
-        mechanism: checkedValue('guillotineMechanism'),
-        glassThickness: checkedValue('guillotineThickness'),
-        glassColor,
-        panelCount: checkedValue('guillotinePanel'),
-        motorDirection: checkedValue('guillotineMotorDirection'),
-        view: checkedValue('guillotineView'),
-        motorType: checkedValue('guillotineMotorType'),
-        remoteControl: checkedValue('guillotineRemote'),
-        width: Math.max(1, Number(overlay.querySelector('#guillotineWidth').value) || 1),
-        height: Math.max(1, Number(overlay.querySelector('#guillotineHeight').value) || 1),
-        quantity: 1,
-        pozNo: overlay.querySelector('#guillotinePozNo').value,
-        leftPostStandard: true
-      };
-      guillotinePlacements = guillotinePlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
-      slidingPlacements = slidingPlacements.filter(item => Number(item.gapIndex) !== Number(placement.gapIndex));
-      guillotinePlacements.push(placement);
+      const metas = placementMetasFromPending(meta);
+      const editRecord = meta.editRecord || null;
+      const pozNos = Array.isArray(meta.batchPozNos) ? meta.batchPozNos : [editRecord ? editRecord.placement.pozNo : overlay.querySelector('#guillotinePozNo').value];
+      const dimensionInputs = metas.map((item, index) => {
+        const widthInput = index === 0
+          ? overlay.querySelector('#guillotineWidth')
+          : overlay.querySelector(`#guillotineBatchList [data-batch-index="${index}"][data-batch-field="width"]`);
+        const heightInput = index === 0
+          ? overlay.querySelector('#guillotineHeight')
+          : overlay.querySelector(`#guillotineBatchList [data-batch-index="${index}"][data-batch-field="height"]`);
+        const width = Number(widthInput && widthInput.value);
+        const height = Number(heightInput && heightInput.value);
+        if (!(width > 0) || !(height > 0)) return { invalid: true, input: !(width > 0) ? widthInput : heightInput, index };
+        return { width, height };
+      });
+      const invalidDimension = dimensionInputs.find(item => item.invalid);
+      if (invalidDimension) {
+        const poz = String(pozNos[invalidDimension.index] || '');
+        error.textContent = currentLanguage === 'en' ? `Enter positive width and height values for ${poz}.` : `${poz} için pozitif genişlik ve yükseklik gir.`;
+        if (invalidDimension.input) invalidDimension.input.focus();
+        return;
+      }
+      const placements = metas.map((item, index) => {
+        const isSidePlacement = placementIsSide(item);
+        const existing = editRecord && index === 0 ? editRecord.placement : null;
+        return {
+          id: existing && existing.id ? existing.id : (isSidePlacement ? `guillotine_side_${Date.now()}_${index}_${item.sideIndex}_${item.sideZone}` : `guillotine_${Date.now()}_${index}_${item.index}`),
+          gapIndex: Number(item.index) || 0,
+          placementView: isSidePlacement ? 'side-left' : 'front',
+          sideIndex: isSidePlacement ? (Number(item.sideIndex) || 0) : null,
+          sideZone: isSidePlacement ? String(item.sideZone || '') : '',
+          sideGapIndex: isSidePlacement ? (Number(item.sideGapIndex) || 0) : null,
+          series: checkedValue('guillotineSeries'),
+          type: checkedValue('guillotineType'),
+          mechanism: checkedValue('guillotineMechanism'),
+          glassThickness: checkedValue('guillotineThickness'),
+          glassColor,
+          panelCount: checkedValue('guillotinePanel'),
+          motorDirection: checkedValue('guillotineMotorDirection'),
+          view: checkedValue('guillotineView'),
+          motorType: checkedValue('guillotineMotorType'),
+          remoteControl: checkedValue('guillotineRemote'),
+          width: dimensionInputs[index].width,
+          height: dimensionInputs[index].height,
+          quantity: 1,
+          pozNo: String(pozNos[index] || pozNos[0] || nextGuillotinePozNo()),
+          leftPostStandard: isSidePlacement ? true : !frontPostProfiles[Number(item.index) || 0]
+        };
+      });
+      placements.forEach(storeGuillotinePlacement);
       overlay.hidden = true;
       pendingGuillotinePlacementMeta = null;
       suppressFormPreviewUpdate = true;
       try { updatePreview(false); }
       finally { window.setTimeout(() => { suppressFormPreviewUpdate = false; }, 450); }
-      const txt = GUILLOTINE_UI_TEXT[currentLanguage] || GUILLOTINE_UI_TEXT.tr;
-      statusText.textContent = txt.placed(placement.pozNo, placement.gapIndex + 1, placement.gapIndex + 2);
+      if (editRecord) statusText.textContent = currentLanguage === 'en' ? `${placements[0].pozNo} updated.` : `${placements[0].pozNo} güncellendi.`;
+      else if (placements.length > 1) statusText.textContent = currentLanguage === 'en' ? `${placements.length} guillotine products placed.` : `${placements.length} giyotin ürün yerleştirildi.`;
+      else {
+        const placement = placements[0];
+        const txt = GUILLOTINE_UI_TEXT[currentLanguage] || GUILLOTINE_UI_TEXT.tr;
+        statusText.textContent = placement.placementView === 'side-left'
+          ? (currentLanguage === 'en' ? `${placement.pozNo} placed in the left side view.` : `${placement.pozNo} sol yan görünüşe yerleştirildi.`)
+          : txt.placed(placement.pozNo, placement.gapIndex + 1, placement.gapIndex + 2);
+      }
     });
     return overlay;
   }
 
-  function showGuillotineDetailsOverlay(meta) {
+  function showGuillotineDetailsOverlay(meta, options = {}) {
     const overlay = ensureGuillotineDetailsOverlay();
     translateGuillotineDetailsOverlay(overlay);
-    pendingGuillotinePlacementMeta = { ...meta };
-    const gap = Math.max(1, Number(meta.value) || 1);
-    const width = Math.max(1, gap - 5);
+    const batchMetas = Array.isArray(meta && meta.batchMetas) ? meta.batchMetas.map(normalizedProductMeta).filter(Boolean) : null;
+    const baseMeta = batchMetas && batchMetas.length ? batchMetas[0] : normalizedProductMeta(meta) || { ...meta };
+    const record = options.editExisting || meta.editProduct || meta.placementId ? (meta.placementId ? findProductByInteraction(meta) : productRecordForMeta(baseMeta)) : null;
+    const existing = record && record.type === 'guillotine_glass' ? record.placement : null;
+    pendingGuillotinePlacementMeta = { ...baseMeta, batchMetas: batchMetas || undefined, editRecord: existing ? record : null };
+    const gap = Math.max(1, Number(baseMeta.value) || 1);
+    const width = Math.max(1, Number(baseMeta.placementWidth) || (gap - 5));
     const d = lastDrawing && lastDrawing.input ? lastDrawing.input : {};
-    const height = Math.max(1, Number(d.frontHeight || 0) - Number(d.parapetHeight || 0) - 5);
+    const height = Math.max(1, Number(baseMeta.placementHeight) || (Number(d.frontHeight || 0) - Number(d.parapetHeight || 0) - 5));
     const defaults = {
       guillotineSeries: 'A SERIES', guillotineType: 'STANDARD', guillotineMechanism: 'CHAIN',
       guillotineThickness: '8 MM', guillotineColor: 'TRANSPARENT', guillotinePanel: '1+1',
-      guillotineMotorDirection: 'RIGHT', guillotineView: 'INSIDE VIEW', guillotineMotorType: 'SOMFY RTS',
-      guillotineRemote: '1 CHANNEL'
+      guillotineMotorDirection: 'RIGHT', guillotineView: 'INSIDE VIEW', guillotineMotorType: 'SOMFY RTS', guillotineRemote: '1 CHANNEL'
     };
-    Object.entries(defaults).forEach(([name, value]) => overlay.querySelectorAll(`input[name="${name}"]`).forEach(el => { el.checked = el.value === value; }));
-    overlay.querySelector('#guillotineOtherColor').value = '';
-    overlay.querySelector('#guillotineOtherRow').hidden = true;
-    overlay.querySelector('#guillotineWidth').value = String(Math.round(width));
-    overlay.querySelector('#guillotineHeight').value = String(Math.round(height));
-    const existing = guillotinePlacements.find(item => Number(item.gapIndex) === Number(meta.index));
-    overlay.querySelector('#guillotinePozNo').value = existing ? existing.pozNo : nextGuillotinePozNo();
+    const values = existing ? {
+      guillotineSeries: existing.series, guillotineType: existing.type, guillotineMechanism: existing.mechanism,
+      guillotineThickness: existing.glassThickness, guillotineColor: existing.glassColor, guillotinePanel: existing.panelCount,
+      guillotineMotorDirection: existing.motorDirection, guillotineView: existing.view, guillotineMotorType: existing.motorType, guillotineRemote: existing.remoteControl
+    } : defaults;
+    const knownColors = ['TRANSPARENT','GREY','BRONZE','LOW-E GLASS'];
+    Object.entries(defaults).forEach(([name, fallback]) => {
+      let value = values[name] || fallback;
+      if (name === 'guillotineColor' && !knownColors.includes(String(value))) value = 'OTHER';
+      setRadioGroupValue(overlay, name, value, fallback);
+    });
+    const existingColor = existing ? String(existing.glassColor || 'TRANSPARENT') : 'TRANSPARENT';
+    overlay.querySelector('#guillotineOtherColor').value = knownColors.includes(existingColor) ? '' : existingColor;
+    overlay.querySelector('#guillotineOtherRow').hidden = knownColors.includes(existingColor);
+    overlay.querySelector('#guillotineWidth').value = String(Math.round(existing ? existing.width : width));
+    overlay.querySelector('#guillotineHeight').value = String(Math.round(existing ? existing.height : height));
+    const pozNos = batchMetas ? allocatePozNos('G', batchMetas.length) : [existing ? existing.pozNo : nextGuillotinePozNo()];
+    pendingGuillotinePlacementMeta.batchPozNos = pozNos;
+    overlay.querySelector('#guillotinePozNo').value = pozNos[0];
+    const batchList = overlay.querySelector('#guillotineBatchList');
+    const guillotineTxt = GUILLOTINE_UI_TEXT[currentLanguage] || GUILLOTINE_UI_TEXT.tr;
+    batchList.hidden = !(batchMetas && batchMetas.length > 1);
+    batchList.innerHTML = batchMetas && batchMetas.length > 1 ? batchMetas.slice(1).map((item, offset) => {
+      const index = offset + 1;
+      const itemWidth = Math.max(1, Math.round(Number(item.placementWidth) || 1));
+      const itemHeight = Math.max(1, Math.round(Number(item.placementHeight) || 1));
+      return `<div class="product-batch-row product-batch-row-guillotine" data-batch-index="${index}">
+        <label class="product-batch-field product-batch-poz"><span>${escapeHtml(guillotineTxt.pozNo)}</span><input type="text" value="${escapeHtml(pozNos[index])}" readonly></label>
+        <label class="product-batch-field"><span>${escapeHtml(guillotineTxt.width)} <small>(mm)</small></span><input type="text" inputmode="numeric" autocomplete="off" data-batch-index="${index}" data-batch-field="width" value="${itemWidth}"></label>
+        <label class="product-batch-field"><span>${escapeHtml(guillotineTxt.height)} <small>(mm)</small></span><input type="text" inputmode="numeric" autocomplete="off" data-batch-index="${index}" data-batch-field="height" value="${itemHeight}"></label>
+      </div>`;
+    }).join('') : '';
+    const deleteBtn = overlay.querySelector('#guillotineDetailsDelete');
+    deleteBtn.hidden = !existing;
+    deleteBtn.textContent = currentLanguage === 'en' ? 'Delete Existing Product' : 'Mevcut Ürünü Sil';
     overlay.querySelector('#guillotineDetailsError').textContent = '';
     overlay.hidden = false;
-    overlay.querySelector('input[name="guillotineSeries"]:checked').dispatchEvent(new Event('change', { bubbles: true }));
-    window.setTimeout(() => overlay.querySelector('input[name="guillotineSeries"]:checked').focus({ preventScroll: true }), 20);
+    const active = overlay.querySelector('input[name="guillotineSeries"]:checked');
+    if (active) active.dispatchEvent(new Event('change', { bubbles: true }));
+    window.setTimeout(() => { const first = overlay.querySelector('input[name="guillotineSeries"]:checked'); if (first) first.focus({ preventScroll: true }); }, 20);
   }
 
   function ensureDimensionEditOverlay() {
@@ -1280,7 +2430,7 @@
           <label><input type="radio" name="dimensionAction" value="addSameProfile" /> <span id="dimActionAddSame">Bu aralığa aynı profilden ekle</span></label>
           <label><input type="radio" name="dimensionAction" value="addDifferentProfile" /> <span id="dimActionAddDifferent">Bu aralığa farklı profil ekle</span></label>
           <label><input type="radio" name="dimensionAction" value="placeProduct" /> <span id="dimActionProduct">Bu alana ürün yerleştir</span></label>
-          <label><input type="radio" name="dimensionAction" value="editProfile" /> <span id="dimActionProfile">Mevcut elemanı / profili düzenle</span></label>
+          <label><input type="radio" name="dimensionAction" value="editProduct" /> <span id="dimActionProfile">Mevcut ürünü düzenle</span></label>
         </fieldset>
         <div class="v66-action-options" id="dimensionActionOptions">
           <label id="productOptionWrap">Ürün
@@ -1289,6 +2439,11 @@
           <label id="profileOptionWrap">Profil
             <select id="dimensionProfileSelect"></select>
           </label>
+          <div id="dimensionCustomProfileFields" class="dimension-custom-profile-fields" hidden>
+            <label><span>En</span><input id="dimensionProfileEn" type="text" inputmode="numeric" autocomplete="off" value="100" /></label>
+            <label><span>Boy</span><input id="dimensionProfileBoy" type="text" inputmode="numeric" autocomplete="off" value="100" /></label>
+            <label><span>Et</span><input id="dimensionProfileEt" type="text" inputmode="numeric" autocomplete="off" value="2" /></label>
+          </div>
           <div class="v66-profile-hint" id="dimensionProfileHint"></div>
         </div>
         <div id="dimensionEditError" class="dim-edit-error" aria-live="polite"></div>
@@ -1328,12 +2483,21 @@
       overlay.querySelector('#productOptionWrap').hidden = action !== 'placeProduct';
       overlay.querySelector('#profileOptionWrap').hidden = true;
       profileSelect.disabled = true;
+      overlay.querySelector('#dimensionCustomProfileFields').hidden = action !== 'addDifferentProfile';
       overlay.querySelector('#dimensionProfileHint').textContent = '';
       input.disabled = action !== 'resize';
     };
 
     overlay.querySelectorAll('input[name="dimensionAction"]').forEach(r => r.addEventListener('change', refreshActionOptions));
     profileSelect.addEventListener('change', refreshActionOptions);
+
+    overlay.querySelectorAll('#dimensionProfileEn,#dimensionProfileBoy,#dimensionProfileEt').forEach(profileInput => {
+      profileInput.addEventListener('input', () => {
+        const clean = String(profileInput.value || '').replace(/[^0-9]/g, '');
+        if (profileInput.value !== clean) profileInput.value = clean;
+        overlay.querySelector('#dimensionEditError').textContent = '';
+      });
+    });
 
     input.addEventListener('input', () => {
       const clean = String(input.value || '').replace(/[^0-9]/g, '');
@@ -1363,9 +2527,22 @@
       };
 
       if (action === 'resize') {
-        if (!clean || Number(clean) <= 0) {
-          error.textContent = currentLanguage === 'en' ? 'Enter a positive number.' : 'Pozitif bir sayı gir.';
+        const sideSupportGap = isLeftSideSupportGapMeta(meta);
+        if (!clean || (!sideSupportGap && Number(clean) <= 0) || (sideSupportGap && Number(clean) < 0)) {
+          error.textContent = sideSupportGap
+            ? (currentLanguage === 'en' ? 'Enter zero or a positive number.' : 'Sıfır veya pozitif bir sayı gir.')
+            : (currentLanguage === 'en' ? 'Enter a positive number.' : 'Pozitif bir sayı gir.');
           input.focus();
+          return;
+        }
+        if (sideSupportGap) {
+          try {
+            resizeLeftSideSupportGap(meta, Number(clean));
+          } catch (err) {
+            error.textContent = err.message;
+            return;
+          }
+          finishUpdate(currentLanguage === 'en' ? 'Support post position updated.' : 'Destek dikmesi konumu güncellendi.');
           return;
         }
         if (isFrontPostGapMeta(meta)) {
@@ -1389,37 +2566,69 @@
         return;
       }
 
-      if (action === 'addSameProfile') {
-        const postEl = $('postCount');
-        const current = Number(String(postEl && postEl.value ? postEl.value : '').split(';')[0]) || (lastDrawing && lastDrawing.input ? Number(lastDrawing.input.postCount) || 0 : 0);
-        if (postEl) {
-          postEl.value = String(Math.max(1, current + 1));
-          postEl.dataset.userEdited = 'true';
+      if (action === 'addSameProfile' || action === 'addDifferentProfile') {
+        const sideGap = isLeftSideSupportGapMeta(meta);
+        const frontGap = isFrontPostGapMeta(meta);
+        if (!sideGap && !frontGap) {
+          error.textContent = currentLanguage === 'en' ? 'Profile insertion is not available in this zone.' : 'Bu bölgeye profil ekleme aktif değil.';
+          return;
         }
-        finishUpdate(currentLanguage === 'en' ? 'Same profile/post infrastructure applied: post count increased by 1.' : 'Aynı profil/dikme ekleme altyapısı çalıştı: dikme sayısı 1 artırıldı.');
+        let profile = null;
+        if (action === 'addDifferentProfile') {
+          const rawEn = Number(overlay.querySelector('#dimensionProfileEn').value || 0);
+          const rawBoy = Number(overlay.querySelector('#dimensionProfileBoy').value || 0);
+          const rawEt = Number(overlay.querySelector('#dimensionProfileEt').value || 0);
+          if (!(rawEn > 0) || !(rawBoy > 0) || !(rawEt > 0) || rawEt * 2 >= Math.min(rawEn, rawBoy)) {
+            error.textContent = currentLanguage === 'en'
+              ? 'Enter positive width, depth and wall thickness values. Thickness must be less than half of the smaller side.'
+              : 'En, Boy ve Et Kalınlığı pozitif olmalı; et kalınlığı küçük kenarın yarısından az olmalıdır.';
+            return;
+          }
+          profile = sanitizeGlassTrackProfile({ mode: 'other', en: rawEn, boy: rawBoy, et: rawEt });
+        }
+        try {
+          if (sideGap) addSidePostToGap(meta, profile || { mode: 'standard', en: 100, boy: 100, et: 2 });
+          else insertFrontPostInGap(meta, profile);
+        } catch (err) {
+          error.textContent = err.message;
+          return;
+        }
+        finishUpdate(currentLanguage === 'en' ? 'Post added at the center of the selected gap.' : 'Dikme seçilen aralığın tam ortasına eklendi.');
         return;
       }
 
-      if (action === 'addDifferentProfile' || action === 'editProfile') {
-        const profileId = profileSelect.value;
-        const prof = SMART_PROFILE_OPTIONS.find(p => p.id === profileId) || SMART_PROFILE_OPTIONS[0];
-        statusText.textContent = currentLanguage === 'en'
-          ? `Profile relation saved as infrastructure: ${prof.en}, side ${prof.side} mm / top ${prof.top} mm. Detailed geometry will be connected in the next step.`
-          : `Profil ilişki altyapısı kaydedildi: ${prof.tr}, yan ${prof.side} mm / üst ${prof.top} mm. Detay çizim sonraki aşamada bağlanacak.`;
-        closeOverlay();
+      if (action === 'editProduct') {
+        const productMeta = normalizedProductMeta(meta);
+        const record = productRecordForMeta(productMeta);
+        if (!record) {
+          error.textContent = currentLanguage === 'en' ? 'No existing product was found in this zone.' : 'Bu alanda düzenlenecek mevcut ürün bulunamadı.';
+          return;
+        }
+        overlay.hidden = true;
+        pendingDimensionEdit = null;
+        const editMeta = { ...productMeta, editProduct: true, placementId: record.placement.id, productType: record.type };
+        if (record.type === 'guillotine_glass') showGuillotineDetailsOverlay(editMeta, { editExisting: true });
+        else showSlidingDetailsOverlay(editMeta, { editExisting: true });
         return;
       }
 
       if (action === 'placeProduct') {
-        if (!isFrontPostGapMeta(meta)) {
-          error.textContent = currentLanguage === 'en' ? 'Products can currently be placed only between two posts in the front view.' : 'Ürünler şimdilik yalnızca ön görünüşte iki dikme arasına yerleştirilebilir.';
+        const frontGap = isFrontPostGapMeta(meta);
+        const sideGap = isLeftSideSupportGapMeta(meta);
+        if (!frontGap && !sideGap) {
+          error.textContent = currentLanguage === 'en' ? 'This zone is not ready for product placement.' : 'Bu bölge ürün yerleşimine hazır değil.';
+          return;
+        }
+        const placementMeta = sideGap ? sideProductMeta(meta) : meta;
+        if (!placementMeta || Number(placementMeta.placementWidth || placementMeta.value || 0) <= 0 || (sideGap && Number(placementMeta.placementHeight || 0) <= 0)) {
+          error.textContent = currentLanguage === 'en' ? 'The selected zone is too small for a product.' : 'Seçilen bölge ürün yerleşimi için çok küçük.';
           return;
         }
         const selectedProduct = productSelect.value || 'sliding_glass';
         overlay.hidden = true;
         pendingDimensionEdit = null;
-        if (selectedProduct === 'guillotine_glass') showGuillotineDetailsOverlay(meta);
-        else showSlidingDetailsOverlay(meta);
+        if (selectedProduct === 'guillotine_glass') showGuillotineDetailsOverlay(placementMeta);
+        else showSlidingDetailsOverlay(placementMeta);
       }
     });
 
@@ -1458,13 +2667,15 @@
     overlay.querySelector('#dimensionProfileSelect').querySelectorAll('option').forEach((opt, i) => { const p = SMART_PROFILE_OPTIONS[i]; if (p) opt.textContent = isEn ? p.en : p.tr; });
 
     const frontPostGap = isFrontPostGapMeta(meta);
+    const sideSupportGap = isLeftSideSupportGapMeta(meta);
     const postCountForGap = lastDrawing && lastDrawing.input ? Number(lastDrawing.input.postCount) || 0 : 0;
+    const existingProduct = productRecordForMeta(normalizedProductMeta(meta));
     const actionMap = {
-      resize: frontPostGap ? (!!meta.canResize && postCountForGap > 2) : !!meta.canResize,
-      addSameProfile: false,
-      addDifferentProfile: false,
-      placeProduct: frontPostGap && !!meta.canPlaceProduct,
-      editProfile: false
+      resize: sideSupportGap ? !!meta.canResize : (frontPostGap ? (!!meta.canResize && postCountForGap > 2) : !!meta.canResize),
+      addSameProfile: (frontPostGap || sideSupportGap) && !!meta.canAddSameProfile,
+      addDifferentProfile: (frontPostGap || sideSupportGap) && !!meta.canAddDifferentProfile,
+      placeProduct: (frontPostGap || sideSupportGap) && !!meta.canPlaceProduct && !existingProduct,
+      editProduct: !!existingProduct
     };
     overlay.querySelectorAll('input[name="dimensionAction"]').forEach(r => {
       r.disabled = !actionMap[r.value];
@@ -1480,9 +2691,11 @@
       r.onchange = () => {
         input.disabled = r.value !== 'resize' || r.disabled;
         overlay.querySelector('#productOptionWrap').hidden = r.value !== 'placeProduct';
+        overlay.querySelector('#dimensionCustomProfileFields').hidden = r.value !== 'addDifferentProfile';
       };
     });
     overlay.querySelector('#dimensionProfileSelect').disabled = true;
+    overlay.querySelector('#dimensionCustomProfileFields').hidden = !(firstAllowed && firstAllowed.value === 'addDifferentProfile');
     overlay.querySelector('#profileOptionWrap').classList.add('is-disabled');
     overlay.hidden = false;
     const profileSelect = overlay.querySelector('#dimensionProfileSelect');
@@ -1535,7 +2748,15 @@
       profileScope: hit.dataset.profileScope || '',
       en: Number(hit.dataset.en || 0) || 0,
       boy: Number(hit.dataset.boy || 0) || 0,
-      et: Number(hit.dataset.et || 0) || 0
+      et: Number(hit.dataset.et || 0) || 0,
+      sidePostId: hit.dataset.sidePostId || '',
+      sideIndex: Math.max(0, Number(hit.dataset.sideIndex || 0) || 0),
+      placementId: hit.dataset.placementId || '',
+      productType: hit.dataset.productType || '',
+      placementView: hit.dataset.placementView || '',
+      gapIndex: Math.max(0, Number(hit.dataset.gapIndex || 0) || 0),
+      sideGapIndex: Math.max(0, Number(hit.dataset.sideGapIndex || 0) || 0),
+      sideZone: hit.dataset.sideZone || ''
     };
   }
 
@@ -1564,6 +2785,7 @@
         <div id="glassTrackEditorNote" class="post-editor-note"></div>
         <div id="glassTrackEditorError" class="dim-edit-error" aria-live="polite"></div>
         <div class="dim-edit-actions">
+          <button id="glassTrackEditorDelete" type="button" class="dim-edit-delete" hidden>Dikmeyi Sil</button>
           <button id="glassTrackEditorCancel" type="button" class="dim-edit-cancel">İptal</button>
           <button id="glassTrackEditorApply" type="submit" class="dim-edit-apply">Tamam</button>
         </div>
@@ -1585,6 +2807,18 @@
     });
     const close = () => { overlay.hidden = true; focusPreviewCanvas(); };
     overlay.querySelector('#glassTrackEditorCancel').addEventListener('click', close);
+    overlay.querySelector('#glassTrackEditorDelete').addEventListener('click', () => {
+      const postId = overlay.dataset.sidePostId || '';
+      const sideIndex = Number(overlay.dataset.sideIndex || 0) || 0;
+      if (!postId) return;
+      const message = currentLanguage === 'en' ? 'Delete this support post?' : 'Bu destek dikmesi silinsin mi?';
+      if (!window.confirm(message)) return;
+      try { deleteSidePost(sideIndex, postId); }
+      catch (err) { overlay.querySelector('#glassTrackEditorError').textContent = err.message; return; }
+      close();
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Support post deleted.' : 'Destek dikmesi silindi.';
+    });
     overlay.addEventListener('click', evt => { if (evt.target === overlay) close(); });
     overlay.addEventListener('keydown', evt => { if (evt.key === 'Escape') { evt.preventDefault(); close(); } });
     overlay.querySelector('#glassTrackEditorForm').addEventListener('submit', evt => {
@@ -1609,7 +2843,14 @@
       const modeType = overlay.dataset.profilePart || 'track';
       const scope = overlay.dataset.profileScope || '';
       if (modeType === 'support') {
-        if (scope === 'left' || scope === 'right') glassSupportProfileState[scope] = next;
+        const sidePostId = overlay.dataset.sidePostId || '';
+        const sideIndex = Number(overlay.dataset.sideIndex || 0) || 0;
+        if (sidePostId) {
+          const meta = { index: sideIndex };
+          const posts = materializeSidePosts(meta);
+          const target = posts.find(item => String(item.id) === String(sidePostId));
+          if (target) { target.profile = next; storeSidePosts(meta, posts); }
+        } else if (scope === 'left' || scope === 'right') glassSupportProfileState[scope] = next;
       } else {
         glassTrackProfileState = next;
         glassSupportProfileState = { left: null, right: null };
@@ -1632,11 +2873,11 @@
     const isEn = currentLanguage === 'en';
     const isSupport = (meta.profilePart || '') === 'support';
     const scope = meta.profileScope || '';
-    const current = sanitizeGlassTrackProfile(
-      isSupport
-        ? ((scope === 'left' || scope === 'right') ? (glassSupportProfileState[scope] || glassTrackProfileState) : glassTrackProfileState)
-        : glassTrackProfileState
-    );
+    const current = sanitizeGlassTrackProfile(isSupport
+      ? ({ mode: meta.profileMode || 'other', en: meta.en || 100, boy: meta.boy || 100, et: meta.et || 2 })
+      : glassTrackProfileState);
+    overlay.dataset.sidePostId = isSupport ? (meta.sidePostId || '') : '';
+    overlay.dataset.sideIndex = isSupport ? String(Number(meta.sideIndex) || 0) : '0';
     overlay.dataset.profilePart = isSupport ? 'support' : 'track';
     overlay.dataset.profileScope = scope;
     overlay.querySelector('#glassTrackEditorTitle').textContent = isSupport
@@ -1647,6 +2888,9 @@
     overlay.querySelector('#glassProfileOther').textContent = isEn ? 'Other' : 'Diğer';
     overlay.querySelector('#glassTrackEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
     overlay.querySelector('#glassTrackEditorApply').textContent = isEn ? 'OK' : 'Tamam';
+    const deleteBtn = overlay.querySelector('#glassTrackEditorDelete');
+    deleteBtn.hidden = !isSupport || !meta.sidePostId;
+    deleteBtn.textContent = isEn ? 'Delete Post' : 'Dikmeyi Sil';
     overlay.querySelector('#glassTrackEditorMeta').innerHTML = `
       <b>${isEn ? 'Clicked area' : 'Tıklanan alan'}:</b> ${escapeHtml(isSupport ? supportProfileScopeLabel(scope, isEn) : (isEn ? 'glass track - whole system' : 'cam kaydı - tüm sistem'))}<br>
       <b>${isEn ? 'Effect' : 'Etki'}:</b> ${escapeHtml(isSupport ? (isEn ? 'only this support and its top-view section' : 'sadece bu destek dikmesi ve üst görünüş kesiti') : (isEn ? 'all glass tracks + default support profiles' : 'tüm cam kayıtları + varsayılan destek profilleri'))}<br>
@@ -1694,12 +2938,22 @@
           <div id="postEditorNote" class="post-editor-note"></div>
         </div>
         <div class="dim-edit-actions">
+          <button id="postEditorDelete" type="button" class="dim-edit-delete">Dikmeyi Sil</button>
           <button id="postEditorCancel" type="button" class="dim-edit-cancel">İptal</button>
           <button id="postEditorApply" type="submit" class="dim-edit-apply">Tamam</button>
         </div>
       </form>`;
     previewPanel.appendChild(overlay);
     overlay.querySelector('#postEditorCancel').addEventListener('click', () => { overlay.hidden = true; });
+    overlay.querySelector('#postEditorDelete').addEventListener('click', () => {
+      const idx = Number(overlay.dataset.postIndex || 0) || 0;
+      if (!window.confirm(currentLanguage === 'en' ? 'Delete this front post?' : 'Bu ön dikme silinsin mi?')) return;
+      try { deleteFrontPost(idx); }
+      catch (err) { window.alert(err.message); return; }
+      overlay.hidden = true;
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Front post deleted.' : 'Ön dikme silindi.';
+    });
     overlay.addEventListener('click', evt => { if (evt.target === overlay) overlay.hidden = true; });
     overlay.addEventListener('keydown', evt => { if (evt.key === 'Escape') { evt.preventDefault(); overlay.hidden = true; } });
     overlay.querySelector('#postEditorForm').addEventListener('submit', evt => {
@@ -1735,6 +2989,10 @@
     overlay.querySelector('#postPlacementEqual').textContent = isEn ? 'Equal division' : 'Eşit bölme';
     overlay.querySelector('#postEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
     overlay.querySelector('#postEditorApply').textContent = isEn ? 'OK' : 'Tamam';
+    overlay.querySelector('#postEditorDelete').textContent = isEn ? 'Delete Post' : 'Dikmeyi Sil';
+    overlay.querySelector('#postEditorDelete').disabled = Number(meta.currentPostCount || 0) <= 2;
+    overlay.querySelector('#postEditorDelete').classList.toggle('disabled', Number(meta.currentPostCount || 0) <= 2);
+    overlay.dataset.postIndex = String(meta.postIndex || 0);
     overlay.querySelector('#postEditorMeta').innerHTML = `
       <b>${isEn ? 'Clicked front post' : 'Tıklanan ön dikme'}:</b> ${meta.postIndex + 1} / ${Math.max(meta.currentPostCount || 0, meta.postIndex + 1)}<br>
       <b>${isEn ? 'Current post count' : 'Mevcut dikme adedi'}:</b> ${meta.currentPostCount}<br>
@@ -1750,24 +3008,40 @@
   }
 
   function handlePreviewDimensionEdit(evt) {
+    if (toolboxSelectionMode) {
+      evt.preventDefault();
+      evt.stopPropagation();
+      toggleToolboxSelectionFromHit(evt.target);
+      return;
+    }
     const dimHit = evt.target && evt.target.closest ? evt.target.closest('[data-dim-id],[data-edit-field]') : null;
-    const postHit = !dimHit && evt.target && evt.target.closest ? evt.target.closest('[data-interaction-type="postEditor"],[data-interaction-type="glassTrackEditor"]') : null;
-    if (!dimHit && !postHit) return;
+    const interactionHit = !dimHit && evt.target && evt.target.closest ? evt.target.closest('[data-interaction-type="postEditor"],[data-interaction-type="glassTrackEditor"],[data-interaction-type="productEditor"]') : null;
+    if (!dimHit && !interactionHit) return;
     evt.preventDefault();
     evt.stopPropagation();
     if (previewState.dragMoved) {
       previewState.dragMoved = false;
       return;
     }
-    if (postHit) {
-      const interactionMeta = previewInteractionMetaFromHit(postHit);
+    if (interactionHit) {
+      const interactionMeta = previewInteractionMetaFromHit(interactionHit);
       if (interactionMeta.interactionType === 'glassTrackEditor') showGlassTrackEditorOverlay(interactionMeta);
-      else showPostEditorOverlay(interactionMeta);
+      else if (interactionMeta.interactionType === 'postEditor') showPostEditorOverlay(interactionMeta);
+      else if (interactionMeta.interactionType === 'productEditor') {
+        const record = findProductByInteraction(interactionMeta);
+        if (!record) return;
+        const editMeta = interactionMetaToProductMeta(interactionMeta, record);
+        editMeta.editProduct = true;
+        editMeta.placementId = record.placement.id;
+        editMeta.productType = record.type;
+        if (record.type === 'guillotine_glass') showGuillotineDetailsOverlay(editMeta, { editExisting: true });
+        else showSlidingDetailsOverlay(editMeta, { editExisting: true });
+      }
       return;
     }
     const meta = dimensionMetaFromHit(dimHit);
     restoreActiveDimensionPanelParts();
-    if (!meta.editable) {
+    if (!meta.editable && !meta.canAddSameProfile && !meta.canAddDifferentProfile && !meta.canPlaceProduct && !findProductForMeta(normalizedProductMeta(meta))) {
       showPassiveDimensionInfo(meta);
       return;
     }
@@ -1776,8 +3050,23 @@
 
   function bindPreviewKeyboardGuard() {
     document.addEventListener('keydown', evt => {
+      if (toolboxSelectionMode) {
+        const active = document.activeElement;
+        const tag = active && active.tagName ? active.tagName.toLowerCase() : '';
+        const isFormField = ['input','select','textarea','button'].includes(tag) && active !== preview;
+        if (evt.key === 'Escape') {
+          evt.preventDefault();
+          cancelToolboxSelection(currentLanguage === 'en' ? 'Selection cancelled.' : 'Seçim iptal edildi.');
+          return;
+        }
+        if (evt.key === 'Enter' && !isFormField) {
+          evt.preventDefault();
+          finishToolboxSelection();
+          return;
+        }
+      }
       if (evt.key !== 'Enter' && evt.key !== ' ') return;
-      const expanded = document.fullscreenElement === previewPanel || (previewPanel && previewPanel.classList.contains('is-expanded'));
+      const expanded = !!(previewPanel && previewPanel.classList.contains('is-expanded'));
       if (!expanded) return;
       const active = document.activeElement;
       if (active && active.id === 'expandPreviewBtn') {
@@ -1790,6 +3079,12 @@
 
   function bindPreviewInteractions() {
     preview.addEventListener('click', handlePreviewDimensionEdit);
+    preview.addEventListener('contextmenu', evt => {
+      if (!toolboxSelectionMode) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      showToolboxContextMenu(evt.clientX, evt.clientY);
+    });
 
     preview.addEventListener('wheel', evt => {
       if (!getPreviewSvg()) return;
@@ -1840,7 +3135,7 @@
       const next = previewState.zoom < 1.6 ? Math.max(1.8, previewState.zoom * 1.6) : 1;
       setPreviewZoom(next, evt.clientX, evt.clientY);
     });
-    window.addEventListener('resize', () => applyPreviewScale());
+    // Pencere boyutu değişse bile kullanıcı zoom'u korunur; yeniden sığdırma yalnızca Fit butonuyla yapılır.
   }
 
   function deepCloneJson(value) {
@@ -1890,8 +3185,13 @@
           right: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.right)
         },
         frontPostCenters: Array.isArray(customFrontPostCenters) ? customFrontPostCenters.map(Number) : null,
+        sideSupportCenters: { ...customSideSupportCenters },
+        sidePosts: deepCloneJson(customSidePosts) || {},
+        frontPostProfiles: deepCloneJson(frontPostProfiles) || [],
         slidingPlacements: deepCloneJson(slidingPlacements) || [],
+        sideSlidingPlacements: deepCloneJson(sideSlidingPlacements) || [],
         guillotinePlacements: deepCloneJson(guillotinePlacements) || [],
+        sideGuillotinePlacements: deepCloneJson(sideGuillotinePlacements) || [],
         manualInputFlags: {
           rayCount: Boolean($('rayCount') && $('rayCount').dataset.userEdited === 'true'),
           postCount: Boolean($('postCount') && $('postCount').dataset.userEdited === 'true')
@@ -1967,11 +3267,26 @@
       customFrontPostCenters = Array.isArray(drawingState.frontPostCenters)
         ? drawingState.frontPostCenters.map(Number).filter(Number.isFinite)
         : null;
+      customSideSupportCenters = drawingState.sideSupportCenters && typeof drawingState.sideSupportCenters === 'object'
+        ? Object.fromEntries(Object.entries(drawingState.sideSupportCenters).map(([key, value]) => [String(key), Number(value)]).filter(([, value]) => Number.isFinite(value)))
+        : {};
+      customSidePosts = drawingState.sidePosts && typeof drawingState.sidePosts === 'object'
+        ? deepCloneJson(drawingState.sidePosts) || {}
+        : {};
+      frontPostProfiles = Array.isArray(drawingState.frontPostProfiles)
+        ? deepCloneJson(drawingState.frontPostProfiles) || []
+        : [];
       slidingPlacements = Array.isArray(drawingState.slidingPlacements)
         ? deepCloneJson(drawingState.slidingPlacements)
         : [];
+      sideSlidingPlacements = Array.isArray(drawingState.sideSlidingPlacements)
+        ? deepCloneJson(drawingState.sideSlidingPlacements)
+        : [];
       guillotinePlacements = Array.isArray(drawingState.guillotinePlacements)
         ? deepCloneJson(drawingState.guillotinePlacements)
+        : [];
+      sideGuillotinePlacements = Array.isArray(drawingState.sideGuillotinePlacements)
+        ? deepCloneJson(drawingState.sideGuillotinePlacements)
         : [];
       pendingSlidingPlacementMeta = null;
       pendingGuillotinePlacementMeta = null;
@@ -1995,11 +3310,29 @@
       suppressFormPreviewUpdate = false;
     }
 
-    const drawing = updatePreview(options.resetZoom !== false);
+    const drawing = updatePreview(options.resetZoom === true);
     if (!drawing && options.requireValidDrawing === true) {
       throw new Error(currentLanguage === 'en'
         ? 'The project data was loaded, but the drawing could not be rebuilt.'
         : 'Proje verileri yüklendi ancak çizim yeniden oluşturulamadı.');
+    }
+    return drawing;
+  }
+
+
+  function restoreProjectSnapshotWithHistory(rawSnapshot, options = {}) {
+    const shouldResetHistory = options.resetHistory === true;
+    const previousRestoring = projectHistory.restoring;
+    if (shouldResetHistory) projectHistory.restoring = true;
+    let drawing;
+    try {
+      drawing = restoreProjectSnapshot(rawSnapshot, options);
+    } finally {
+      if (shouldResetHistory) projectHistory.restoring = previousRestoring;
+    }
+    if (shouldResetHistory) {
+      resetProjectHistory(false);
+      if (drawing) recordProjectHistoryState({ force: true });
     }
     return drawing;
   }
@@ -2057,7 +3390,7 @@
     }
     const text = await file.text();
     const snapshot = parseProjectSnapshot(text);
-    restoreProjectSnapshot(snapshot);
+    restoreProjectSnapshotWithHistory(snapshot, { resetZoom: false, resetHistory: true });
     statusText.textContent = currentLanguage === 'en'
       ? `Project loaded: ${file.name}`
       : `Proje yüklendi: ${file.name}`;
@@ -2088,7 +3421,8 @@
     schemaVersion: PROJECT_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     createSnapshot: createProjectSnapshot,
-    restoreSnapshot: restoreProjectSnapshot,
+    restoreSnapshot: restoreProjectSnapshotWithHistory,
+    resetHistory: (captureCurrent = true) => resetProjectHistory(captureCurrent),
     serialize: serializeProjectSnapshot,
     parse: parseProjectSnapshot,
     getRecord: getCurrentProjectRecord,
@@ -2337,7 +3671,7 @@ ${err.message}`);
   function syncExpandButton() {
     const btn = $('expandPreviewBtn');
     if (!btn || !previewPanel) return;
-    const expanded = document.fullscreenElement === previewPanel || previewPanel.classList.contains('is-expanded');
+    const expanded = previewPanel.classList.contains('is-expanded');
     const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
     btn.textContent = expanded ? txt.shrinkPreviewBtn : txt.expandPreviewBtn;
   }
@@ -2351,24 +3685,40 @@ ${err.message}`);
     }
   }
 
+  function capturePreviewViewport() {
+    const totalScale = Math.max(0.0001, (Number(previewState.baseScale) || 1) * (Number(previewState.zoom) || 1));
+    return {
+      worldCenterX: (preview.scrollLeft + preview.clientWidth / 2) / totalScale,
+      worldCenterY: (preview.scrollTop + preview.clientHeight / 2) / totalScale,
+      totalScale
+    };
+  }
+
+  function restorePreviewViewport(viewport) {
+    if (!viewport) return;
+    const totalScale = Math.max(0.0001, viewport.totalScale || ((Number(previewState.baseScale) || 1) * (Number(previewState.zoom) || 1)));
+    preview.scrollLeft = Math.max(0, viewport.worldCenterX * totalScale - preview.clientWidth / 2);
+    preview.scrollTop = Math.max(0, viewport.worldCenterY * totalScale - preview.clientHeight / 2);
+  }
+
   async function togglePreviewFullscreen() {
     if (!previewPanel) return;
-    try {
-      const isFs = document.fullscreenElement === previewPanel;
-      if (isFs && document.exitFullscreen) await document.exitFullscreen();
-      else if (!document.fullscreenElement && previewPanel.requestFullscreen) await previewPanel.requestFullscreen();
-      else previewPanel.classList.toggle('is-expanded');
-    } catch (err) {
-      previewPanel.classList.toggle('is-expanded');
-    }
-    window.setTimeout(() => {
-      applyPreviewScale();
+    const viewport = capturePreviewViewport();
+    const expanded = !previewPanel.classList.contains('is-expanded');
+    // Native Fullscreen API kullanılmaz: tarayıcının Esc davranışı büyük önizlemeyi
+    // istemeden küçültmesin. Büyük önizleme sadece bu butonla açılır/kapanır.
+    previewPanel.classList.toggle('is-expanded', expanded);
+    document.body.classList.toggle('preview-expanded-open', expanded);
+    window.requestAnimationFrame(() => {
+      restorePreviewViewport(viewport);
+      window.requestAnimationFrame(() => restorePreviewViewport(viewport));
       focusPreviewCanvas();
-    }, 60);
+    });
     syncExpandButton();
   }
 
   function resetForm() {
+    resetProjectHistory(false);
     fillInitial();
     document.querySelectorAll('.quick-test-btn.active').forEach(btn => btn.classList.remove('active'));
     updatePreview();
@@ -2643,6 +3993,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
   }
 
   function applyPresetValues(values) {
+    resetProjectHistory(false);
     fillInitial();
     const deferredManual = {};
     Object.entries(values || {}).forEach(([id, value]) => {
@@ -2734,11 +4085,16 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     $('resetBtn').addEventListener('click', resetForm);
     $('expandPreviewBtn').addEventListener('click', () => { void togglePreviewFullscreen(); });
     $('fitPreviewBtn').addEventListener('click', fitPreview);
+    if ($('undoPreviewBtn')) $('undoPreviewBtn').addEventListener('click', undoProjectHistory);
+    if ($('redoPreviewBtn')) $('redoPreviewBtn').addEventListener('click', redoProjectHistory);
     $('calcBtn').addEventListener('click', openCalculator);
-    $('projectExportBtn').addEventListener('click', exportProjectSnapshot);
+    if ($('projectExportBtn')) $('projectExportBtn').addEventListener('click', exportProjectSnapshot);
     if ($('previewProjectExportBtn')) $('previewProjectExportBtn').addEventListener('click', exportProjectSnapshot);
-    if ($('multiProductBtn')) $('multiProductBtn').addEventListener('click', () => showToolboxPlaceholder('product'));
-    if ($('multiDimensionBtn')) $('multiDimensionBtn').addEventListener('click', () => showToolboxPlaceholder('dimension'));
+    if ($('multiProductBtn')) $('multiProductBtn').addEventListener('click', () => startToolboxSelection('multi-product'));
+    if ($('multiDimensionBtn')) $('multiDimensionBtn').addEventListener('click', () => startToolboxSelection('multi-dimension'));
+    if ($('multiDeleteBtn')) $('multiDeleteBtn').addEventListener('click', () => startToolboxSelection('multi-delete'));
+    if ($('deleteAllProductsBtn')) $('deleteAllProductsBtn').addEventListener('click', deleteAllProducts);
+    document.querySelectorAll('[data-boolean-field]').forEach(btn => btn.addEventListener('click', () => toggleToolboxBoolean(btn.dataset.booleanField)));
     $('projectImportBtn').addEventListener('click', openProjectSnapshotPicker);
     $('projectImportInput').addEventListener('change', async evt => {
       try {
@@ -2767,6 +4123,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
       if (!el) return;
       el.addEventListener('change', () => {
         if (suppressFormPreviewUpdate) return;
+        if (BOOLEAN_FIELD_IDS.includes(id)) syncToolboxBooleanButtons();
         updatePreview();
       });
       el.addEventListener('input', () => {
@@ -2787,6 +4144,8 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
         }
         if (['systemCount', 'width', 'rayCount', 'postCount'].includes(id)) {
           customFrontPostCenters = null;
+          frontPostProfiles = [];
+          customSidePosts = {};
           slidingPlacements = [];
           guillotinePlacements = [];
         }
@@ -2799,9 +4158,10 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     });
   }
 
-  document.addEventListener('fullscreenchange', () => { window.setTimeout(() => applyPreviewScale(), 60); syncExpandButton(); });
+  document.addEventListener('fullscreenchange', syncExpandButton);
   bindPreviewInteractions();
   bindPreviewKeyboardGuard();
+  bindHistoryKeyboardShortcuts();
   bindPreviewFilterControls();
   enhanceExcelCombos();
   bindStrictInputs();

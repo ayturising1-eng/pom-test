@@ -10,7 +10,7 @@
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.11';
+      const build = '8.9.16';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
@@ -20,10 +20,10 @@
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.11" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.16" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.11" />
+  <link rel="stylesheet" href="style.css?v=8.9.16" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -76,7 +76,6 @@
       <div><span>Durum</span><strong id="cloudSaveState" data-state="new">Kaydedilmedi</strong></div>
     </div>
     <div class="cloud-project-actions">
-      <button id="projectExportBtn" class="secondary-btn project-file-action" type="button">Proje Dosyası İndir</button>
       <button id="projectImportBtn" class="soft-btn project-file-action" type="button">Proje Dosyası Aç</button>
       <input id="projectImportInput" type="file" accept=".plmr,.json,application/json,text/plain" hidden />
       <button id="newCloudProjectBtn" type="button" class="soft-btn">Yeni Proje</button>
@@ -181,6 +180,10 @@
               <button id="previewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Yenile</button>
               <button id="expandPreviewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Büyüt</button>
               <button id="fitPreviewBtn" class="secondary-btn preview-tool-btn" type="button">Çizimi Sığdır</button>
+              <div id="historyControlGroup" class="history-control-group" role="group" aria-label="Çizim geçmişi">
+                <button id="undoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled>Geri Al</button>
+                <button id="redoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled>İleri Al</button>
+              </div>
             </div>
           </div>
         </div>
@@ -196,8 +199,13 @@
           <div class="preview-toolbox-grid">
             <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span></button>
             <button id="showMainDims" class="preview-toggle-btn is-on" type="button" aria-pressed="true"><span class="toggle-dot" aria-hidden="true"></span><span id="showMainDimsLabel">Ana ölçüleri göster</span></button>
+            <button id="glassTrackQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="glassTrack" aria-pressed="false"><span class="boolean-quick-label">Cam Kaydı</span><span class="boolean-quick-state">HAYIR</span></button>
+            <button id="triangleJoineryQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="triangleJoinery" aria-pressed="false"><span class="boolean-quick-label">Üçgen Doğrama</span><span class="boolean-quick-state">HAYIR</span></button>
+            <button id="waterStandardQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="waterStandard" aria-pressed="true"><span class="boolean-quick-label">Su Çıkışı Standart mı?</span><span class="boolean-quick-state">EVET</span></button>
             <button id="multiProductBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ürün Ekleme</button>
             <button id="multiDimensionBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ölçü Düzenleme</button>
+            <button id="multiDeleteBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ürün Silme</button>
+            <button id="deleteAllProductsBtn" class="danger-btn preview-toolbox-btn" type="button">Tüm Ürünleri Sil</button>
           </div>
         </aside>
       </div>
@@ -487,18 +495,18 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.11"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.11"></script>
-  <script src="peri01Geometry.js?v=8.9.11"></script>
-  <script src="modernDxfTemplate.js?v=8.9.11"></script>
-  <script src="dxfModernEngine.js?v=8.9.11"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.16"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.16"></script>
+  <script src="peri01Geometry.js?v=8.9.16"></script>
+  <script src="modernDxfTemplate.js?v=8.9.16"></script>
+  <script src="dxfModernEngine.js?v=8.9.16"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.11"></script>
-  <script src="adminUsersApi.js?v=8.9.11"></script>
-  <script src="activityTracker.js?v=8.9.11"></script>
-  <script src="app.js?v=8.9.11"></script>
-  <script src="cloudProjects.js?v=8.9.11"></script>
-  <script src="adminPanel.js?v=8.9.11"></script>
+  <script src="supabaseConfig.js?v=8.9.16"></script>
+  <script src="adminUsersApi.js?v=8.9.16"></script>
+  <script src="activityTracker.js?v=8.9.16"></script>
+  <script src="app.js?v=8.9.16"></script>
+  <script src="cloudProjects.js?v=8.9.16"></script>
+  <script src="adminPanel.js?v=8.9.16"></script>
 </body>
 </html>
