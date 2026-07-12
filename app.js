@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '8.9.10';
+  const APP_VERSION = '8.9.11';
   const PROJECT_FORMAT = 'PULUMUR_PROJECT';
   const PROJECT_SCHEMA_VERSION = 1;
 
@@ -138,7 +138,7 @@
       options_motor: 'Motor', options_remote: 'Kumanda', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Ekstralar / Notlar',
       extra_triangleJoinery: 'Üçgen Doğrama', extra_waterStandard: 'Su Çıkışı Standart mı?', quickTestsHead: 'Hızlı Testler',
       previewTitle: 'Çizim Ön İzleme', previewBtn: 'Önizlemeyi Yenile', expandPreviewBtn: 'Önizlemeyi Büyüt', fitPreviewBtn: 'Çizimi Sığdır', shrinkPreviewBtn: 'Önizlemeyi Küçült', showMainDimsLabel: 'Ana ölçüleri göster', showAllDimsLabel: 'Tüm ölçüleri göster',
-      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç',
+      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', previewProjectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç', multiProductBtn: 'Çoklu Ürün Ekleme', multiDimensionBtn: 'Çoklu Ölçü Düzenleme',
       calcTitle: 'Pülümür Hesaplayıcı', calcSub: '4 satırdan herhangi 3 tanesini doldur. Boş olan değer hesaplanır.',
       calcGuide: '<strong>TR</strong><ul><li>4 alandan 3 tanesini doldur.</li><li>Hesaplanacak alanı boş bırak.</li><li>Hesapla’ya bas.</li><li>Sonucu ana forma aktar.</li></ul>',
       calcWaiting: 'Sonuç bekleniyor.', calcReady: 'Sonuç', calcPoz: 'poz', calcOpenNote: 'Ana formdaki açılım / arka / ön değerleri aktarıldı. Açıyı hesaplamak için Hesapla’ya bas.',
@@ -163,7 +163,7 @@
       options_motor: 'Motor', options_remote: 'Remote', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Extras / Notes',
       extra_triangleJoinery: 'Triangle Joinery', extra_waterStandard: 'Standard Water Outlet?', quickTestsHead: 'Quick Tests',
       previewTitle: 'Drawing Preview', previewBtn: 'Refresh Preview', expandPreviewBtn: 'Expand Preview', fitPreviewBtn: 'Fit Drawing', shrinkPreviewBtn: 'Collapse Preview', showMainDimsLabel: 'Show main dimensions', showAllDimsLabel: 'Show all dimensions',
-      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File',
+      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', previewProjectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File', multiProductBtn: 'Multiple Product Placement', multiDimensionBtn: 'Multiple Dimension Editing',
       calcTitle: 'Pulumur Calculator', calcSub: 'Fill any 3 of the 4 rows. The empty value will be calculated.',
       calcGuide: '<strong>EN</strong><ul><li>Fill 3 of the 4 fields.</li><li>Leave one field empty.</li><li>Click Calculate.</li><li>Transfer the result to the main form.</li></ul>',
       calcWaiting: 'Waiting for result.', calcReady: 'Result', calcPoz: 'position', calcOpenNote: 'Projection / rear H / front H values were copied from the main form. Click Calculate to calculate the angle.',
@@ -357,7 +357,10 @@
     setText('resetBtn', txt.resetBtn);
     setText('calcBtn', txt.calcBtn);
     setText('projectExportBtn', txt.projectExportBtn);
+    setText('previewProjectExportBtn', txt.previewProjectExportBtn);
     setText('projectImportBtn', txt.projectImportBtn);
+    setText('multiProductBtn', txt.multiProductBtn);
+    setText('multiDimensionBtn', txt.multiDimensionBtn);
     setText('calcTitle', txt.calcTitle);
     setText('calcSub', txt.calcSub);
     setText('calcGuide', txt.calcGuide, true);
@@ -428,7 +431,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.10').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.11').catch(() => {}), { once: true });
     }
   }
 
@@ -556,8 +559,8 @@
       applyPreviewDimensionFilter();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.10: system/company admin panel, 4-digit PIN login and license management are active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.10: sistem/firma yönetici paneli, 4 haneli PIN girişi ve lisans yönetimi aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.11: the expanded preview toolbox layout is active; wall/fabric hatch scale is identical in preview, PDF and DXF; zoom extents and MESUT-MM remain active.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.11: büyütülmüş önizleme toolbox düzeni aktiftir; duvar/kumaş tarama ölçeği önizleme, PDF ve DXF'te aynıdır; zoom extents ve MESUT-MM aktiftir.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
@@ -2715,6 +2718,15 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     ['opening', 'rearHeight', 'frontHeight', 'rayCount', 'postCount'].forEach(id => semiNumeric(id, false));
   }
 
+  function showToolboxPlaceholder(command) {
+    const isEn = currentLanguage === 'en';
+    const message = command === 'product'
+      ? (isEn ? 'Multiple product placement will be activated in the next toolbox revision.' : 'Çoklu ürün ekleme komutu sonraki toolbox revizyonunda aktif edilecek.')
+      : (isEn ? 'Multiple dimension editing will be activated in the next toolbox revision.' : 'Çoklu ölçü düzenleme komutu sonraki toolbox revizyonunda aktif edilecek.');
+    statusText.textContent = message;
+    window.alert(message);
+  }
+
   function bindEvents() {
     $('generateBtn').addEventListener('click', generateDxf);
     $('pdfBtn').addEventListener('click', () => { void generatePdf(); });
@@ -2724,6 +2736,9 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     $('fitPreviewBtn').addEventListener('click', fitPreview);
     $('calcBtn').addEventListener('click', openCalculator);
     $('projectExportBtn').addEventListener('click', exportProjectSnapshot);
+    if ($('previewProjectExportBtn')) $('previewProjectExportBtn').addEventListener('click', exportProjectSnapshot);
+    if ($('multiProductBtn')) $('multiProductBtn').addEventListener('click', () => showToolboxPlaceholder('product'));
+    if ($('multiDimensionBtn')) $('multiDimensionBtn').addEventListener('click', () => showToolboxPlaceholder('dimension'));
     $('projectImportBtn').addEventListener('click', openProjectSnapshotPicker);
     $('projectImportInput').addEventListener('change', async evt => {
       try {

@@ -167,7 +167,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.9.10 - CLEAN COMPANY DISPLAY + PROJECT FILE TOOLBAR - 12.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.9.11 - EXPANDED PREVIEW TOOLBOX - 12.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {

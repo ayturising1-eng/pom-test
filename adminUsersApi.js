@@ -82,7 +82,7 @@
       endpoint,
       hasAccessToken: Boolean(accessToken),
       tokenLength: accessToken.length,
-      build: '8.9.10'
+      build: '8.9.11'
     };
   }
 

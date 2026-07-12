@@ -2936,7 +2936,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   .auth-options { grid-template-columns: 1fr; gap: 8px; }
 }
 
-/* v8.9.10 - rol bazlı yönetim paneli ve firma filtresi */
+/* v8.9.11 - rol bazlı yönetim paneli ve firma filtresi */
 .admin-activity-toolbar {
   display: grid;
   grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(145px, .8fr)) auto;
@@ -3028,7 +3028,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 }
 
 
-/* v8.9.10 - kullanıcı liste filtresi tablo başlıklarının üzerinde */
+/* v8.9.11 - kullanıcı liste filtresi tablo başlıklarının üzerinde */
 .admin-user-list-toolbar {
   display: grid;
   grid-template-columns: minmax(230px, 1fr) minmax(360px, 2fr) auto;
@@ -3053,12 +3053,153 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 }
 
 
-/* v8.9.10 - sade firma gösterimi ve proje dosyası araçlarının üst çubuğa taşınması */
+/* v8.9.11 - sade firma gösterimi ve proje dosyası araçlarının üst çubuğa taşınması */
 .cloud-project-actions .project-file-action { white-space: nowrap; }
 @media (max-width: 860px) {
   .cloud-project-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* v8.9.10 - Sistem yöneticisi proje silme işlemi */
+/* v8.9.11 - Sistem yöneticisi proje silme işlemi */
 .projects-table .project-actions-cell { min-width: 230px; flex-wrap: wrap; }
 .projects-table .project-delete-btn { min-width: 48px; }
+
+/* v8.9.11 - Tam ekran önizleme toolbox düzeni */
+.preview-workspace {
+  display: block;
+  min-width: 0;
+}
+.preview-toolbox {
+  display: none;
+}
+.preview-project-export {
+  display: none !important;
+}
+.preview-head {
+  align-items: center !important;
+}
+.preview-download-actions {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.preview-panel:fullscreen,
+.preview-panel.is-expanded {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+.preview-panel:fullscreen .preview-head,
+.preview-panel.is-expanded .preview-head {
+  min-height: 0;
+  padding: 6px 10px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-bottom: 1px solid var(--line);
+}
+.preview-panel:fullscreen .preview-title,
+.preview-panel.is-expanded .preview-title {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px !important;
+}
+.preview-panel:fullscreen .preview-title h2,
+.preview-panel.is-expanded .preview-title h2 {
+  display: none;
+}
+.preview-panel:fullscreen .preview-toolbar-row,
+.preview-panel.is-expanded .preview-toolbar-row {
+  width: auto;
+}
+.preview-panel:fullscreen .preview-control-row,
+.preview-panel.is-expanded .preview-control-row {
+  width: auto !important;
+  grid-template-columns: repeat(3, 118px) !important;
+  gap: 6px !important;
+}
+.preview-panel:fullscreen .preview-download-actions,
+.preview-panel.is-expanded .preview-download-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, 128px);
+  gap: 6px !important;
+  align-items: center !important;
+}
+.preview-panel:fullscreen .preview-download-actions .preview-tool-btn,
+.preview-panel.is-expanded .preview-download-actions .preview-tool-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.preview-panel:fullscreen .preview-project-export,
+.preview-panel.is-expanded .preview-project-export {
+  display: inline-flex !important;
+}
+.preview-panel:fullscreen .preview-workspace,
+.preview-panel.is-expanded .preview-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 19vw, 360px);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.preview-panel:fullscreen .preview-canvas,
+.preview-panel.is-expanded .preview-canvas {
+  min-width: 0;
+  min-height: 0 !important;
+  height: 100% !important;
+  padding: 12px !important;
+  overflow: auto;
+}
+.preview-panel:fullscreen .preview-toolbox,
+.preview-panel.is-expanded .preview-toolbox {
+  display: block;
+  min-width: 0;
+  height: 100%;
+  padding: 12px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: #edf3f7;
+}
+.preview-toolbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+.preview-toolbox-grid > button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 52px;
+  height: auto !important;
+  padding: 9px 8px !important;
+  white-space: normal;
+  line-height: 1.18 !important;
+  text-align: center;
+}
+.preview-toolbox-grid .preview-toggle-btn {
+  justify-content: flex-start;
+}
+.preview-toolbox-btn {
+  border-radius: 11px;
+  font-size: 12px !important;
+  font-weight: 900;
+}
+
+@media (max-width: 980px) {
+  .preview-panel:fullscreen .preview-control-row,
+  .preview-panel.is-expanded .preview-control-row {
+    grid-template-columns: repeat(3, minmax(94px, 1fr)) !important;
+  }
+  .preview-panel:fullscreen .preview-download-actions,
+  .preview-panel.is-expanded .preview-download-actions {
+    grid-template-columns: repeat(3, minmax(104px, 1fr));
+  }
+  .preview-panel:fullscreen .preview-workspace,
+  .preview-panel.is-expanded .preview-workspace {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}

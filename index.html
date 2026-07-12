@@ -10,7 +10,7 @@
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.10';
+      const build = '8.9.11';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
@@ -20,10 +20,10 @@
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.10" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.11" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.10" />
+  <link rel="stylesheet" href="style.css?v=8.9.11" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -182,18 +182,25 @@
               <button id="expandPreviewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Büyüt</button>
               <button id="fitPreviewBtn" class="secondary-btn preview-tool-btn" type="button">Çizimi Sığdır</button>
             </div>
-            <div class="preview-filter-row" aria-label="Ölçü filtreleri">
-              <button id="showMainDims" class="preview-toggle-btn is-on" type="button" aria-pressed="true"><span class="toggle-dot" aria-hidden="true"></span><span id="showMainDimsLabel">Ana ölçüleri göster</span></button>
-              <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span></button>
-            </div>
           </div>
         </div>
         <div class="preview-download-actions">
+          <button id="previewProjectExportBtn" class="soft-btn preview-tool-btn preview-project-export" type="button">Proje Dosyası İndir</button>
           <button id="pdfBtn" class="secondary-btn preview-tool-btn" type="button">PDF İndir</button>
           <button id="generateBtn" class="primary-btn preview-tool-btn" type="button">DXF İndir</button>
         </div>
       </div>
-      <div id="preview" class="preview-canvas" role="img" tabindex="-1" aria-label="DXF çizim önizlemesi"></div>
+      <div class="preview-workspace">
+        <div id="preview" class="preview-canvas" role="img" tabindex="-1" aria-label="DXF çizim önizlemesi"></div>
+        <aside id="previewToolbox" class="preview-toolbox" aria-label="Hızlı çizim komutları">
+          <div class="preview-toolbox-grid">
+            <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span></button>
+            <button id="showMainDims" class="preview-toggle-btn is-on" type="button" aria-pressed="true"><span class="toggle-dot" aria-hidden="true"></span><span id="showMainDimsLabel">Ana ölçüleri göster</span></button>
+            <button id="multiProductBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ürün Ekleme</button>
+            <button id="multiDimensionBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ölçü Düzenleme</button>
+          </div>
+        </aside>
+      </div>
     </aside>
   </main>
 
@@ -480,18 +487,18 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.10"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.10"></script>
-  <script src="peri01Geometry.js?v=8.9.10"></script>
-  <script src="modernDxfTemplate.js?v=8.9.10"></script>
-  <script src="dxfModernEngine.js?v=8.9.10"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.11"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.11"></script>
+  <script src="peri01Geometry.js?v=8.9.11"></script>
+  <script src="modernDxfTemplate.js?v=8.9.11"></script>
+  <script src="dxfModernEngine.js?v=8.9.11"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.10"></script>
-  <script src="adminUsersApi.js?v=8.9.10"></script>
-  <script src="activityTracker.js?v=8.9.10"></script>
-  <script src="app.js?v=8.9.10"></script>
-  <script src="cloudProjects.js?v=8.9.10"></script>
-  <script src="adminPanel.js?v=8.9.10"></script>
+  <script src="supabaseConfig.js?v=8.9.11"></script>
+  <script src="adminUsersApi.js?v=8.9.11"></script>
+  <script src="activityTracker.js?v=8.9.11"></script>
+  <script src="app.js?v=8.9.11"></script>
+  <script src="cloudProjects.js?v=8.9.11"></script>
+  <script src="adminPanel.js?v=8.9.11"></script>
 </body>
 </html>
