@@ -104,6 +104,7 @@
     gap_between_posts: { canResize: true, canAddSameProfile: true, canAddDifferentProfile: true, canPlaceProduct: true, canRemoveElement: false },
     wall_to_post_gap: { canResize: false, canAddSameProfile: true, canAddDifferentProfile: true, canPlaceProduct: true, canRemoveElement: false },
     side_support_gap: { canResize: true, canAddSameProfile: true, canAddDifferentProfile: true, canPlaceProduct: true, canRemoveElement: false },
+    parapet_width_resize: { canResize: true, canAddSameProfile: false, canAddDifferentProfile: false, canPlaceProduct: false, canRemoveElement: false },
     system_width: { canResize: true, canAddSameProfile: false, canAddDifferentProfile: false, canPlaceProduct: true, canRemoveElement: false },
     fixed_block_size: { canResize: false, canAddSameProfile: false, canAddDifferentProfile: false, canPlaceProduct: false, canRemoveElement: false, passiveReason: 'Bu blok sabit parçadır. Ölçüsü değiştirilemez.' },
     info_only: { canResize: false, canAddSameProfile: false, canAddDifferentProfile: false, canPlaceProduct: false, canRemoveElement: false, passiveReason: 'Bu ölçü şu an sadece bilgi amaçlıdır.' }
@@ -121,6 +122,7 @@
     front_post_gap: { editable: true, actionType: 'gap_between_posts', dimensionType: 'detail' },
     side_wall_to_post_gap: { editable: true, actionType: 'wall_to_post_gap', dimensionType: 'detail' },
     side_support_gap: { editable: true, actionType: 'side_support_gap', dimensionType: 'detail' },
+    parapet_width: { editable: true, actionType: 'parapet_width_resize', dimensionType: 'detail' },
     parapet_height_info: { editable: false, actionType: 'info_only', dimensionType: 'info', passiveReason: 'Parapet ölçüsü bu aşamada form alanından yönetilir.' },
     fixed_block_size: { editable: false, actionType: 'fixed_block_size', dimensionType: 'info', passiveReason: 'Bu blok sabit parçadır. Ölçüsü değiştirilemez. Sistem ölçüsü değiştiğinde konumu otomatik güncellenir.' },
     triangle_info: { editable: false, actionType: 'info_only', dimensionType: 'info' },
@@ -170,7 +172,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.9.16 - UNDO REDO HISTORY AND PERSISTENT PREVIEW - 12.07.2026';
+  const BUILD_LABEL = 'WEB DXF V8.9.33 - HISTORY REDO AND SIDE BUTTON COLOR FIX - 13.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   const SAMPLE_INPUT = {
@@ -304,6 +306,8 @@
       sys.raySystemW = areaW;
       sys.rayPitch = pitch;
       for (let r = 0; r < sys.rayCount; r += 1) sys.rays.push(areaStartX + r * pitch);
+      const custom = d.customRayPositions && d.customRayPositions[String(s)];
+      if (Array.isArray(custom) && custom.length === sys.rayCount && custom.every(Number.isFinite)) { const sorted=custom.map(Number); sorted[0]=areaStartX; sorted[sorted.length-1]=areaEndX-K.rayW; if(sorted.every((v,i)=>i===0||v>=sorted[i-1]+K.rayW-0.001)) sys.rays=sorted; }
     });
     return { systems, systemCount: sysCount, noGapMode: noMode, explicitWidth, explicitRay, totalNet, totalNominal };
   }
@@ -370,12 +374,25 @@
     };
   }
 
+  function normalizeSideViewKey(rawKey, sideIndex = 0) {
+    const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
+    if (key === 'right') return 'right';
+    if (/^middle[_:-]?\d+$/.test(key)) {
+      const n = Number(key.replace(/\D+/g, ''));
+      return String(Math.max(1, Number.isFinite(n) ? n : Number(sideIndex) || 0));
+    }
+    const n = Number(key === '' ? sideIndex : key);
+    return String(Math.max(0, Number.isFinite(n) ? Math.round(n) : Number(sideIndex) || 0));
+  }
+
   function normalizeSideSlidingPlacement(item, index = 0) {
     const raw = item || {};
     const base = normalizeSlidingPlacement(raw, index);
     const legacyZone = String(raw.sideZone || 'wall_support');
     const sideGapIndex = Math.max(0, Math.round(Number(raw.sideGapIndex ?? (legacyZone === 'support_post' ? 1 : 0)) || 0));
-    return { ...base, placementView: 'side-left', sideIndex: Math.max(0, Math.round(Number(raw.sideIndex) || 0)), sideGapIndex, sideZone: `gap_${sideGapIndex}` };
+    const sideIndex = Math.max(0, Math.round(Number(raw.sideIndex) || 0));
+    const sideViewKey = normalizeSideViewKey(raw.sideViewKey || (raw.placementView === 'side-right' ? 'right' : ''), sideIndex);
+    return { ...base, placementView: sideViewKey === 'right' ? 'side-right' : 'side-left', sideIndex, sideViewKey, sideGapIndex, sideZone: `gap_${sideGapIndex}` };
   }
 
   function normalizeSideGuillotinePlacement(item, index = 0) {
@@ -383,31 +400,219 @@
     const base = normalizeGuillotinePlacement(raw, index);
     const legacyZone = String(raw.sideZone || 'wall_support');
     const sideGapIndex = Math.max(0, Math.round(Number(raw.sideGapIndex ?? (legacyZone === 'support_post' ? 1 : 0)) || 0));
-    return { ...base, placementView: 'side-left', sideIndex: Math.max(0, Math.round(Number(raw.sideIndex) || 0)), sideGapIndex, sideZone: `gap_${sideGapIndex}` };
+    const sideIndex = Math.max(0, Math.round(Number(raw.sideIndex) || 0));
+    const sideViewKey = normalizeSideViewKey(raw.sideViewKey || (raw.placementView === 'side-right' ? 'right' : ''), sideIndex);
+    return { ...base, placementView: sideViewKey === 'right' ? 'side-right' : 'side-left', sideIndex, sideViewKey, sideGapIndex, sideZone: `gap_${sideGapIndex}` };
+  }
+
+  function normalizeSideFeatureState(raw, d) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const defaultGlass = yes(d.glassTrack);
+    const defaultTriangle = yes(d.triangleJoinery);
+    const bool = (value, fallback) => value === undefined || value === null ? !!fallback : !!value;
+    const normalizeMiddle = value => {
+      const out = {};
+      if (value && typeof value === 'object') Object.entries(value).forEach(([key, enabled]) => { out[normalizeSideViewKey(key, Number(key) || 0)] = !!enabled; });
+      return out;
+    };
+    return {
+      glassTrack: {
+        left: bool(source.glassTrack && source.glassTrack.left, defaultGlass),
+        right: bool(source.glassTrack && source.glassTrack.right, defaultGlass),
+        middle: normalizeMiddle(source.glassTrack && source.glassTrack.middle)
+      },
+      triangle: {
+        left: bool(source.triangle && source.triangle.left, defaultTriangle),
+        right: bool(source.triangle && source.triangle.right, defaultTriangle),
+        middle: normalizeMiddle(source.triangle && source.triangle.middle)
+      },
+      middleEnabled: normalizeMiddle(source.middleEnabled)
+    };
+  }
+
+  function normalizeGlassTrackLengthOffsets(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const normalizeNumber = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+    const middle = {};
+    if (source.middle && typeof source.middle === 'object') Object.entries(source.middle).forEach(([key, value]) => { middle[normalizeSideViewKey(key, Number(key) || 0)] = normalizeNumber(value); });
+    return { left: normalizeNumber(source.left), right: normalizeNumber(source.right), middle };
+  }
+
+
+  function normalizeSideScopedNumbers(raw, fallback = null, minValue = null) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const norm = value => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return minValue == null ? n : Math.max(minValue, n);
+    };
+    const middle = {};
+    if (source.middle && typeof source.middle === 'object') {
+      Object.entries(source.middle).forEach(([key, value]) => {
+        middle[normalizeSideViewKey(key, Number(key) || 0)] = norm(value);
+      });
+    }
+    return { left: norm(source.left), right: norm(source.right), middle };
+  }
+
+  function normalizeTriangleDivisionState(raw) {
+    return normalizeSideScopedNumbers(raw, null, 1);
+  }
+
+  function normalizeBackWallState(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const normalizeWall = value => {
+      const wall = value && typeof value === 'object' ? value : {};
+      const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+      return {
+        xOffset: finite(wall.xOffset, 0),
+        depth: Math.max(1, finite(wall.depth, K.sideWallDepth)),
+        height: Math.max(0, finite(wall.height, 0))
+      };
+    };
+    const middle = {};
+    if (source.middle && typeof source.middle === 'object') {
+      Object.entries(source.middle).forEach(([key, value]) => {
+        middle[normalizeSideViewKey(key, Number(key) || 0)] = normalizeWall(value);
+      });
+    }
+    return { left: normalizeWall(source.left), right: normalizeWall(source.right), middle };
+  }
+
+  function normalizeBackWallSegmentsState(rawState, d) {
+    const raw = rawState && typeof rawState === 'object' ? rawState : {};
+    const sourceMap = raw.side && typeof raw.side === 'object' ? raw.side : {};
+    const side = {};
+    Object.entries(sourceMap).forEach(([rawKey, items]) => {
+      const key = normalizeSideViewKey(rawKey, Number(rawKey) || 0);
+      const cleaned = Array.isArray(items) ? items.map((item, index) => ({
+        id: String(item && item.id || `back_wall_${key}_${index + 1}`),
+        start: Math.max(0, Number(item && item.start) || 0),
+        end: Math.max(0, Number(item && item.end) || 0),
+        height: Math.max(0, Number(item && item.height) || 0)
+      })).filter(item => item.end > item.start).sort((a, b) => a.start - b.start) : [];
+      if (cleaned.length) side[key] = cleaned;
+    });
+    return { side };
+  }
+
+  function explicitBackWallSegmentsFor(d, key) {
+    const normalized = normalizeSideViewKey(key, 0);
+    const list = d && d.backWallSegments && d.backWallSegments.side ? d.backWallSegments.side[normalized] : null;
+    return Array.isArray(list) && list.length ? list : null;
+  }
+
+  function sideScopedValue(state, key, fallback = null) {
+    const normalized = normalizeSideViewKey(key, 0);
+    if (!state) return fallback;
+    if (normalized === 'right') return state.right == null ? fallback : state.right;
+    if (normalized === '0') return state.left == null ? fallback : state.left;
+    return state.middle && state.middle[normalized] != null ? state.middle[normalized] : fallback;
+  }
+
+  function triangleDivisionCount(d, key, opening) {
+    const explicit = Number(sideScopedValue(d && d.triangleDivisionState, key, NaN));
+    if (Number.isFinite(explicit) && explicit >= 1) return Math.max(1, Math.round(explicit));
+    const AB = Math.max(1, Number(opening) - 150);
+    return Math.max(1, triangleDogramaAraDikmeSay(AB) + 1);
+  }
+
+  function sideBackWallSettings(d, key, rearHeight) {
+    const raw = sideScopedValue(d && d.backWallState, key, null) || {};
+    const explicitSegments = explicitBackWallSegmentsFor(d, key);
+    const segmentDepth = explicitSegments ? Math.max(...explicitSegments.map(item => Math.max(0, Number(item.end) || 0))) : 0;
+    return {
+      xOffset: Number.isFinite(Number(raw.xOffset)) ? Number(raw.xOffset) : 0,
+      depth: Math.max(1, Number(raw.depth) || K.sideWallDepth, segmentDepth),
+      height: Math.max(1, Number(raw.height) || Number(rearHeight) || 1)
+    };
+  }
+
+  function backWallSegmentsFor(d, key, rearHeight) {
+    const explicit = explicitBackWallSegmentsFor(d, key);
+    if (explicit) return explicit;
+    const wall = sideBackWallSettings(d, key, rearHeight);
+    return [{ id: `back_wall_${normalizeSideViewKey(key, 0)}_1`, start: 0, end: wall.depth, height: wall.height }];
+  }
+
+  function sideBackWallFaceX(d, p, key) {
+    const base = K.systemStartX - (1750 + Number(p && p.opening || 0));
+    return base + sideBackWallSettings(d, key, p && p.rearHeight).xOffset;
+  }
+
+  function sideViewKeyForPosition(p) {
+    return normalizeSideViewKey(p && p.sideViewKey != null ? p.sideViewKey : (p && p.index), p && p.index);
+  }
+
+  function sideViewScopeForKey(key) {
+    const normalized = normalizeSideViewKey(key, 0);
+    if (normalized === 'right') return 'right';
+    if (normalized === '0') return 'left';
+    return `middle_${normalized}`;
+  }
+
+  function sideFeatureEnabled(d, feature, key, positionIndex = 0) {
+    const state = d && d.sideFeatureState && d.sideFeatureState[feature];
+    const normalized = normalizeSideViewKey(key, positionIndex);
+    if (state) {
+      if (normalized === 'right') return !!state.right;
+      if (normalized === '0') return !!state.left;
+      return !!(state.middle && state.middle[normalized]);
+    }
+    if (feature === 'glassTrack') {
+      const differentOpening = d.openingList && d.openingList.length > 1;
+      return yes(d.glassTrack) && (!differentOpening || positionIndex === 0 || positionIndex === d.sidePositionCount - 1);
+    }
+    if (feature === 'triangle') {
+      const differentOpening = d.openingList && d.openingList.length > 1;
+      return yes(d.triangleJoinery) && (!differentOpening || positionIndex === 0 || positionIndex === d.sidePositionCount - 1);
+    }
+    return false;
+  }
+
+  function sideViewEnabled(d, key, positionIndex = 0) {
+    const normalized = normalizeSideViewKey(key, positionIndex);
+    if (normalized === 'left' || normalized === 'right' || normalized === '0') return true;
+    return !!(d && d.sideFeatureState && d.sideFeatureState.middleEnabled && d.sideFeatureState.middleEnabled[normalized]);
+  }
+
+  function sideTrackLengthOffset(d, key) {
+    const normalized = normalizeSideViewKey(key, 0);
+    const state = d && d.glassTrackLengthOffsets;
+    if (!state) return 0;
+    if (normalized === 'right') return Number(state.right) || 0;
+    if (normalized === '0') return Number(state.left) || 0;
+    return Number(state.middle && state.middle[normalized]) || 0;
+  }
+
+  function topGlassTrackFrontRefY(d) {
+    const firstOpening = nthOrLast(d && d.openingList, 0) || (d && d.opening) || 0;
+    return -Number(firstOpening) + 100;
   }
 
   function sideSupportGeometryFor(d, p) {
-    const differentOpening = d.openingList && d.openingList.length > 1;
-    const trackVisible = yes(d.glassTrack) && (!differentOpening || p.index === 0 || p.index === d.sidePositionCount - 1);
-    const camW = Math.max(1, Number(p.opening) - 100);
-    if (!trackVisible) return { exists: false, index: p.index };
-    const scope = p.index === 0 ? 'left' : 'right';
-    const wallX = K.systemStartX - (1750 + Number(p.opening));
+    const sideViewKey = sideViewKeyForPosition(p);
+    const trackVisible = sideFeatureEnabled(d, 'glassTrack', sideViewKey, p.index);
+    const camW = Math.max(1, Number(p.opening) - 100 + sideTrackLengthOffset(d, sideViewKey));
+    if (!trackVisible) return { exists: false, index: p.index, sideViewKey };
+    const scope = sideViewScopeForKey(sideViewKey);
+    const wallX = sideBackWallFaceX(d, p, sideViewKey);
     const frontPostRearFace = K.sideBaseX - K.postSize;
     const defaultCenterX = (wallX + frontPostRearFace) / 2;
     const explicitMap = d.sidePosts && typeof d.sidePosts === 'object' ? d.sidePosts : {};
-    const hasExplicit = Object.prototype.hasOwnProperty.call(explicitMap, String(p.index));
-    let rawPosts = hasExplicit && Array.isArray(explicitMap[String(p.index)]) ? explicitMap[String(p.index)] : null;
+    const hasExplicit = Object.prototype.hasOwnProperty.call(explicitMap, sideViewKey);
+    let rawPosts = hasExplicit && Array.isArray(explicitMap[sideViewKey]) ? explicitMap[sideViewKey] : null;
     if (!rawPosts) {
       rawPosts = camW > 5000 ? [{
-        id: `auto_side_${p.index}_0`,
-        centerX: Number(d.sideSupportCenters && d.sideSupportCenters[String(p.index)]) || defaultCenterX,
+        id: `auto_side_${sideViewKey}_0`,
+        centerX: Number(d.sideSupportCenters && d.sideSupportCenters[sideViewKey]) || defaultCenterX,
         profile: supportProfileFor(d, scope)
       }] : [];
     }
     const posts = rawPosts.map((raw, i) => {
       const profile = normalizeGlassTrackProfile(raw && raw.profile ? raw.profile : supportProfileFor(d, scope));
-      return { id: String((raw && raw.id) || `side_${p.index}_${i}`), centerX: Number(raw && raw.centerX), profile };
+      const extension = Number(raw && raw.extension);
+      return { id: String((raw && raw.id) || `side_${sideViewKey}_${i}`), centerX: Number(raw && raw.centerX), profile, extension: Number.isFinite(extension) ? extension : 0 };
     }).filter(post => Number.isFinite(post.centerX)).sort((a, b) => a.centerX - b.centerX);
     let cursor = wallX;
     const normalizedPosts = [];
@@ -419,9 +624,17 @@
       const centerX = clamp(post.centerX, minCenter, Math.max(minCenter, maxCenter));
       const left = centerX - width / 2;
       const right = centerX + width / 2;
-      const defaultTopCenterY = -(Number(p.opening) - 100) / 2;
-      const topCenterY = defaultTopCenterY - (centerX - defaultCenterX);
-      normalizedPosts.push({ ...post, width, centerX, left, right, topCenterY });
+      // Üst görünüş kesiti yan görünüşteki gerçek dikme merkezinden 1:1 taşınır.
+      // Kullanıcı kuralı: yan görünüşte +X hareket, üst görünüşte aynı miktarda
+      // -Y harekettir. Cam kaydının duvar tarafındaki ucu sabit referanstır.
+      // Bu nedenle ölçek/oran kullanılmaz; arka duvardan olan gerçek mesafe
+      // doğrudan üst görünüşte cam kaydı boyunca ters yönde uygulanır.
+      const distanceFromWall = centerX - wallX;
+      const trackFrontY = topGlassTrackFrontRefY(d);
+      const trackLength = Math.max(1, camW);
+      const trackWallEndY = trackFrontY + trackLength;
+      const topCenterY = trackWallEndY - distanceFromWall;
+      normalizedPosts.push({ ...post, width, centerX, left, right, topCenterY, distanceFromWall });
       cursor = right;
     });
     const gaps = [];
@@ -432,14 +645,15 @@
     });
     gaps.push({ index: normalizedPosts.length, left: leftBoundary, right: frontPostRearFace, width: Math.max(0, frontPostRearFace - leftBoundary), leftPostId: normalizedPosts.length ? normalizedPosts[normalizedPosts.length - 1].id : '' });
     const rectStartY = -(p.opening + (p.rearHeight - d.frontHeight) + K.frontViewExtraDrop) + (Number(d.sideGlobalShiftY) || 0);
-    const dikH = Math.max(1, d.frontHeight - K.onPostHeightCorrection - d.parapetHeight);
+    const localFrontParapet = sideParapetHeightAt(d, p.index, K.sideBaseX - K.postSize / 2, wallX, sideViewKey);
+    const dikH = Math.max(1, d.frontHeight - K.onPostHeightCorrection - localFrontParapet);
     const yanPostUstY = rectStartY - K.onPostTopDrop;
     const yanAltY = yanPostUstY - dikH;
-    const duvarY = yanAltY - K.altBlockCorrection - d.parapetHeight;
+    const duvarY = yanAltY - K.altBlockCorrection - localFrontParapet;
     const profile = d.glassTrackProfile || normalizeGlassTrackProfile();
     const camBottomY = rectStartY - 3 - profile.en;
     return {
-      exists: true, index: p.index, scope, posts: normalizedPosts, gaps, wallX, frontPostRearFace, defaultCenterX,
+      exists: true, index: p.index, sideViewKey, scope, posts: normalizedPosts, gaps, wallX, frontPostRearFace, defaultCenterX,
       productClearHeight: Math.max(1, camBottomY - duvarY),
       wallToSupportGap: gaps[0] ? gaps[0].width : 0,
       supportToPostGap: gaps[gaps.length - 1] ? gaps[gaps.length - 1].width : 0,
@@ -520,12 +734,23 @@
       left: normalizeGlassTrackProfile(raw && raw.__glassTrackSupportProfiles && raw.__glassTrackSupportProfiles.left ? raw.__glassTrackSupportProfiles.left : d.glassTrackProfile),
       right: normalizeGlassTrackProfile(raw && raw.__glassTrackSupportProfiles && raw.__glassTrackSupportProfiles.right ? raw.__glassTrackSupportProfiles.right : d.glassTrackProfile)
     };
+    d.sideFeatureState = normalizeSideFeatureState(raw && raw.__sideFeatureState, d);
+    d.glassTrackLengthOffsets = normalizeGlassTrackLengthOffsets(raw && raw.__glassTrackLengthOffsets);
+    d.triangleDivisionState = normalizeTriangleDivisionState(raw && raw.__triangleDivisionState);
+    d.backWallState = normalizeBackWallState(raw && raw.__backWallState);
+    d.backWallSegmentsRaw = raw && raw.__backWallSegments && typeof raw.__backWallSegments === 'object' ? raw.__backWallSegments : null;
     d.frontPostProfiles = Array.isArray(raw && raw.__frontPostProfiles)
       ? raw.__frontPostProfiles.map(item => item ? normalizeGlassTrackProfile(item) : null)
       : [];
     d.sidePosts = raw && raw.__sidePosts && typeof raw.__sidePosts === 'object'
-      ? Object.fromEntries(Object.entries(raw.__sidePosts).map(([key, items]) => [String(key), Array.isArray(items) ? items.map((item, i) => ({ id: String((item && item.id) || `side_${key}_${i}`), centerX: Number(item && item.centerX), profile: normalizeGlassTrackProfile(item && item.profile) })).filter(item => Number.isFinite(item.centerX)) : []]))
+      ? Object.fromEntries(Object.entries(raw.__sidePosts).map(([key, items]) => [String(key), Array.isArray(items) ? items.map((item, i) => {
+          const extension = Number(item && item.extension);
+          return { id: String((item && item.id) || `side_${key}_${i}`), centerX: Number(item && item.centerX), profile: normalizeGlassTrackProfile(item && item.profile), extension: Number.isFinite(extension) ? extension : 0 };
+        }).filter(item => Number.isFinite(item.centerX)) : []]))
       : {};
+    d.customRayPositions = raw && raw.__customRayPositions && typeof raw.__customRayPositions === 'object' ? raw.__customRayPositions : null;
+    d.frontPostExtensions = Array.isArray(raw && raw.__frontPostExtensions) ? raw.__frontPostExtensions.map(value => Math.max(0, Number(value) || 0)) : [];
+    d.parapetSegmentsRaw = raw && raw.__parapetSegments && typeof raw.__parapetSegments === 'object' ? raw.__parapetSegments : null;
     d.customFrontPostCenters = Array.isArray(raw && raw.__frontPostCenters)
       ? raw.__frontPostCenters.map(Number).filter(Number.isFinite)
       : null;
@@ -569,6 +794,9 @@
       const rearHeight = nthOrLast(d.rearHeightList, i) || d.rearHeight;
       d.positions.push({ index: i, opening, rearHeight, rayLength: rayLenFor(opening, rearHeight, d.frontHeight), angleRad: sideAngleRadFor(opening, rearHeight, d.frontHeight) });
     }
+    d.parapetSegments = normalizeParapetSegmentsState(d.parapetSegmentsRaw, d);
+    d.backWallSegments = normalizeBackWallSegmentsState(d.backWallSegmentsRaw, d);
+    d.frontPostExtensions = Array.from({ length: d.postCount }, (_, i) => Math.max(0, Number(d.frontPostExtensions[i]) || 0));
     d.maxOpening = Math.max(...d.positions.map(p => p.opening));
     d.lastOpening = d.positions[d.positions.length - 1].opening;
     d.maxRearHeight = Math.max(...d.positions.map(p => p.rearHeight));
@@ -595,37 +823,43 @@
     d.frontPostWidths = d.postCenterXs.map((_, i) => frontPostWidthAt(d, i));
     d.sideSupportGeometry = {};
     d.positions.slice(0, d.sidePositionCount).forEach(p => {
-      const geom = sideSupportGeometryFor(d, p);
-      if (geom.exists) d.sideSupportGeometry[String(p.index)] = geom;
+      const key = String(p.index);
+      const geom = sideSupportGeometryFor(d, { ...p, sideViewKey: key });
+      if (geom.exists) d.sideSupportGeometry[key] = geom;
     });
     d.rightSideSupportGeometry = null;
-    if (d.sidePositionCount === 1 && d.positions[0]) {
-      const rightD = { ...d, sidePosts: {}, sideSupportCenters: {}, glassTrackSupportProfiles: { ...d.glassTrackSupportProfiles, left: d.glassTrackSupportProfiles.right } };
-      const rightGeom = sideSupportGeometryFor(rightD, { ...d.positions[0], index: 0 });
+    const rightPositionIndex = Math.max(0, d.sidePositionCount - 1);
+    if (d.positions[rightPositionIndex]) {
+      const rightGeom = sideSupportGeometryFor(d, { ...d.positions[rightPositionIndex], index: rightPositionIndex, sideViewKey: 'right' });
       if (rightGeom.exists) d.rightSideSupportGeometry = rightGeom;
     }
-    d.slidingPlacements = (d.slidingPlacements || []).filter(item => item.gapIndex < d.postCenterXs.length - 1).map(item => {
-      const clearGap = Math.max(1, frontGapBounds(d, d.postCenterXs, item.gapIndex).width);
-      const width = Math.max(1, clearGap - 5);
-      let panelCount = Math.max(2, Math.ceil(width / 1200));
-      if (item.openingType === 'CENTER OPENING') {
-        panelCount = Math.max(4, panelCount);
-        if (panelCount % 2 !== 0) panelCount += 1;
-      }
-      return { ...item, width, panelCount };
-    });
-    d.guillotinePlacements = (d.guillotinePlacements || []).filter(item => item.gapIndex < d.postCenterXs.length - 1).map(item => {
-      const clearGap = Math.max(1, frontGapBounds(d, d.postCenterXs, item.gapIndex).width);
-      return { ...item, width: Math.max(1, clearGap - 5) };
-    });
+    // v8.9.27: Ürün ölçüleri, detay formunda kullanıcının kaydettiği gerçek değerlerdir.
+    // Ön/yan aralık, parapet veya dikme geometrisi değiştiğinde ürün ölçüleri otomatik
+    // olarak yeniden zorlanmaz. Otomatik başlangıç değeri ürün ekleme ekranında hesaplanır;
+    // sonrasında kullanıcı manuel değer girebilir. Yeniden otomatik sığdırma yalnız
+    // “Ürünü Alana Uydur” komutuyla yapılır.
+    d.slidingPlacements = (d.slidingPlacements || [])
+      .filter(item => item.gapIndex < d.postCenterXs.length - 1)
+      .map(item => {
+        const width = Math.max(1, Number(item.width) || 1);
+        let panelCount = Math.max(2, Math.ceil(width / 1200));
+        if (item.openingType === 'CENTER OPENING') {
+          panelCount = Math.max(4, panelCount);
+          if (panelCount % 2 !== 0) panelCount += 1;
+        }
+        return { ...item, width, height: Math.max(1, Number(item.height) || 1), panelCount };
+      });
+    d.guillotinePlacements = (d.guillotinePlacements || [])
+      .filter(item => item.gapIndex < d.postCenterXs.length - 1)
+      .map(item => ({ ...item, width: Math.max(1, Number(item.width) || 1), height: Math.max(1, Number(item.height) || 1) }));
     const normalizeSidePlacementGeometry = item => {
-      const geom = d.sideSupportGeometry[String(Number(item.sideIndex) || 0)];
+      const key = normalizeSideViewKey(item && item.sideViewKey, Number(item && item.sideIndex) || 0);
+      const geom = key === 'right' ? d.rightSideSupportGeometry : d.sideSupportGeometry[key];
       if (!geom || !geom.exists) return null;
       const gapIndex = Math.max(0, Number(item.sideGapIndex) || 0);
       const gap = Array.isArray(geom.gaps) ? geom.gaps[gapIndex] : null;
-      const zoneWidth = gap ? gap.width : 0;
-      if (zoneWidth <= 5 || geom.productClearHeight <= 5) return null;
-      return { ...item, width: Math.max(1, zoneWidth - 5), height: Math.max(1, geom.productClearHeight - 5) };
+      if (!gap || !(Number(gap.width) > 0)) return null;
+      return { ...item, width: Math.max(1, Number(item.width) || 1), height: Math.max(1, Number(item.height) || 1) };
     };
     d.sideSlidingPlacements = (d.sideSlidingPlacements || []).map(normalizeSidePlacementGeometry).filter(Boolean).map(item => {
       let panelCount = Math.max(2, Math.ceil(item.width / 1200));
@@ -702,13 +936,15 @@
       text: { x: textX, y: textY },
       textOverride: '<>',
       measuredValue: Math.abs(Number(measured) || 0),
+      dimensionAxis: String(options.dimensionAxis || 'aligned'),
       graphics: dimGraphicsAligned(x1, y1, x2, y2, q1x, q1y, q2x, q2y, textX, textY, textValue, rotationDeg, options)
     };
     if (options && options.edit) ent.edit = enrichDimensionEdit(options.edit, measured);
     if (options && options.dimensionFilterType) ent.dimensionFilterType = String(options.dimensionFilterType);
+    if (options && Number.isInteger(Number(options.positionIndex))) ent.positionIndex = Number(options.positionIndex);
     if (options && options.layer) ent.layer = options.layer;
     if (options && Number.isFinite(Number(options.entityColor))) ent.color = Number(options.entityColor);
-    g.dimension(ent);
+    return g.dimension(ent);
   }
 
   function addDimH(g, x1, x2, yRef, yDim, label, options = {}) {
@@ -716,7 +952,7 @@
     const scale = Number(options.scale || 1) > 0 ? Number(options.scale || 1) : 1;
     const textX = (x1 + x2) / 2;
     const textY = yDim + 140 * scale;
-    addDimAlignedEntity(g, x1, yRef, x2, yRef, x1, yDim, x2, yDim, textX, textY, measured, 0, options);
+    return addDimAlignedEntity(g, x1, yRef, x2, yRef, x1, yDim, x2, yDim, textX, textY, measured, 0, { ...options, dimensionAxis: 'horizontal' });
   }
 
   function addDimV(g, y1, y2, xRef, xDim, label, options = {}) {
@@ -724,7 +960,7 @@
     const scale = Number(options.scale || 1) > 0 ? Number(options.scale || 1) : 1;
     const textX = xDim - 150 * scale;
     const textY = (y1 + y2) / 2;
-    addDimAlignedEntity(g, xRef, y1, xRef, y2, xDim, y1, xDim, y2, textX, textY, measured, 90, options);
+    return addDimAlignedEntity(g, xRef, y1, xRef, y2, xDim, y1, xDim, y2, textX, textY, measured, 90, { ...options, dimensionAxis: 'vertical' });
   }
 
   function addDimAligned(g, x1, y1, x2, y2, xLoc, yLoc, label, options = {}) {
@@ -738,7 +974,7 @@
     const q2x = x2 + nx * off, q2y = y2 + ny * off;
     const textX = (q1x + q2x) / 2 + nx * 120;
     const textY = (q1y + q2y) / 2 + ny * 120;
-    addDimAlignedEntity(g, x1, y1, x2, y2, q1x, q1y, q2x, q2y, textX, textY, len, Math.atan2(dy, dx) * 180 / Math.PI, options);
+    return addDimAlignedEntity(g, x1, y1, x2, y2, q1x, q1y, q2x, q2y, textX, textY, len, Math.atan2(dy, dx) * 180 / Math.PI, { ...options, dimensionAxis: 'aligned' });
   }
   function rotatePoint(px, py, bx, by, ang) { const dx = px - bx, dy = py - by, ca = Math.cos(ang), sa = Math.sin(ang); return [bx + dx * ca - dy * sa, by + dx * sa + dy * ca]; }
   function getBlocks() { return (root.PulumurFilteredBlocks && root.PulumurFilteredBlocks.blocks) ? root.PulumurFilteredBlocks.blocks : {}; }
@@ -763,7 +999,12 @@
     if (e.type === 'text') {
       const mirroredRot = normDeg(180 - (Number(e.rotation) || 0));
       const nextRot = e.keepReadableOnMirror ? readableRot(mirroredRot) : mirroredRot;
-      return { ...e, x: mx(e.x), rotation: nextRot };
+      let nextAlign = e.align;
+      if (e.flipAlignOnMirror) {
+        if (nextAlign === 'left') nextAlign = 'right';
+        else if (nextAlign === 'right') nextAlign = 'left';
+      }
+      return { ...e, x: mx(e.x), rotation: nextRot, align: nextAlign };
     }
     if (e.type === 'dimension') {
       const mapPt = p => p ? ({ x: mx(p.x), y: p.y }) : p;
@@ -799,10 +1040,35 @@
     (made || []).forEach(e => {
       if (e && e.noMirror) return;
       const mirrored = mirrorEntityX(e, midX);
-      if (mirrored && mirrored.type === 'dimension' && mirrored.edit && /^side_(?:gap|wall_to_support|support_to_post|wall_to_post)_/i.test(String(mirrored.edit.dimId || ''))) {
-        mirrored.edit = { ...mirrored.edit, view: 'Right', editable: false, canResize: false, canAddSameProfile: false, canAddDifferentProfile: false, canPlaceProduct: false, ruleKey: 'info_only', passiveReason: 'Sağ yan görünüş desteği bu aşamada yalnız bilgi amaçlıdır.' };
-      }
       g.entities.push(mirrored);
+    });
+  }
+
+
+  function appendLastPositionPresentationCopy(g, made) {
+    // Sağ ana görünüş ekranda geometrik olarak aynalanarak çizilir. Son pozun sol
+    // sunumu bunun karşı aynası olduğundan yerel kaynak geometri tekrar
+    // aynalanmaz; doğrudan kopyalanır. Ürün semantiği drawOneSideView içinde
+    // INSIDE/OUTSIDE ve sağ/sol motor dönüşümüyle hazırlanır.
+    (made || []).forEach(entity => {
+      if (!entity || entity.noMirror || entity.type === 'interaction') return;
+      if (entity.type === 'dimension') {
+        const dimId = String(entity.edit && entity.edit.dimId || '');
+        if (!/^side_(?:opening|rear_height|front_height)_right_pos_/i.test(dimId)) return;
+        const passive = {
+          ...(entity.edit || {}),
+          editable: false,
+          canResize: false,
+          canAddSameProfile: false,
+          canAddDifferentProfile: false,
+          canPlaceProduct: false,
+          canRemoveElement: false,
+          passiveReason: 'Son poz sol yan görünüşü, sağ yan görünüşün sunum amaçlı ayna kopyasıdır.'
+        };
+        g.entities.push({ ...entity, edit: passive });
+        return;
+      }
+      g.entities.push({ ...entity });
     });
   }
   function mirrorNewEntitiesX(g, startIndex, midX) {
@@ -856,18 +1122,21 @@
     for (let i = startIndex; i < endIndex; i += 1) moveEntityY(g.entities[i], dy);
   }
   function frontViewMinY(d) {
-    // PERI01: sağ/ayna yan görünüş, karşı görünüşteki gerçek dikme gövdesinin -Y uç hattına hizalanır.
-    // Ön görünüş dikme gövdesi: rectStartY - onPostTopDrop noktasından başlar,
-    // yüksekliği frontHeight - onPostHeightCorrection - parapetHeight kadardır.
-    // Bu nedenle alt uç = rectStartY - frontHeight + 46 + parapetHeight.
-    return d.commonFrontRectStartY - d.frontHeight + K.onPostHeightCorrection - K.onPostTopDrop + d.parapetHeight;
+    // Segmentli parapet ve manuel -Y dikme uzatmalarıyla gerçek en alt ön dikme kotu.
+    const xs = Array.isArray(d.postCenterXs) ? d.postCenterXs : postCenterXs(d);
+    if (!xs.length) return d.commonFrontRectStartY - d.frontHeight + K.onPostHeightCorrection - K.onPostTopDrop + d.parapetHeight;
+    return Math.min(...xs.map((x, index) => {
+      const profile = frontPostProfileAt(d, index);
+      const parapetTop = d.commonFrontRectStartY - d.frontHeight + frontParapetHeightAt(d, x);
+      const extension = frontPostExtensionAt(d, index);
+      return profile.custom ? parapetTop - extension : parapetTop + K.altBlockCorrection - extension;
+    }));
   }
 
 
   function sideMirrorNeeded(d, p) {
-    const differentOpening = d.openingList.length > 1;
-    if (differentOpening) return p.index === d.sidePositionCount - 1;
-    return yes(d.glassTrack) || yes(d.sideTrack);
+    const rightIndex = Math.max(0, d.sidePositionCount - 1);
+    return p.index === rightIndex && (sideFeatureEnabled(d, 'glassTrack', 'right', rightIndex) || sideFeatureEnabled(d, 'triangle', 'right', rightIndex) || yes(d.sideTrack) || d.openingList.length > 1);
   }
   function rotatedRect(g, x, y, w, h, bx, by, ang, layer) { const pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(p => rotatePoint(p[0], p[1], bx, by, ang)); g.poly(pts, true, layer); return pts; }
   function blockRef(g, name, x, y, w, h, layer = 'BLOCKREF', rotation = 0, scaleX = 1, scaleY = 1) { return g.insert(name, x, y, { layer, rotation, scaleX, scaleY, previewW: w, previewH: h }); }
@@ -886,6 +1155,91 @@
     const maxEt = Math.max(0, Math.min(en, boy) / 2 - 0.1);
     et = Math.min(et, maxEt);
     return { mode, en, boy, et };
+  }
+
+
+  function normalizeParapetSegmentList(rawList, length, fallbackHeight, prefix) {
+    const maxLength = Math.max(0, Number(length) || 0);
+    const baseHeight = Math.max(0, Number(fallbackHeight) || 0);
+    const input = Array.isArray(rawList) ? rawList : [];
+    const clean = input.map((raw, index) => {
+      const start = clamp(Number(raw && raw.start) || 0, 0, maxLength);
+      const end = clamp(Number(raw && raw.end), 0, maxLength);
+      const height = Math.max(0, Number(raw && raw.height));
+      return {
+        id: String((raw && raw.id) || `${prefix}_${index + 1}`),
+        start: Math.min(start, Number.isFinite(end) ? end : maxLength),
+        end: Math.max(start, Number.isFinite(end) ? end : maxLength),
+        height: Number.isFinite(height) ? height : baseHeight
+      };
+    }).filter(item => item.end - item.start > 0.001).sort((a, b) => a.start - b.start || a.end - b.end);
+    if (!clean.length && maxLength > 0 && baseHeight > 0) return [{ id: `${prefix}_1`, start: 0, end: maxLength, height: baseHeight }];
+    return clean;
+  }
+
+  function normalizeParapetSegmentsState(rawState, d) {
+    if (!yes(d.parapet) || !(d.parapetHeight > 0)) return { front: [], side: {} };
+    const raw = rawState && typeof rawState === 'object' ? rawState : {};
+    const front = normalizeParapetSegmentList(raw.front, d.width, d.parapetHeight, 'front_parapet');
+    const side = {};
+    d.positions.slice(0, d.sidePositionCount).forEach(p => {
+      const source = raw.side && (raw.side[String(p.index)] || raw.side[p.index]);
+      side[String(p.index)] = normalizeParapetSegmentList(source, p.opening, d.parapetHeight, `side_${p.index}_parapet`);
+    });
+    // Sağ yan görünüş artık son pozun aynası olmakla birlikte bağımsız düzenleme
+    // verisi taşır. Eski projelerde ayrı sağ veri yoksa son poz parapeti başlangıç
+    // şablonu olarak kullanılır; ilk düzenlemeden sonra "right" anahtarında saklanır.
+    const rightIndex = Math.max(0, d.sidePositionCount - 1);
+    const rightPosition = d.positions[rightIndex] || d.positions[0];
+    if (rightPosition) {
+      const explicitRight = raw.side && raw.side.right;
+      const fallbackRight = raw.side && (raw.side[String(rightIndex)] || raw.side[rightIndex]);
+      side.right = normalizeParapetSegmentList(explicitRight || fallbackRight, rightPosition.opening, d.parapetHeight, 'side_right_parapet');
+    }
+    return { front, side };
+  }
+
+  function segmentHeightAt(segments, coordinate, fallback = 0) {
+    const list = Array.isArray(segments) ? segments : [];
+    const x = Number(coordinate) || 0;
+    const hit = list.find((item, index) => x >= Number(item.start) - 0.001 && (x < Number(item.end) - 0.001 || index === list.length - 1 && x <= Number(item.end) + 0.001));
+    return hit ? Math.max(0, Number(hit.height) || 0) : Math.max(0, Number(fallback) || 0);
+  }
+
+  function parapetSegmentVerticalDimX(segmentStartX, segmentWidth) {
+    // v8.9.25: Parapet ve oluk-parapet düşey ölçüleri global bir kolonda
+    // toplanmaz. Her segment, kendi X alanının yaklaşık ilk üçte birlik
+    // bölümünde ortak bir zincir ölçü hattı taşır.
+    const start = Number(segmentStartX) || 0;
+    const width = Math.max(1, Number(segmentWidth) || 1);
+    const safeInset = Math.min(Math.max(55, width * 0.08), Math.max(55, width / 2));
+    const preferred = width * 0.36;
+    const local = width > safeInset * 2
+      ? clamp(preferred, safeInset, width - safeInset)
+      : width / 2;
+    return start + local;
+  }
+
+  function frontPositionIndexAtX(d, absoluteX) {
+    const systems = d && Array.isArray(d.systems) ? d.systems : [];
+    const x = Number(absoluteX) || 0;
+    const hit = systems.find(sys => x >= Number(sys.startX) - 0.001 && x <= Number(sys.endX) + 0.001);
+    return hit ? Number(hit.index) || 0 : 0;
+  }
+
+  function frontParapetHeightAt(d, absoluteX) {
+    return segmentHeightAt(d && d.parapetSegments ? d.parapetSegments.front : [], (Number(absoluteX) || 0) - K.systemStartX, d && d.parapetHeight);
+  }
+
+  function sideParapetHeightAt(d, sideIndex, absoluteX, wallX, sideViewKey = null) {
+    const key = normalizeSideViewKey(sideViewKey, Number(sideIndex) || 0);
+    const list = d && d.parapetSegments && d.parapetSegments.side ? d.parapetSegments.side[key] : [];
+    return segmentHeightAt(list, (Number(absoluteX) || 0) - Number(wallX || 0), d && d.parapetHeight);
+  }
+
+  function frontPostExtensionAt(d, index) {
+    const value = d && Array.isArray(d.frontPostExtensions) ? Number(d.frontPostExtensions[index]) : 0;
+    return Math.max(0, Number.isFinite(value) ? value : 0);
   }
 
   function drawHollowRect(g, x, y, w, h, layer, et = 0) {
@@ -908,13 +1262,29 @@
   }
 
   function supportProfileFor(d, scope = 'left') {
-    if (d && d.glassTrackSupportProfiles && d.glassTrackSupportProfiles[scope]) return d.glassTrackSupportProfiles[scope];
+    if (d && d.glassTrackSupportProfiles) {
+      if (d.glassTrackSupportProfiles[scope]) return d.glassTrackSupportProfiles[scope];
+      if (String(scope || '').startsWith('middle_') && d.glassTrackSupportProfiles.left) return d.glassTrackSupportProfiles.left;
+    }
     return d && d.glassTrackProfile ? d.glassTrackProfile : normalizeGlassTrackProfile();
   }
 
   function rayXs(d) { return d.systems.flatMap(s => s.rays); }
   function raySystemInfos(d) { return d.systems.map(s => ({ ...s })); }
   function rayIntervals(d) { const out = []; d.systems.forEach(sys => { for (let i = 0; i < sys.rays.length - 1; i += 1) { const x1 = sys.rays[i]; const x2 = sys.rays[i + 1]; out.push({ system: sys.index, x: x1 + K.rayW, len: x2 - (x1 + K.rayW) }); } }); return out; }
+
+  function editableRaySpans(sys) {
+    const rays = Array.isArray(sys && sys.rays) ? sys.rays.map(Number) : [];
+    if (rays.length <= 2) return [];
+    const centers = rays.map(x => x + K.rayW / 2);
+    const spans = [];
+    spans.push({ index: 0, mode: 'outer_to_center', x1: rays[0], x2: centers[1], label: 'DIŞTAN MERKEZE' });
+    for (let i = 1; i < centers.length - 2; i += 1) {
+      spans.push({ index: i, mode: 'center_to_center', x1: centers[i], x2: centers[i + 1], label: 'MERKEZDEN MERKEZE' });
+    }
+    spans.push({ index: rays.length - 2, mode: 'center_to_outer', x1: centers[centers.length - 2], x2: rays[rays.length - 1] + K.rayW, label: 'MERKEZDEN DIŞA' });
+    return spans;
+  }
   function systemRanges(d) { return d.systems.map(sys => { const rays = sys.rays; const x1 = rays.length ? rays[0] - 6 : sys.startX; const x2 = rays.length ? rays[rays.length - 1] + 86 : sys.endX; return { system: sys.index, x1, x2, mid: (x1 + x2) / 2 }; }); }
   function systemGapRanges(d) { const out = []; for (let i = 0; i < d.systems.length - 1; i += 1) { const left = d.systems[i], right = d.systems[i + 1]; const x1 = left.rays[left.rays.length - 1] + 80; const x2 = right.rays[0]; out.push({ x1, x2, mid: (x1 + x2) / 2 }); } return out; }
 
@@ -1077,48 +1447,33 @@
   function drawTopPosts(g, d) { postCenterXs(d).forEach((x, i) => { const profile = frontPostProfileAt(d, i); if (!profile.custom) { blockRef(g, 'PergoRise Dikme Üst Görünüş', x, d.posY, 100, 100, 'POST'); blockRef(g, 'PergoRise Dikme Oluk Bağlantı Üst Görünüş', x, d.posY, 135, 95); } else { drawHollowRect(g, x - profile.en / 2, d.posY + profile.boy, profile.en, -profile.boy, 'POST', profile.et); } }); }
 
   function drawTopGlassTrack(g, d) {
-    if (!yes(d.glassTrack)) return;
     const profile = d.glassTrackProfile || normalizeGlassTrackProfile();
-    const sideH = profile.en;
     const topW = profile.boy;
-    const et = profile.et;
-    const leftSupportProfile = supportProfileFor(d, 'left');
-    const rightSupportProfile = supportProfileFor(d, 'right');
     const firstA = nthOrLast(d.openingList, 0) || d.opening;
-    const lastIdx = Math.max(0, d.systemCount - 1);
+    const lastIdx = Math.max(0, d.sidePositionCount - 1);
     const lastA = nthOrLast(d.openingList, lastIdx) || firstA;
-    const firstL = Math.max(1, firstA - 100);
-    const lastL = Math.max(1, lastA - 100);
-    const baseY = -firstA + 100;
-
-    // Sol yan kayıt: -X dış ucu sabit, +X yönüne doğru genişler.
-    const leftX = d.solX - 50;
-    // Sağ yan kayıt: +X dış ucu sabit, -X yönüne doğru genişler.
-    const rightOuterX = d.sagX + 50;
-    const rightX = rightOuterX - topW;
-
-    const items = [
-      { baseX: leftX, camL: firstL, by: baseY, side: 'left' },
-      { baseX: rightX, camL: lastL, by: baseY, side: 'right' }
-    ];
-
-    items.forEach(({ baseX, camL, by, side }) => {
-      // V8.2.79: Cam kaydı uzun profillerinde et/ofset çizilmez; sadece dış kontur görünür.
-      // Et kalınlığı yalnızca destek dikmesinin üst kesit görünüşünde gösterilir.
+    const baseY = topGlassTrackFrontRefY(d);
+    const items = [];
+    if (sideFeatureEnabled(d, 'glassTrack', '0', 0)) items.push({ baseX: d.solX - 50, camL: Math.max(1, firstA - 100 + sideTrackLengthOffset(d, '0')), by: baseY, sideViewKey: '0', geom: d.sideSupportGeometry && d.sideSupportGeometry['0'] });
+    if (sideFeatureEnabled(d, 'glassTrack', 'right', lastIdx)) items.push({ baseX: d.sagX + 50 - topW, camL: Math.max(1, lastA - 100 + sideTrackLengthOffset(d, 'right')), by: baseY, sideViewKey: 'right', geom: d.rightSideSupportGeometry });
+    for (let i = 1; i < lastIdx; i += 1) {
+      const key = String(i);
+      if (!sideFeatureEnabled(d, 'glassTrack', key, i)) continue;
+      const sys = d.systems[Math.min(i, d.systems.length - 1)] || d.systems[0];
+      const a = nthOrLast(d.openingList, i) || d.opening;
+      items.push({ baseX: (sys ? sys.startX : d.solX) - topW / 2, camL: Math.max(1, a - 100 + sideTrackLengthOffset(d, key)), by: baseY, sideViewKey: key, geom: d.sideSupportGeometry && d.sideSupportGeometry[key] });
+    }
+    items.forEach(({ baseX, camL, by, sideViewKey, geom }) => {
       g.rect(baseX, by, topW, camL, 'GLASS');
-      const sideIndex = side === 'left' ? 0 : Math.max(0, d.sidePositionCount - 1);
-      const sideGeom = side === 'right' && d.sidePositionCount === 1
-        ? d.rightSideSupportGeometry
-        : (d.sideSupportGeometry ? d.sideSupportGeometry[String(sideIndex)] : null);
-      const posts = sideGeom && Array.isArray(sideGeom.posts) ? sideGeom.posts : [];
+      const posts = geom && Array.isArray(geom.posts) ? geom.posts : [];
       posts.forEach(post => {
-        const sp = post.profile || (side === 'left' ? leftSupportProfile : rightSupportProfile);
+        const supportScope = sideViewKey === 'right' ? 'right' : (sideViewKey === '0' ? 'left' : `middle_${sideViewKey}`);
+        const sp = post.profile || supportProfileFor(d, supportScope);
         const supTopW = sp.boy;
         const supSideH = sp.en;
-        const supEt = sp.et;
-        const sx = side === 'left' ? baseX : (baseX + topW - supTopW);
+        const sx = sideViewKey === 'right' ? (baseX + topW - supTopW) : baseX;
         const sy = Number(post.topCenterY) - supSideH / 2;
-        drawHollowRect(g, sx, sy, supTopW, supSideH, 'GLASS', supEt);
+        drawHollowRect(g, sx, sy, supTopW, supSideH, 'GLASS', sp.et);
       });
     });
   }
@@ -1208,6 +1563,34 @@
     // V8.4.5: Üst görünüşte açılım ölçüsü gösterilmez.
     // Açılım ölçüsü yan görünüşte poz bazlı olarak korunur.
 
+    // Ray ölçüleri tek ve çoklu sistemlerde aynı kuralla üretilir.
+    const gutterInnerY = -d.opening + K.topGutterH;
+    const topWidthDimY = gutterInnerY + 500;
+    const rayDimY = topWidthDimY + 660; // v8.9.20: bütün pozlarda Poz 3 referansındaki sabit ölçü hattı
+    d.systems.forEach((sys, s) => {
+      editableRaySpans(sys).forEach(span => {
+        addDimH(g, span.x1, span.x2, gutterInnerY, rayDimY, formatMm(span.x2 - span.x1), {
+          layer: 'Ölçüler - Detay',
+          edit: {
+            dimId: `top_ray_spacing_${s}_${span.index}`,
+            ruleKey: 'top_ray_gap',
+            field: '__ray_interval__',
+            index: s,
+            raySystemIndex: s,
+            rayIntervalIndex: span.index,
+            raySpanMode: span.mode,
+            label: `Poz ${s + 1} ${span.label}`,
+            view: 'Top',
+            relatedZoneId: `top_ray_spacing_zone_${s}_${span.index}`,
+            editable: true,
+            canResize: true,
+            actionType: 'ray_interval_resize',
+            dimensionType: 'detail'
+          }
+        });
+      });
+    });
+
     if (d.systemCount === 1) {
       addDimH(g, d.rayAreaStartX - 6, d.rayAreaStartX + d.raySystemW + 6, 0, 800, `GENİŞLİK ${formatMm(d.nominalWidth)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: 'top_total_width', ruleKey: 'top_total_width', field: 'width', index: 0, label: 'Toplam Genişlik', view: 'Top', relatedZoneId: 'top_total_width_zone' } });
       return;
@@ -1215,8 +1598,7 @@
 
     // Çoklu poz üst görünüş genişlik ölçüleri:
     // Ölçü çizgisi, oluk profilinin iç kenarından +Y yönüne 500 mm içeride konumlanır.
-    const gutterInnerY = -d.opening + K.topGutterH;
-    const topWidthDimY = gutterInnerY + 500;
+
     systemRanges(d).forEach(r => addDimH(g, r.x1, r.x2, gutterInnerY, topWidthDimY, `SİSTEM ${r.system + 1} ${formatMm(r.x2 - r.x1)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: `top_system_${r.system + 1}_width`, ruleKey: 'top_system_width', field: 'width', index: r.system, label: `Sistem ${r.system + 1} Genişlik`, view: 'Top', relatedZoneId: `top_system_${r.system + 1}_zone` } }));
     systemGapRanges(d).forEach((gap, gi) => addDimH(g, gap.x1, gap.x2, gutterInnerY, topWidthDimY, `${formatMm(gap.x2 - gap.x1)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: `top_system_gap_${gi + 1}`, ruleKey: 'info_only', field: '__info__', index: gi, label: 'Sistem Ara Boşluk', view: 'Top', relatedZoneId: `top_system_gap_zone_${gi + 1}`, editable: false } }));
 
@@ -1399,10 +1781,11 @@
       const rightCenter = postXs[gapIndex + 1];
       const bounds = frontGapBounds(d, postXs, gapIndex);
       const clearGap = Math.max(1, bounds.width);
-      const width = Math.max(1, Math.min(Number(placement.width) || clearGap - 5, clearGap - 5));
-      const height = Math.max(1, Number(placement.height) || (d.frontHeight - d.parapetHeight - 5));
+      const width = Math.max(1, Number(placement.width) || clearGap - 5);
+      const parapetH = frontParapetHeightAt(d, (bounds.left + bounds.right) / 2);
+      const height = Math.max(1, Number(placement.height) || (d.frontHeight - parapetH - 5));
       const baseX = bounds.left;
-      const baseY = postBottomY - (placement.leftPostStandard !== false ? K.onPostHeightCorrection : 0);
+      const baseY = rectStartY - d.frontHeight + parapetH - K.onPostTopDrop;
       const name = slidingBlockName(placement);
       g.insert(name, baseX, baseY, { layer: 'Ürün Yerleşimi - Sürme', previewW: width, previewH: height });
       g.entities.push({ type: 'interaction', kind: 'productEditor', x: baseX, y: baseY, w: width, h: height, data: { placementId: placement.id, productType: 'sliding_glass', placementView: 'front', gapIndex, pozNo: placement.pozNo } });
@@ -1427,9 +1810,34 @@
   }
 
 
+  function mirroredGuillotinePlacement(placement) {
+    const source = placement || {};
+    return {
+      ...source,
+      renderVariant: 'MIRROR',
+      motorDirection: String(source.motorDirection || 'RIGHT').toUpperCase() === 'LEFT' ? 'RIGHT' : 'LEFT',
+      view: String(source.view || 'INSIDE VIEW').toUpperCase() === 'OUTSIDE VIEW' ? 'INSIDE VIEW' : 'OUTSIDE VIEW'
+    };
+  }
+
+  function rightMasterGuillotinePlacement(placement) {
+    const source = placement || {};
+    // Sağ görünüş, yerel yan görünüş geometrisinin X aynası olarak ekrana gelir.
+    // Motorun kullanıcı formunda seçilen tarafta görünmesi için kaynak blokta
+    // yalnız motor konumu ters hazırlanır. INSIDE/OUTSIDE metni sağ ana görünüşte
+    // kullanıcının seçtiği değer olarak kalır.
+    return {
+      ...source,
+      renderVariant: 'RIGHT_MASTER',
+      motorDirection: String(source.motorDirection || 'RIGHT').toUpperCase() === 'LEFT' ? 'RIGHT' : 'LEFT'
+    };
+  }
+
   function guillotineBlockName(placement) {
     const poz = String((placement && placement.pozNo) || 'G01').toUpperCase().replace(/[^A-Z0-9_-]+/g, '_');
-    return `GUILLOTINE_POZ_${poz}`;
+    const variantKey = String(placement && placement.renderVariant || '').toUpperCase();
+    const variant = variantKey === 'MIRROR' ? '_MIRROR' : (variantKey === 'RIGHT_MASTER' ? '_RIGHT_MASTER' : '');
+    return `GUILLOTINE_POZ_${poz}${variant}`;
   }
 
   function guillotineArrowEntity(panel, direction, x) {
@@ -1493,7 +1901,10 @@
     const textH = guillotineMotorTextHeight(width, viewText);
     const bandY = height - 75;
     const motorRight = String(placement.motorDirection || 'RIGHT').toUpperCase() !== 'LEFT';
-    entities.push({ type: 'text', layer, x: motorRight ? width - 10 : 10, y: bandY, height: textH, value: 'MOTOR', align: motorRight ? 'right' : 'left', rotation: 0 });
+    // Motor etiketi aynalı sağ görünüşte dahi ürün çerçevesinin içinde kalsın.
+    // Kenar payı genişliğe göre büyür; dar ürünlerde merkez metnine yaklaşmaz.
+    const textMargin = Math.max(120, Math.min(width / 3, width * 0.12));
+    entities.push({ type: 'text', layer, x: motorRight ? width - textMargin : textMargin, y: bandY, height: textH, value: 'MOTOR', align: motorRight ? 'right' : 'left', rotation: 0 });
     entities.push({ type: 'text', layer, x: width / 2, y: bandY, height: textH, value: viewText, align: 'center', rotation: 0 });
     return { dxfName: guillotineBlockName(placement), entities, bounds: { minX: 0, minY: 0, maxX: width, maxY: height } };
   }
@@ -1503,6 +1914,13 @@
     [...(d.guillotinePlacements || []), ...(d.sideGuillotinePlacements || [])].forEach(placement => {
       const name = guillotineBlockName(placement);
       blocks[name] = buildGuillotineBlockDefinition(placement);
+      const sideKey = normalizeSideViewKey(placement && placement.sideViewKey, Number(placement && placement.sideIndex) || 0);
+      if (sideKey === 'right') {
+        const mirrored = mirroredGuillotinePlacement(placement);
+        const rightMaster = rightMasterGuillotinePlacement(placement);
+        blocks[guillotineBlockName(mirrored)] = buildGuillotineBlockDefinition(mirrored);
+        blocks[guillotineBlockName(rightMaster)] = buildGuillotineBlockDefinition(rightMaster);
+      }
     });
     return blocks;
   }
@@ -1516,10 +1934,11 @@
       const rightCenter = postXs[gapIndex + 1];
       const bounds = frontGapBounds(d, postXs, gapIndex);
       const clearGap = Math.max(1, bounds.width);
-      const width = Math.max(1, Math.min(Number(placement.width) || clearGap - 5, clearGap - 5));
-      const height = Math.max(1, Number(placement.height) || (d.frontHeight - d.parapetHeight - 5));
+      const width = Math.max(1, Number(placement.width) || clearGap - 5);
+      const parapetH = frontParapetHeightAt(d, (bounds.left + bounds.right) / 2);
+      const height = Math.max(1, Number(placement.height) || (d.frontHeight - parapetH - 5));
       const baseX = bounds.left;
-      const baseY = postBottomY - (placement.leftPostStandard !== false ? K.onPostHeightCorrection : 0);
+      const baseY = rectStartY - d.frontHeight + parapetH - K.onPostTopDrop;
       const name = guillotineBlockName(placement);
       g.insert(name, baseX, baseY, { layer: 'Ürün Yerleşimi - Giyotin', previewW: width, previewH: height });
       g.entities.push({ type: 'interaction', kind: 'productEditor', x: baseX, y: baseY, w: width, h: height, data: { placementId: placement.id, productType: 'guillotine_glass', placementView: 'front', gapIndex, pozNo: placement.pozNo } });
@@ -1536,60 +1955,133 @@
   function drawFrontView(g, d) {
     const postXs = Array.isArray(d.postCenterXs) ? d.postCenterXs : postCenterXs(d);
     const rectStartY = d.commonFrontRectStartY;
-    const onDikmeH = Math.max(1, d.frontHeight - K.onPostHeightCorrection - d.parapetHeight);
-    const altBlokY = rectStartY - d.frontHeight + K.altBlockCorrection + d.parapetHeight;
+    const frontBaseY = rectStartY - d.frontHeight;
     g.rect(K.gutterX, rectStartY, d.width + 100, K.frontGutterH, 'PROFILE');
-    if (yes(d.parapet) && d.parapetHeight > 0) { const pBaseY = rectStartY - d.frontHeight; const pTopY = pBaseY + d.parapetHeight; g.rect(K.systemStartX, pTopY, d.width, -d.parapetHeight, 'WALL'); safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', K.systemStartX, pTopY, d.width, -d.parapetHeight, 'HATCH_WALL'); }
+
+    const frontSegments = yes(d.parapet) && d.parapetSegments && Array.isArray(d.parapetSegments.front)
+      ? d.parapetSegments.front : [];
+    frontSegments.forEach((segment, segmentIndex) => {
+      const x = K.systemStartX + Number(segment.start || 0);
+      const width = Math.max(0, Number(segment.end || 0) - Number(segment.start || 0));
+      const height = Math.max(0, Number(segment.height) || 0);
+      if (!(width > 0 && height > 0)) return;
+      const topY = frontBaseY + height;
+      g.rect(x, topY, width, -height, 'WALL');
+      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, topY, width, -height, 'HATCH_WALL');
+      g.entities.push({ type: 'interaction', kind: 'parapetEditor', x, y: frontBaseY, w: width, h: height, data: {
+        parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height
+      }});
+      addDimH(g, x, x + width, frontBaseY, frontBaseY + 50, formatMm(width), {
+        scale: 0.58,
+        layer: 'Ölçüler - Ön Görünüş',
+        edit: {
+          dimId: `front_parapet_width_${segment.id}`,
+          ruleKey: 'parapet_width',
+          field: '__parapet_width__',
+          index: segmentIndex,
+          label: `Parapet ${segmentIndex + 1} Genişlik`,
+          view: 'Front',
+          relatedZoneId: `front_parapet_zone_${segment.id}`,
+          parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+          segmentStart: segment.start, segmentEnd: segment.end, sideIndex: 0,
+          editable: true, canResize: true, actionType: 'parapet_width_resize', dimensionType: 'detail'
+        }
+      });
+    });
+
     d.systems.forEach(sys => {
       const p = d.positions[sys.index] || d.positions[0];
       const rayTopY = onRayTopYForPosition(d, sys.index);
       const rayH = Math.max(1, p.rearHeight - d.frontHeight - K.onRayHCorrection);
       const onRayY = rayTopY - rayH;
-      sys.rays.forEach(x => { g.rect(x, rayTopY, K.rayW, -rayH, 'Ray - Ön Görünüş'); blockRef(g, 'PergoRise Ray Kafası Ön Görünüş', x + 40, onRayY, 110, 70); });
+      sys.rays.forEach(x => {
+        g.rect(x, rayTopY, K.rayW, -rayH, 'Ray - Ön Görünüş');
+        blockRef(g, 'PergoRise Ray Kafası Ön Görünüş', x + 40, onRayY, 110, 70);
+      });
     });
+
     postXs.forEach((x, idx) => {
       const postProfile = frontPostProfileAt(d, idx);
+      const parapetH = frontParapetHeightAt(d, x);
+      const extension = frontPostExtensionAt(d, idx);
+      const parapetTopY = frontBaseY + parapetH;
+      let hitBottomY;
       if (!postProfile.custom) {
         blockRef(g, 'PergoRise Dikme Oluk Bağlantı Karşı Görünüş', x, rectStartY, 135, 85);
-        g.rect(x - 50, rectStartY - K.onPostTopDrop, K.postSize, -onDikmeH, 'POST');
-        blockRef(g, 'PergoRise Dikme Alt Bağlantı Karşı Görünüş', x, altBlokY, 125, 70);
+        const normalBodyBottom = parapetTopY + K.altBlockCorrection;
+        const bodyTop = rectStartY - K.onPostTopDrop;
+        const bodyBottom = normalBodyBottom - extension;
+        g.rect(x - K.postSize / 2, bodyTop, K.postSize, -(bodyTop - bodyBottom), 'POST');
+        blockRef(g, 'PergoRise Dikme Alt Bağlantı Karşı Görünüş', x, parapetTopY + K.altBlockCorrection - extension, 125, 70);
+        hitBottomY = bodyBottom - 24;
       } else {
-        const customH = Math.max(1, d.frontHeight - d.parapetHeight);
-        g.rect(x - postProfile.en / 2, rectStartY, postProfile.en, -customH, 'POST');
+        const bodyBottom = parapetTopY - extension;
+        g.rect(x - postProfile.en / 2, rectStartY, postProfile.en, -(rectStartY - bodyBottom), 'POST');
+        hitBottomY = bodyBottom - 24;
       }
-      {
-        const hitTopY = rectStartY + 24;
-        const hitBottomY = postProfile.custom ? rectStartY - Math.max(1, d.frontHeight - d.parapetHeight) - 24 : rectStartY - K.onPostTopDrop - onDikmeH - 24;
-        const hitW = Math.max(124, postProfile.en + 24);
-        g.entities.push({ type: 'interaction', kind: 'postEditor', x: x - hitW / 2, y: hitBottomY, w: hitW, h: hitTopY - hitBottomY, data: { postIndex: idx, postCount: d.postCount, totalRayCount: d.totalRayCount, placementMode: d.manualPostPlacementMode || 'standard' } });
-      }
+      const hitTopY = rectStartY + 24;
+      const hitW = Math.max(124, postProfile.en + 24);
+      g.entities.push({ type: 'interaction', kind: 'postEditor', x: x - hitW / 2, y: hitBottomY, w: hitW, h: hitTopY - hitBottomY, data: {
+        postIndex: idx, postCount: d.postCount, totalRayCount: d.totalRayCount,
+        placementMode: d.manualPostPlacementMode || 'standard', profileMode: postProfile.mode,
+        en: postProfile.en, boy: postProfile.boy, et: postProfile.et, postExtension: extension
+      }});
     });
-    drawSlidingPlacements(g, d, postXs, rectStartY, onDikmeH);
-    drawGuillotinePlacements(g, d, postXs, rectStartY, onDikmeH);
-    addDimH(g, K.systemStartX, K.systemStartX + d.nominalWidth, rectStartY - d.frontHeight - 80, rectStartY - d.frontHeight - 350, `GENİŞLİK ${formatMm(d.nominalWidth)}`, { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_total_width', ruleKey: 'front_total_width', field: 'width', index: 0, label: 'Ön Genişlik', view: 'Front', relatedZoneId: 'front_total_width_zone' } });
-    if (!(yes(d.parapet) && d.parapetHeight > 0)) {
-      addDimV(g, rectStartY, rectStartY - d.frontHeight, K.systemStartX - 100, K.systemStartX - 360, `ÖN ${formatMm(d.frontHeight)}`, { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_height', ruleKey: 'front_front_height', field: 'frontHeight', index: 0, label: 'Ön H', view: 'Front', relatedZoneId: 'front_height_zone' } });
+
+    drawSlidingPlacements(g, d, postXs, rectStartY, Math.max(1, d.frontHeight - K.onPostHeightCorrection - d.parapetHeight));
+    drawGuillotinePlacements(g, d, postXs, rectStartY, Math.max(1, d.frontHeight - K.onPostHeightCorrection - d.parapetHeight));
+    addDimH(g, K.systemStartX, K.systemStartX + d.nominalWidth, frontBaseY - 80, frontBaseY - 350, `GENİŞLİK ${formatMm(d.nominalWidth)}`, { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_total_width', ruleKey: 'front_total_width', field: 'width', index: 0, label: 'Ön Genişlik', view: 'Front', relatedZoneId: 'front_total_width_zone' } });
+
+    if (!frontSegments.length) {
+      addDimV(g, rectStartY, frontBaseY, K.systemStartX - 100, K.systemStartX - 360, `ÖN ${formatMm(d.frontHeight)}`, { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_height', ruleKey: 'front_front_height', field: 'frontHeight', index: 0, label: 'Ön H', view: 'Front', relatedZoneId: 'front_height_zone' } });
+    } else {
+      // v8.9.25: Her parapet segmenti kendi alanında iki parçalı zincir
+      // ölçü taşır: parapet yüksekliği ve oluk altı-parapet üstü mesafesi.
+      // Aynı yüksekliğe sahip segmentler de ayrı ayrı ölçülür.
+      frontSegments.forEach((segment, segmentIndex) => {
+        const height = Math.max(0, Number(segment.height) || 0);
+        const x = K.systemStartX + Number(segment.start || 0);
+        const width = Math.max(1, Number(segment.end || 0) - Number(segment.start || 0));
+        const refX = x + width / 2;
+        const topY = frontBaseY + height;
+        const dimX = parapetSegmentVerticalDimX(x, width);
+        const positionIndex = frontPositionIndexAtX(d, refX);
+        addDimV(g, frontBaseY, topY, refX, dimX, formatMm(height), {
+          scale: 0.72,
+          layer: 'Ölçüler - Ön Görünüş',
+          positionIndex,
+          edit: {
+            dimId: `front_parapet_height_${segment.id}`,
+            ruleKey: 'parapet_height_info', field: '__parapet__', index: segmentIndex,
+            label: 'Parapet H', view: 'Front', relatedZoneId: `front_parapet_zone_${segment.id}`,
+            parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+            editable: false, dimensionType: 'detail'
+          }
+        });
+        addDimV(g, topY, rectStartY, refX, dimX, formatMm(rectStartY - topY), {
+          scale: 0.72,
+          layer: 'Ölçüler - Ön Görünüş',
+          positionIndex,
+          edit: {
+            dimId: `front_post_height_${segment.id}`,
+            ruleKey: 'info_only', field: '__info__', index: segmentIndex,
+            label: 'Oluk - Parapet Arası', view: 'Front', relatedZoneId: `front_post_height_zone_${segment.id}`,
+            parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+            editable: false, dimensionType: 'detail',
+            passiveReason: 'Oluk altı ile ilgili parapet parçasının üst kotu arasındaki bilgi ölçüsüdür.'
+          }
+        });
+      });
     }
 
-    // PERI01 LISP v32/v30 parapet mantığı:
-    // Parapet varsa karşı görünüşte iki ek düşey ölçü çizilir.
-    // 1) Parapet alt kotu -> parapet üst kotu
-    // 2) Parapet üst kotu -> oluk altı/dikme üst referansı
-    // Ölçülen referans X'i karşı görünüş başlangıcıdır; ölçü aksları üst görünüş açılım ölçüsüyle aynı sol aksa alınır.
-    if (yes(d.parapet) && d.parapetHeight > 0) {
-      const onParapetBaseY = rectStartY - d.frontHeight;
-      const onParapetTopY = onParapetBaseY + d.parapetHeight;
-      const onOlukAltiY = rectStartY;
-      const onOlcuGeomX = K.systemStartX;
-      const onOlcuAksX = 100;
-      const onOlcuAksX2 = -130;
-      const smallDim = { scale: 0.82 };
-      addDimV(g, onParapetBaseY, onParapetTopY, onOlcuGeomX, onOlcuAksX, `PARAPET ${formatMm(d.parapetHeight)}`, { ...smallDim, layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_parapet_height_info', ruleKey: 'parapet_height_info', field: 'parapetHeight', index: 0, label: 'Parapet H', view: 'Front', relatedZoneId: 'front_parapet_zone', editable: false } });
-      addDimV(g, onParapetTopY, onOlukAltiY, onOlcuGeomX, onOlcuAksX2, `DİKME ${formatMm(onOlukAltiY - onParapetTopY)}`, { ...smallDim, layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_post_height_info', ruleKey: 'info_only', field: '__info__', index: 0, label: 'Dikme H', view: 'Front', relatedZoneId: 'front_post_height_zone', editable: false } });
+    if (postXs.length > 1) {
+      const midY = rectStartY - Math.max(1, d.frontHeight - d.parapetHeight) / 2;
+      for (let i = 0; i < postXs.length - 1; i += 1) {
+        const gb = frontGapBounds(d, postXs, i);
+        addDimH(g, gb.left, gb.right, midY, midY, formatMm(gb.width), { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: `front_post_gap_${i + 1}`, ruleKey: 'front_post_gap', field: '__zone__', index: i, label: `Dikme ${i + 1} - Dikme ${i + 2} Arası`, view: 'Front', relatedZoneId: `front_gap_post_${i + 1}_post_${i + 2}` } });
+      }
     }
-
-    if (postXs.length > 1) { const midY = rectStartY - onDikmeH / 2; for (let i = 0; i < postXs.length - 1; i += 1) { const gb = frontGapBounds(d, postXs, i); addDimH(g, gb.left, gb.right, midY, midY, formatMm(gb.width), { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: `front_post_gap_${i + 1}`, ruleKey: 'front_post_gap', field: '__zone__', index: i, label: `Dikme ${i + 1} - Dikme ${i + 2} Arası`, view: 'Front', relatedZoneId: `front_gap_post_${i + 1}_post_${i + 2}` } }); } }
-
   }
 
   function triangleDogramaTopY(baseX, baseY, AD, slope, topOff, x) {
@@ -1608,7 +2100,7 @@
     return ent;
   }
 
-  function triangleDogramaUrunCiz(g, baseX, baseY, AB, BC, AD, slope, off = 41.7, memberW = 41.7) {
+  function triangleDogramaUrunCiz(g, baseX, baseY, AB, BC, AD, slope, off = 41.7, memberW = 41.7, divisionCount = null) {
     const topOff = off * Math.sqrt(1 + slope * slope);
     const pA = [baseX, baseY];
     const pB = [baseX + AB, baseY];
@@ -1624,7 +2116,10 @@
       triangleDogramaKapaliCiz(g, inA, inB, inC, inD);
 
       const innerW = AB - 2 * off;
-      const n = triangleDogramaAraDikmeSay(AB);
+      const explicitDivisions = Number(divisionCount);
+      const n = Number.isFinite(explicitDivisions)
+        ? Math.max(0, Math.round(explicitDivisions) - 1)
+        : triangleDogramaAraDikmeSay(AB);
       if (n > 0) {
         let clear = (innerW - n * memberW) / (n + 1);
         if (clear < 1) clear = 1;
@@ -1658,46 +2153,96 @@
 
   function markNoMirror(entity) { if (entity) entity.noMirror = true; return entity; }
 
+  function sideGlassTrackBottomY(d, sideTopY, sideViewKey = '0', positionIndex = 0) {
+    if (!sideFeatureEnabled(d, 'glassTrack', sideViewKey, positionIndex)) return Number(sideTopY || 0);
+    const profile = d && d.glassTrackProfile ? d.glassTrackProfile : normalizeGlassTrackProfile();
+    // v8.9.28: Cam kaydı aktifken yan görünüş net üst sınırı, profilin
+    // -Y dış kenarıdır. Profil En değeri değiştiğinde bu kot ve ona bağlı
+    // bütün bilgi ölçüleri doğrudan yeniden hesaplanır.
+    return Number(sideTopY || 0) - 3 - Math.max(5, Number(profile.en) || 100);
+  }
+
+  function sideProductPlacementMetrics(d, p, geom, zone, baseY, placement) {
+    const midX = (Number(zone.left) + Number(zone.right)) / 2;
+    const sideViewKey = sideViewKeyForPosition(p);
+    const parapetH = sideParapetHeightAt(d, p.index, midX, Number(geom.wallX) || 0, sideViewKey);
+    const localBaseY = baseY + parapetH;
+    // v8.9.28: Yan ürünün otomatik yerleşim zarfı, yerel parapet üst kotu ile
+    // cam kayıt profilinin -Y dış kenarı arasındadır. Böylece yan kayıt profilinin
+    // En değeri değiştiğinde otomatik ürün yüksekliği de aynı referansa uyar.
+    const clearTopY = sideGlassTrackBottomY(d, Number(baseY || 0) + Number(d.frontHeight || 0), sideViewKey, p.index);
+    const rawAvailableHeight = Math.max(1, clearTopY - localBaseY);
+    const rawClearWidth = Math.max(1, Number(zone.right) - Number(zone.left));
+    const availableWidth = Math.max(1, rawClearWidth - 5);
+    const availableHeight = Math.max(1, rawAvailableHeight - 5);
+    return {
+      // v8.9.29: Kayıtlı manuel ürün ölçüsü çizimde aynen korunur. Ölçüsü olmayan
+      // eski kayıtlar ve otomatik yerleşim ise her iki yönde 5 mm montaj payı kullanır.
+      width: Math.max(1, Number(placement.width) || availableWidth),
+      height: Math.max(1, Number(placement.height) || availableHeight),
+      baseY: localBaseY,
+      clearTopY,
+      availableWidth,
+      availableHeight
+    };
+  }
+
+  function sidePlacementMatchesView(item, p) {
+    const key = sideViewKeyForPosition(p);
+    return normalizeSideViewKey(item && item.sideViewKey, Number(item && item.sideIndex) || 0) === key;
+  }
+
   function drawSideSlidingPlacements(g, d, p, geom, baseY) {
-    if (p.index !== 0 || !geom || !geom.exists) return;
-    (d.sideSlidingPlacements || []).filter(item => Number(item.sideIndex) === p.index).forEach(placement => {
+    if (!geom || !geom.exists) return;
+    const sideViewKey = sideViewKeyForPosition(p);
+    (d.sideSlidingPlacements || []).filter(item => sidePlacementMatchesView(item, p)).forEach(placement => {
       const zone = sideZoneBounds(geom, placement);
       if (!zone) return;
-      const clearWidth = Math.max(1, zone.right - zone.left);
-      const width = Math.max(1, Math.min(Number(placement.width) || clearWidth - 5, clearWidth - 5));
-      const height = Math.max(1, Math.min(Number(placement.height) || geom.productClearHeight - 5, geom.productClearHeight - 5));
-      markNoMirror(g.insert(slidingBlockName(placement), zone.left, baseY, { layer: 'Ürün Yerleşimi - Sürme', previewW: width, previewH: height, noMirror: true }));
-      g.entities.push({ type: 'interaction', kind: 'productEditor', x: zone.left, y: baseY, w: width, h: height, noMirror: true, data: { placementId: placement.id, productType: 'sliding_glass', placementView: 'side-left', sideIndex: p.index, sideGapIndex: Number(placement.sideGapIndex) || 0, sideZone: placement.sideZone || `gap_${Number(placement.sideGapIndex) || 0}`, pozNo: placement.pozNo } });
-      markNoMirror(addDimH(g, zone.left, zone.left + width, baseY, baseY + 90, String(Math.round(width)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail' }));
-      markNoMirror(addDimV(g, baseY, baseY + height, zone.left + width, zone.left + width - 85, String(Math.round(height)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail' }));
+      const metrics = sideProductPlacementMetrics(d, p, geom, zone, baseY, placement);
+      const { width, height } = metrics;
+      const localBaseY = metrics.baseY;
+      g.insert(slidingBlockName(placement), zone.left, localBaseY, { layer: 'Ürün Yerleşimi - Sürme', previewW: width, previewH: height });
+      g.entities.push({ type: 'interaction', kind: 'productEditor', x: zone.left, y: localBaseY, w: width, h: height, data: { placementId: placement.id, productType: 'sliding_glass', placementView: sideViewKey === 'right' ? 'side-right' : 'side-left', sideIndex: p.index, sideViewKey, sideGapIndex: Number(placement.sideGapIndex) || 0, sideZone: placement.sideZone || `gap_${Number(placement.sideGapIndex) || 0}`, pozNo: placement.pozNo } });
+      addDimH(g, zone.left, zone.left + width, localBaseY, localBaseY + 90, String(Math.round(width)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail', positionIndex: p.index });
+      addDimV(g, localBaseY, localBaseY + height, zone.left + width, zone.left + width - 85, String(Math.round(height)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail', positionIndex: p.index });
     });
   }
 
   function drawSideGuillotinePlacements(g, d, p, geom, baseY) {
-    if (p.index !== 0 || !geom || !geom.exists) return;
-    (d.sideGuillotinePlacements || []).filter(item => Number(item.sideIndex) === p.index).forEach(placement => {
+    if (!geom || !geom.exists) return;
+    const sideViewKey = sideViewKeyForPosition(p);
+    (d.sideGuillotinePlacements || []).filter(item => sidePlacementMatchesView(item, p)).forEach(placement => {
       const zone = sideZoneBounds(geom, placement);
       if (!zone) return;
-      const clearWidth = Math.max(1, zone.right - zone.left);
-      const width = Math.max(1, Math.min(Number(placement.width) || clearWidth - 5, clearWidth - 5));
-      const height = Math.max(1, Math.min(Number(placement.height) || geom.productClearHeight - 5, geom.productClearHeight - 5));
-      markNoMirror(g.insert(guillotineBlockName(placement), zone.left, baseY, { layer: 'Ürün Yerleşimi - Giyotin', previewW: width, previewH: height, noMirror: true }));
-      g.entities.push({ type: 'interaction', kind: 'productEditor', x: zone.left, y: baseY, w: width, h: height, noMirror: true, data: { placementId: placement.id, productType: 'guillotine_glass', placementView: 'side-left', sideIndex: p.index, sideGapIndex: Number(placement.sideGapIndex) || 0, sideZone: placement.sideZone || `gap_${Number(placement.sideGapIndex) || 0}`, pozNo: placement.pozNo } });
-      markNoMirror(addDimH(g, zone.left, zone.left + width, baseY, baseY + 90, String(Math.round(width)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail' }));
-      markNoMirror(addDimV(g, baseY, baseY + height, zone.left + width, zone.left + width - 85, String(Math.round(height)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail' }));
+      const metrics = sideProductPlacementMetrics(d, p, geom, zone, baseY, placement);
+      const { width, height } = metrics;
+      const localBaseY = metrics.baseY;
+      const renderPlacement = p && p.semanticMirror
+        ? mirroredGuillotinePlacement(placement)
+        : (p && p.rightMasterDisplay ? rightMasterGuillotinePlacement(placement) : placement);
+      g.insert(guillotineBlockName(renderPlacement), zone.left, localBaseY, { layer: 'Ürün Yerleşimi - Giyotin', previewW: width, previewH: height });
+      g.entities.push({ type: 'interaction', kind: 'productEditor', x: zone.left, y: localBaseY, w: width, h: height, data: { placementId: placement.id, productType: 'guillotine_glass', placementView: sideViewKey === 'right' ? 'side-right' : 'side-left', sideIndex: p.index, sideViewKey, sideGapIndex: Number(placement.sideGapIndex) || 0, sideZone: placement.sideZone || `gap_${Number(placement.sideGapIndex) || 0}`, pozNo: placement.pozNo } });
+      addDimH(g, zone.left, zone.left + width, localBaseY, localBaseY + 90, String(Math.round(width)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail', positionIndex: p.index });
+      addDimV(g, localBaseY, localBaseY + height, zone.left + width, zone.left + width - 85, String(Math.round(height)), { layer: 'Ölçüler - Detay', scale: 0.32, color: 1, textColor: 1, entityColor: 1, dimensionFilterType: 'detail', positionIndex: p.index });
     });
   }
 
   function drawOneSideView(g, d, p, stackShiftY) {
+    const viewEntityStart = g.entities.length;
     const globalSideShiftY = Number(d.sideGlobalShiftY) || 0;
     const rectStartY = -(p.opening + (p.rearHeight - d.frontHeight) + K.frontViewExtraDrop) + globalSideShiftY + stackShiftY;
-    const dikH = Math.max(1, d.frontHeight - K.onPostHeightCorrection - d.parapetHeight);
     const yanPostUstY = rectStartY - K.onPostTopDrop;
     const yanUstY = rectStartY;
-    const yanAltY = yanPostUstY - dikH;
     const yanX = K.sideBaseX;
-    const duvarX = K.systemStartX - (1750 + p.opening);
-    const duvarY = yanAltY - K.altBlockCorrection - d.parapetHeight;
+    const sideViewKey = sideViewKeyForPosition(p);
+    const wallSettings = sideBackWallSettings(d, sideViewKey, p.rearHeight);
+    const duvarX = sideBackWallFaceX(d, p, sideViewKey);
+    const duvarY = rectStartY - d.frontHeight;
+    const isMiddlePosition = p.index > 0 && p.index < d.sidePositionCount - 1;
+    const middleEnabled = !isMiddlePosition || sideViewEnabled(d, sideViewKey, p.index);
+    const sideFrontParapetH = sideParapetHeightAt(d, p.index, yanX - K.postSize / 2, duvarX, sideViewKey);
+    const yanAltY = duvarY + sideFrontParapetH + K.altBlockCorrection;
+    const dikH = Math.max(1, yanPostUstY - yanAltY);
     const bagX = duvarX;
     const bagY = duvarY + p.rearHeight;
     const arkaMekX = bagX + K.sideArkaMekOffsetX;
@@ -1708,39 +2253,109 @@
     const aci = p.angleRad;
     let sideSupports = [];
     let camBottomY = null;
-    const sideSupportGeometry = d.sideSupportGeometry && d.sideSupportGeometry[String(p.index)];
-    if (d.postCount > 0) { g.rect(yanX, yanPostUstY, -K.postSize, -dikH, 'Dikme - Yan Görünüş'); blockRef(g, 'PergoRise Dikme Oluk Bağlantı Yan Görünüş', yanX, yanPostUstY, 130, 80, 'Blok - Yan Görünüş', 270); blockRef(g, 'PergoRise Dikme Alt Bağlantı Yan Görünüş', yanX - 50, yanAltY, 120, 70, 'Blok - Yan Görünüş'); }
+    const sideSupportGeometry = sideViewKey === 'right' ? d.rightSideSupportGeometry : (d.sideSupportGeometry && d.sideSupportGeometry[sideViewKey]);
+    if (d.postCount > 0) {
+      g.rect(yanX, yanPostUstY, -K.postSize, -dikH, 'Dikme - Yan Görünüş');
+      blockRef(g, 'PergoRise Dikme Oluk Bağlantı Yan Görünüş', yanX, yanPostUstY, 130, 80, 'Blok - Yan Görünüş', 270);
+      blockRef(g, 'PergoRise Dikme Alt Bağlantı Yan Görünüş', yanX - 50, yanAltY, 120, 70, 'Blok - Yan Görünüş');
+      const postIndex = sideViewKey === 'right' ? Math.max(0, d.postCount - 1) : 0;
+      g.entities.push({ type: 'interaction', kind: 'frontPostProfileEditor', x: yanX - K.postSize, y: yanAltY, w: K.postSize, h: Math.max(1, yanPostUstY - yanAltY), data: { postIndex, sideIndex: p.index, sideViewKey } });
+    }
     blockRef(g, 'PergoRise Oluk Yan Görünüş Birleştirilmiş', yanX, yanUstY, 220, 135, 'Blok - Yan Görünüş');
-    if (yes(d.glassTrack) && (!d.farkliAcilim || p.index === 0 || p.index === d.sidePositionCount - 1)) {
+    if (isMiddlePosition) {
+      // Ara poz düzenleme anahtarı her zaman görünür. Buton, arka duvarın +Y
+      // tarafına ve gerçek duvar kalınlığı kadar genişliğe yerleştirilir.
+      // Interaction elemanı preview-only olduğundan DXF/PDF çıktısına girmez.
+      const buttonW = Math.max(260, wallSettings.depth);
+      const buttonH = 190;
+      const buttonX = duvarX - wallSettings.depth;
+      const buttonY = bagY + 80;
+      g.entities.push({ type: 'interaction', kind: 'sideViewEnable', x: buttonX, y: buttonY, w: buttonW, h: buttonH, data: { sideIndex: p.index, sideViewKey, sideEnabled: middleEnabled } });
+    }
+    if (sideFeatureEnabled(d, 'glassTrack', sideViewKey, p.index)) {
       const profile = d.glassTrackProfile || normalizeGlassTrackProfile();
       const sideH = profile.en;
-      const supportScope = p.index === 0 ? 'left' : 'right';
+      const supportScope = sideViewScopeForKey(sideViewKey);
       const supportProfile = supportProfileFor(d, supportScope);
       const supportSideH = supportProfile.en;
-      const camBaseX = yanX - 100, camBaseY = yanUstY - 3, camW = Math.max(1, p.opening - 100);
+      const camBaseX = yanX - 100, camBaseY = yanUstY - 3, camW = Math.max(1, p.opening - 100 + sideTrackLengthOffset(d, sideViewKey));
       camBottomY = camBaseY - sideH;
       // V8.2.79: Yan görünüş cam kaydı profilinde iç ofset çizilmez.
       // Profilin +Y üst referansı sabit, -Y alt ucu seçilen En değerine göre çalışır.
       g.rect(camBaseX, camBaseY, -camW, -sideH, 'GLASS');
-      if (p.index === 0) addGlassTrackInteraction(g, camBaseX - camW, camBaseY - sideH, camW, sideH, profile, 'track', 'global');
+      addGlassTrackInteraction(g, camBaseX - camW, camBaseY - sideH, camW, sideH, profile, 'track', sideViewKey, { sideIndex: p.index, sideViewKey, trackLengthOffset: sideTrackLengthOffset(d, sideViewKey) });
       const supportPosts = sideSupportGeometry && Array.isArray(sideSupportGeometry.posts) ? sideSupportGeometry.posts : [];
       supportPosts.forEach((supportPost, supportIndex) => {
         const supportProfile = supportPost.profile || supportProfileFor(d, supportScope);
         const supportSideH = supportProfile.en;
         const destekX = supportPost.left;
-        const standardSupportTopY = camBaseY - 100;
-        const standardSupportH = Math.max(1, d.frontHeight - 103 - d.parapetHeight);
-        const destekBottomY = standardSupportTopY - standardSupportH;
         const destekY = camBaseY - sideH;
+        // v8.9.26: Destek dikmesinin +Y üst ucu cam kaydında sabit kalır.
+        // Alt uç varsayılan olarak dikme merkezinin bulunduğu yerel parapet parçasına oturur.
+        // Pozitif manuel ofset -Y yönüne uzatır; negatif ofset alttan kısaltır.
+        const localParapetH = yes(d.parapet) ? sideParapetHeightAt(d, p.index, supportPost.centerX, duvarX, sideViewKey) : 0;
+        const automaticBottomY = duvarY + localParapetH;
+        const requestedExtension = Number.isFinite(Number(supportPost.extension)) ? Number(supportPost.extension) : 0;
+        const requestedBottomY = automaticBottomY - requestedExtension;
+        const destekBottomY = Math.min(destekY - 1, requestedBottomY);
         const destekH = Math.max(1, destekY - destekBottomY);
         g.rect(destekX, destekY, supportSideH, -destekH, 'GLASS');
-        addGlassTrackInteraction(g, destekX, destekY - destekH, supportSideH, destekH, supportProfile, 'support', supportScope, { sidePostId: supportPost.id, sideIndex: p.index, supportIndex });
-        sideSupports.push({ ...supportPost, left: destekX, right: destekX + supportSideH });
+        addGlassTrackInteraction(g, destekX, destekBottomY, supportSideH, destekH, supportProfile, 'support', supportScope, { sidePostId: supportPost.id, sideIndex: p.index, sideViewKey, supportIndex, postExtension: requestedExtension });
+        sideSupports.push({ ...supportPost, left: destekX, right: destekX + supportSideH, topY: destekY, bottomY: destekBottomY, automaticBottomY, localParapetH });
       });
     }
-    if (yes(d.parapet) && d.parapetHeight > 0) { g.rect(duvarX + p.opening, duvarY + d.parapetHeight, -200, -d.parapetHeight, 'Duvar - Yan Görünüş'); safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', duvarX + p.opening, duvarY + d.parapetHeight, -200, -d.parapetHeight, 'HATCH_WALL'); }
-    g.rect(duvarX, duvarY, -K.sideWallDepth, p.rearHeight, 'Duvar - Yan Görünüş');
-    safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', duvarX, duvarY, -K.sideWallDepth, p.rearHeight, 'HATCH_WALL');
+    const sideSegments = yes(d.parapet) && d.parapetSegments && d.parapetSegments.side
+      ? (d.parapetSegments.side[sideViewKey] || []) : [];
+    sideSegments.forEach((segment, segmentIndex) => {
+      const x = duvarX + Number(segment.start || 0);
+      const width = Math.max(0, Number(segment.end || 0) - Number(segment.start || 0));
+      const height = Math.max(0, Number(segment.height) || 0);
+      if (!(width > 0 && height > 0)) return;
+      const topY = duvarY + height;
+      g.rect(x, topY, width, -height, 'Duvar - Yan Görünüş');
+      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, topY, width, -height, 'HATCH_WALL');
+      const interaction = { type: 'interaction', kind: 'parapetEditor', x, y: duvarY, w: width, h: height, data: {
+        parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height
+      }};
+      g.entities.push(interaction);
+      const sideParapetWidthDim = addDimH(g, x, x + width, duvarY, duvarY + 50, formatMm(width), {
+        scale: 0.52,
+        layer: 'Ölçüler - Yan Görünüş',
+        edit: {
+          dimId: `side_parapet_width_${p.index}_${segment.id}`,
+          ruleKey: 'parapet_width',
+          field: '__parapet_width__', index: segmentIndex,
+          label: `Parapet ${segmentIndex + 1} Genişlik`,
+          view: sideViewKey === 'right' ? 'Right' : 'Side',
+          relatedZoneId: `side_parapet_zone_${sideViewKey}_${p.index}_${segment.id}`,
+          parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+          segmentStart: segment.start, segmentEnd: segment.end,
+          editable: true, canResize: true,
+          actionType: 'parapet_width_resize', dimensionType: 'detail',
+          passiveReason: ''
+        }
+      });
+      void sideParapetWidthDim;
+    });
+    const wallSegments = backWallSegmentsFor(d, sideViewKey, p.rearHeight);
+    wallSegments.forEach((segment, wallSegmentIndex) => {
+      const start = Math.max(0, Number(segment.start) || 0);
+      const end = Math.max(start, Number(segment.end) || 0);
+      const height = Math.max(0, Number(segment.height) || 0);
+      const wallW = end - start;
+      if (!(wallW > 0 && height > 0)) return;
+      // Keep the legacy right-to-left wall vertex order so unchanged projects
+      // retain byte-stable DXF geometry while segmented walls remain editable.
+      const wallRightX = duvarX - start;
+      const wallLeftX = duvarX - end;
+      g.rect(wallRightX, duvarY, -wallW, height, 'Duvar - Yan Görünüş');
+      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, duvarY, -wallW, height, 'HATCH_WALL');
+      g.entities.push({ type: 'interaction', kind: 'backWallEditor', x: wallLeftX, y: duvarY, w: wallW, h: height, data: {
+        sideIndex: p.index, sideViewKey, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
+        wallSegmentId: segment.id, wallSegmentIndex, segmentStart: start, segmentEnd: end, segmentHeight: height
+      } });
+    });
     blockRef(g, 'PergoRise Ray Duvar Bağlantı Set', bagX, bagY, 120, 95, 'Blok - Yan Görünüş'); blockRef(g, 'PergoRise Ray Arka Mekanizma Yan Görünüş', arkaMekX, arkaMekY, 135, 90, 'Blok - Yan Görünüş', normDeg(aci * 180 / Math.PI));
     rotatedRect(g, startRayX, startRayY, rayLen, -K.sideRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş'); rotatedRect(g, startRayX, startRayY - K.sideInnerRayOffsetY, rayLen, -K.sideInnerRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş');
     const kafa = rotatePoint(startRayX + rayLen, startRayY, arkaMekX, arkaMekY, aci); const rotDeg = normDeg(aci * 180 / Math.PI); blockRef(g, 'PergoRise Ray Kafası Yan Görünüş', kafa[0], kafa[1], 130, 90, 'Blok - Yan Görünüş', rotDeg);
@@ -1751,9 +2366,18 @@
       angleText.keepReadableOnMirror = true;
       angleText.dimensionFilterType = 'main';
     }
-    if (!yes(d.waterStandard)) { const basX = yanX - 35.5; const basY = yanUstY + 13.9; g.rect(basX, basY, 300, 70, 'WATER'); g.text(basX + 310, basY + 35, 'Ø70 Pipe 300 mm', 60, 'WATER', 'left'); }
+    if (!yes(d.waterStandard)) {
+      const basX = yanX - 35.5;
+      const basY = yanUstY + 13.9;
+      g.rect(basX, basY, 300, 70, 'WATER');
+      const pipeText = g.text(basX + 310, basY + 35, 'Ø70 Pipe 300 mm', 60, 'WATER', 'left');
+      if (pipeText) {
+        pipeText.keepReadableOnMirror = true;
+        pipeText.flipAlignOnMirror = true;
+      }
+    }
     p._triangleRange = null;
-    if (yes(d.triangleJoinery) && (!d.farkliAcilim || p.index === 0 || p.index === d.sidePositionCount - 1)) {
+    if (sideFeatureEnabled(d, 'triangle', sideViewKey, p.index)) {
       const triStart = g.entities.length;
       const denom = Math.abs(p.opening - K.slopeOpeningCorrection) < 1e-9 ? 1 : (p.opening - K.slopeOpeningCorrection);
       const slope = Math.abs((p.rearHeight - d.frontHeight - K.slopeHeightCorrection) / denom);
@@ -1767,9 +2391,14 @@
       const copyX = duvarX;
       const copyY = bagY + 600;
       // PERI01: asil ürün yan kayıt/duvar referansından başlar; ikinci kopya duvardan +Y 600'e alınır.
-      triangleDogramaUrunCiz(g, aX, aY, AB, BC, AD, slope, off, memberW);
-      triangleDogramaUrunCiz(g, copyX, copyY, AB, BC, AD, slope, off, memberW);
-      triangleDogramaDisOlcuCiz(g, copyX, copyY, AB, BC, AD);
+      const divisions = triangleDivisionCount(d, sideViewKey, p.opening);
+      triangleDogramaUrunCiz(g, aX, aY, AB, BC, AD, slope, off, memberW, divisions);
+      if (!p.semanticMirror) {
+        triangleDogramaUrunCiz(g, copyX, copyY, AB, BC, AD, slope, off, memberW, divisions);
+        triangleDogramaDisOlcuCiz(g, copyX, copyY, AB, BC, AD);
+      }
+      g.entities.push({ type: 'interaction', kind: 'triangleEditor', x: aX, y: aY, w: AB, h: AD, data: { sideIndex: p.index, sideViewKey, triangleDivisionCount: divisions } });
+      if (!p.semanticMirror) g.entities.push({ type: 'interaction', kind: 'triangleEditor', x: copyX, y: copyY, w: AB, h: AD, data: { sideIndex: p.index, sideViewKey, triangleDivisionCount: divisions } });
       p._triangleRange = { start: triStart, end: g.entities.length };
     }
     if (sideSupportGeometry && sideSupportGeometry.exists && camBottomY != null) {
@@ -1779,7 +2408,7 @@
     const postMidY = yanAltY + dikH / 2;
     const frontPostRearFace = yanX - K.postSize;
     if (sideSupportGeometry && sideSupportGeometry.exists && Array.isArray(sideSupportGeometry.gaps)) {
-      const leftEditable = p.index === 0;
+      const leftEditable = sideViewEnabled(d, sideViewKey, p.index);
       sideSupportGeometry.gaps.forEach((gap, gapIndex) => {
         if (gap.width <= 0.5) return;
         const hasPosts = Array.isArray(sideSupportGeometry.posts) && sideSupportGeometry.posts.length > 0;
@@ -1793,34 +2422,109 @@
           scale: 0.72,
           layer: 'Ölçüler - Yan Görünüş',
           edit: {
-            dimId: `side_gap_${p.index}_${gapIndex}`,
+            dimId: `side_gap_${sideViewKey}_${p.index}_${gapIndex}`,
             ruleKey: leftEditable ? (hasPosts ? 'side_support_gap' : 'side_wall_to_post_gap') : 'info_only',
-            field: '__zone__', index: p.index, sideGapIndex: gapIndex,
-            label, view: leftEditable ? 'Side' : 'Right', relatedZoneId: `side_gap_zone_${p.index}_${gapIndex}`,
+            field: '__zone__', index: p.index, sideViewKey, sideGapIndex: gapIndex,
+            label, view: sideViewKey === 'right' ? 'Right' : 'Side', relatedZoneId: `side_gap_zone_${sideViewKey}_${p.index}_${gapIndex}`,
             dimensionType: 'detail', editable: leftEditable,
             canResize: leftEditable && hasPosts,
             canAddSameProfile: leftEditable,
             canAddDifferentProfile: leftEditable,
             canPlaceProduct: leftEditable,
-            passiveReason: leftEditable ? '' : 'Sağ yan görünüşü bu aşamada yalnız bilgi amaçlıdır.'
+            passiveReason: leftEditable ? '' : 'Bu yan görünüş düzenleme için etkinleştirilmedi.'
           }
         });
       });
     }
-    if (yes(d.glassTrack) && (!d.farkliAcilim || p.index === 0 || p.index === d.sidePositionCount - 1)) {
+    if (sideFeatureEnabled(d, 'glassTrack', sideViewKey, p.index)) {
       const profile = d.glassTrackProfile || normalizeGlassTrackProfile();
       camBottomY = camBottomY == null ? (yanUstY - 3 - profile.en) : camBottomY;
       // V8.2.74: Cam kaydı alt kot ölçüsü, yan görünüş dikmesinden duvara doğru 600 mm içeride gösterilir.
       // V8.2.77: Alt kot, seçilen profilin yan görünüş yüksekliğine göre otomatik değişir.
       const camTrackDimRefX = yanX;
       const camTrackDimLineX = yanX - 600;
-      if (camBottomY - duvarY > 150) addDimV(g, duvarY, camBottomY, camTrackDimRefX, camTrackDimLineX, formatMm(camBottomY - duvarY), { scale: 0.72, layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_glass_track_to_wall_${p.index}`, ruleKey: 'info_only', field: '__info__', index: p.index, label: 'Cam Kaydı - Alt Kot', view: 'Side', relatedZoneId: `side_glass_track_zone_${p.index}`, editable: false, dimensionType: 'detail', passiveReason: 'Cam kaydı ile duvar alt kotu arasındaki bilgi ölçüsüdür.' } });
+      if (camBottomY - duvarY > 150) addDimV(g, duvarY, camBottomY, camTrackDimRefX, camTrackDimLineX, formatMm(camBottomY - duvarY), { scale: 0.72, layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_glass_track_to_wall_${sideViewKey}_${p.index}`, ruleKey: 'info_only', field: '__info__', index: p.index, label: 'Cam Kaydı - Alt Kot', view: sideViewKey === 'right' ? 'Right' : 'Side', sideIndex: p.index, sideViewKey, relatedZoneId: `side_glass_track_zone_${sideViewKey}_${p.index}`, editable: false, dimensionType: 'detail', passiveReason: 'Cam kaydı ile duvar alt kotu arasındaki bilgi ölçüsüdür.' } });
     }
-    addDimH(g, duvarX, yanX, duvarY, duvarY, `AÇILIM ${formatMm(p.opening)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_opening_pos_${p.index + 1}`, ruleKey: 'side_opening', field: 'opening', index: p.index, label: 'Açılım', view: 'Side', relatedZoneId: `side_opening_zone_${p.index + 1}` } });
-    addDimV(g, duvarY, duvarY + p.rearHeight, duvarX - K.sideWallDepth - 80, duvarX - K.sideWallDepth - 360, `ARKA ${formatMm(p.rearHeight)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_rear_height_pos_${p.index + 1}`, ruleKey: 'side_rear_height', field: 'rearHeight', index: p.index, label: 'Arka H', view: 'Side', relatedZoneId: `side_rear_height_zone_${p.index + 1}` } });
+    if (sideSegments.length) {
+      const intermediatePosition = d.sidePositionCount >= 3 && p.index > 0 && p.index < d.sidePositionCount - 1;
+      // v8.9.29: Cam kayıt yalnız kenar yan görünüşlerde çizilir. Bu nedenle ara
+      // pozlarda net üst referans doğrudan oluk altıdır (yanUstY). Kenar pozlarda
+      // cam kayıt gerçekten çiziliyorsa profilin -Y dış kenarı kullanılır ve profil
+      // En değeri değiştiğinde ölçü otomatik revize olur.
+      const trackDrawnInThisPosition = sideFeatureEnabled(d, 'glassTrack', sideViewKey, p.index);
+      const clearTopY = trackDrawnInThisPosition ? sideGlassTrackBottomY(d, yanUstY, sideViewKey, p.index) : yanUstY;
+      sideSegments.forEach((segment, segmentIndex) => {
+        const height = Math.max(0, Number(segment.height) || 0);
+        const x = duvarX + Number(segment.start || 0);
+        const width = Math.max(1, Number(segment.end || 0) - Number(segment.start || 0));
+        const topY = duvarY + height;
+        // Üç veya daha çok pozda, tek parçalı ara poz parapetinin zincir ölçüsü
+        // ön dikmenin hemen solunda gösterilir. Çok parçalı parapetlerde segment
+        // bazlı lokal dağılım korunur.
+        const useFrontLocalPlacement = intermediatePosition && sideSegments.length === 1;
+        const refX = useFrontLocalPlacement ? yanX - K.postSize / 2 : x + width / 2;
+        const dimX = useFrontLocalPlacement ? yanX - K.postSize - 220 : parapetSegmentVerticalDimX(x, width);
+        addDimV(g, duvarY, topY, refX, dimX, formatMm(height), {
+          scale: 0.66, layer: 'Ölçüler - Yan Görünüş', dimensionFilterType: 'detail', positionIndex: p.index,
+          edit: {
+            dimId: `side_parapet_height_${sideViewKey}_${p.index}_${segment.id}`,
+            ruleKey: 'parapet_height_info', field: '__parapet__', index: segmentIndex,
+            label: 'Parapet H', view: sideViewKey === 'right' ? 'Right' : 'Side',
+            relatedZoneId: `side_parapet_zone_${sideViewKey}_${p.index}_${segment.id}`,
+            parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+            editable: false, dimensionType: 'detail'
+          }
+        });
+        if (clearTopY - topY > 0.5) addDimV(g, topY, clearTopY, refX, dimX, formatMm(clearTopY - topY), {
+          scale: 0.66, layer: 'Ölçüler - Yan Görünüş', dimensionFilterType: 'detail', positionIndex: p.index,
+          edit: {
+            dimId: `side_gutter_to_parapet_${sideViewKey}_${p.index}_${segment.id}`,
+            ruleKey: 'info_only', field: '__info__', index: segmentIndex,
+            label: 'Cam Kaydı - Parapet Arası', view: sideViewKey === 'right' ? 'Right' : 'Side',
+            relatedZoneId: `side_parapet_zone_${sideViewKey}_${p.index}_${segment.id}`,
+            parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
+            editable: false, dimensionType: 'detail',
+            passiveReason: 'Cam kayıt profilinin -Y dış kenarı ile ilgili yan parapet parçasının üst kotu arasındaki bilgi ölçüsüdür.'
+          }
+        });
+      });
+    }
+    addDimH(g, duvarX, yanX, duvarY, duvarY - 150, `AÇILIM ${formatMm(p.opening)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_opening_${sideViewKey}_pos_${p.index + 1}`, ruleKey: 'side_opening', field: 'opening', index: p.index, sideIndex: p.index, sideViewKey, label: 'Açılım', view: sideViewKey === 'right' ? 'Right' : 'Side', relatedZoneId: `side_opening_zone_${sideViewKey}_${p.index + 1}` } });
+    addDimV(g, duvarY, duvarY + p.rearHeight, duvarX - K.sideWallDepth - 80, duvarX - K.sideWallDepth - 360, `ARKA ${formatMm(p.rearHeight)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_rear_height_${sideViewKey}_pos_${p.index + 1}`, ruleKey: 'side_rear_height', field: 'rearHeight', index: p.index, sideIndex: p.index, sideViewKey, label: 'Arka H', view: sideViewKey === 'right' ? 'Right' : 'Side', relatedZoneId: `side_rear_height_zone_${sideViewKey}_${p.index + 1}` } });
     // PERI01: yan görünüş ön yükseklik ölçüsü, parapet aktifken de toplam ön kotu verir.
     // Referans alt kotu duvar/parapet alt kotu, üst kotu oluk altı referansıdır.
-    addDimV(g, duvarY, duvarY + d.frontHeight, yanX, yanX + 350, `ÖN ${formatMm(d.frontHeight)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_front_height_pos_${p.index + 1}`, ruleKey: 'side_front_height', field: 'frontHeight', index: 0, label: 'Ön H', view: 'Side', relatedZoneId: `side_front_height_zone_${p.index + 1}` } });
+    addDimV(g, duvarY, duvarY + d.frontHeight, yanX, yanX + 350, `ÖN ${formatMm(d.frontHeight)}`, { layer: 'Ölçüler - Yan Görünüş', edit: { dimId: `side_front_height_${sideViewKey}_pos_${p.index + 1}`, ruleKey: 'side_front_height', field: 'frontHeight', index: 0, sideIndex: p.index, sideViewKey, label: 'Ön H', view: sideViewKey === 'right' ? 'Right' : 'Side', relatedZoneId: `side_front_height_zone_${sideViewKey}_${p.index + 1}` } });
+
+    // v8.9.32: Ara poz kırmızı durumdayken görünüş çizimde kalır fakat düzenlenemez.
+    // Yalnız kalıcı Yan Görünüşü Düzenle anahtarı etkileşimli tutulur; diğer
+    // interaction elemanları kaldırılır ve ölçüler bilgi amaçlı hale getirilir.
+    if (isMiddlePosition && !middleEnabled) {
+      const passiveReason = 'Bu ara poz yan görünüşü düzenleme için etkinleştirilmedi.';
+      const passiveEntities = g.entities.slice(viewEntityStart).flatMap(entity => {
+        if (!entity) return [];
+        if (entity.type === 'interaction') {
+          return entity.kind === 'sideViewEnable' ? [entity] : [];
+        }
+        if (entity.type === 'dimension' && entity.edit) {
+          return [{
+            ...entity,
+            edit: {
+              ...entity.edit,
+              ruleKey: 'info_only',
+              editable: false,
+              canResize: false,
+              canAddSameProfile: false,
+              canAddDifferentProfile: false,
+              canPlaceProduct: false,
+              canRemoveElement: false,
+              passiveReason
+            }
+          }];
+        }
+        return [entity];
+      });
+      g.entities.splice(viewEntityStart, g.entities.length - viewEntityStart, ...passiveEntities);
+    }
   }
 
   function triangleFrameAllowance(d, idx) {
@@ -1895,49 +2599,39 @@
     d.farkliAcilim = d.openingList.length > 1;
     d.leftSideRanges = [];
     let shiftY = 0;
-    let lastMirrorRange = null;
     let firstRectStartY = null;
     const globalSideShiftY = Number(d.sideGlobalShiftY) || 0;
     for (let i = 0; i < d.sidePositionCount; i += 1) {
-      const p = { ...d.positions[i], index: i };
-      const thisRectStartY = -(p.opening + (p.rearHeight - d.frontHeight) + K.frontViewExtraDrop) + globalSideShiftY + shiftY;
+      const pBase = { ...d.positions[i], index: i, sideViewKey: String(i) };
+      const thisRectStartY = -(pBase.opening + (pBase.rearHeight - d.frontHeight) + K.frontViewExtraDrop) + globalSideShiftY + shiftY;
       if (firstRectStartY == null) firstRectStartY = thisRectStartY;
       const start = g.entities.length;
-      drawOneSideView(g, d, p, shiftY);
-      let end = g.entities.length;
-      const removeLeftTriangle = d.farkliAcilim && p.index === d.sidePositionCount - 1 && p._triangleRange && sideMirrorNeeded(d, p);
-      if (sideMirrorNeeded(d, p)) {
-        const midX = K.systemStartX + d.width / 2;
-        let mirrorStart = g.entities.length;
-        if (p.index === 0 && d.sidePositionCount === 1) {
-          const mirrorSink = makeEntitySink();
-          const mirrorD = { ...d, sideSupportCenters: {}, sidePosts: {}, sideSlidingPlacements: [], sideGuillotinePlacements: [], glassTrackSupportProfiles: { ...d.glassTrackSupportProfiles, left: d.glassTrackSupportProfiles.right } };
-          const defaultGeom = sideSupportGeometryFor(mirrorD, p);
-          mirrorD.sideSupportGeometry = defaultGeom.exists ? { '0': defaultGeom } : {};
-          drawOneSideView(mirrorSink, mirrorD, { ...p, index: p.index }, shiftY);
-          appendMirroredEntitiesX(g, mirrorSink.entities, midX);
-        } else {
-          mirrorNewEntitiesX(g, start, midX);
-        }
-        let mirrorEnd = g.entities.length;
-        if (removeLeftTriangle) {
-          const removeCount = p._triangleRange.end - p._triangleRange.start;
-          g.entities.splice(p._triangleRange.start, removeCount);
-          end -= removeCount;
-          mirrorStart -= removeCount;
-          mirrorEnd -= removeCount;
-        }
-        if (firstRectStartY != null) {
-          const deltaY = firstRectStartY - thisRectStartY;
-          if (Math.abs(deltaY) > 0.001) moveEntityRangeY(g, mirrorStart, mirrorEnd, deltaY);
-        }
-        lastMirrorRange = { start: mirrorStart, end: mirrorEnd, index: p.index };
+      const isLastPresentationMirror = d.sidePositionCount > 1 && i === d.sidePositionCount - 1;
+      if (isLastPresentationMirror) {
+        // Çoklu pozlarda son pozun düzenleme kaynağı sağ yan görünüştür. Sol yığındaki
+        // son poz yalnızca sağ görünüşün kurallı ayna sunumudur ve detay etkileşimleri taşımaz.
+        const sourceSink = makeEntitySink();
+        const sourceP = { ...pBase, sideViewKey: 'right', semanticMirror: true };
+        drawOneSideView(sourceSink, d, sourceP, shiftY);
+        appendLastPositionPresentationCopy(g, sourceSink.entities);
+      } else {
+        drawOneSideView(g, d, pBase, shiftY);
       }
+      const end = g.entities.length;
       d.leftSideRanges.push({ start, end, index: i });
-      shiftY -= (p.opening + K.sideViewGapY);
+      shiftY -= (pBase.opening + K.sideViewGapY);
     }
-    if (lastMirrorRange) {
-      // mirrored right side view is already kept on the same Y axis as the first left side gutter block
+
+    const rightIndex = Math.max(0, d.sidePositionCount - 1);
+    const rightPBase = d.positions[rightIndex] || d.positions[0];
+    if (rightPBase && sideMirrorNeeded(d, { ...rightPBase, index: rightIndex })) {
+      const midX = K.systemStartX + d.width / 2;
+      const mirrorSink = makeEntitySink();
+      const rightP = { ...rightPBase, index: rightIndex, sideViewKey: 'right', rightMasterDisplay: true };
+      const rightBaseRectStartY = -(rightP.opening + (rightP.rearHeight - d.frontHeight) + K.frontViewExtraDrop) + globalSideShiftY;
+      const rightShiftY = firstRectStartY == null ? 0 : firstRectStartY - rightBaseRectStartY;
+      drawOneSideView(mirrorSink, d, rightP, rightShiftY);
+      appendMirroredEntitiesX(g, mirrorSink.entities, midX);
     }
   }
 
@@ -1945,7 +2639,7 @@
     const x = -(d.maxOpening + 2900);
     const y = 800 + (d.maxOpening - d.opening) + 450;
     let w = d.systemCount > 1 ? d.width + d.lastOpening + 3500 : d.width + d.maxOpening + 3800;
-    const needsMirror = (d.openingList.length > 1) || yes(d.glassTrack) || yes(d.sideTrack);
+    const needsMirror = (d.openingList.length > 1) || sideFeatureEnabled(d, 'glassTrack', 'right', Math.max(0, d.sidePositionCount - 1)) || sideFeatureEnabled(d, 'triangle', 'right', Math.max(0, d.sidePositionCount - 1)) || yes(d.sideTrack);
     if (needsMirror) w = Math.max(w, d.width + 2 * d.maxOpening + 5200);
     const triExtra = yes(d.triangleJoinery) ? Math.max(0, triangleFrameAllowance(d, d.sidePositionCount - 1)) : 0;
     const h = Math.max(5000, d.maxOpening + d.maxRearHeight + 2750 + triExtra + (d.sidePositionCount - 1) * (d.maxOpening + K.sideViewGapY));
@@ -2582,9 +3276,47 @@
     const sy = y => maxY - y;
     const parts = [];
     let hatchSeq = 0;
+    const inferDimensionPositionIndex = (entity, edit) => {
+      if (Number.isInteger(Number(entity.positionIndex))) return Number(entity.positionIndex);
+      if (edit && Number.isInteger(Number(edit.raySystemIndex))) return Number(edit.raySystemIndex);
+      const id = String(edit && edit.dimId || '');
+      let match = /(?:^|_)pos_(\d+)(?:_|$)/i.exec(id);
+      if (match) return Math.max(0, Number(match[1]) - 1);
+      match = /^top_system_(\d+)_/i.exec(id);
+      if (match) return Math.max(0, Number(match[1]) - 1);
+      match = /^top_ray_interval_(\d+)_/i.exec(id);
+      if (match) return Math.max(0, Number(match[1]));
+      const view = String(edit && edit.view || '').toLowerCase();
+      if ((view === 'side' || view === 'right') && edit && Number.isInteger(Number(edit.index))) return Math.max(0, Number(edit.index));
+      const systems = drawing && drawing.input && Array.isArray(drawing.input.systems) ? drawing.input.systems : [];
+      if (systems.length) {
+        const eb = entityBounds(entity, blockLib);
+        const cx = (Number(eb[0]) + Number(eb[2])) / 2;
+        const found = systems.find(sys => cx >= Number(sys.startX) - 1 && cx <= Number(sys.endX) + 1);
+        if (found && Number.isInteger(Number(found.index))) return Number(found.index);
+      }
+      return -1;
+    };
+    const dimensionHitMarkup = (entity, cssClass, titleText) => {
+      const mainLine = Array.isArray(entity.graphics) ? entity.graphics.find((item, index) => index >= 2 && item && item.type === 'line') : null;
+      const textGraphic = Array.isArray(entity.graphics) ? entity.graphics.find(item => item && item.type === 'text') : null;
+      const safeTitle = escXml(titleText || 'Ölçü');
+      const out = [];
+      if (textGraphic) {
+        const h = Math.max(28, Number(textGraphic.height) || 90);
+        const width = Math.max(h * 1.4, String(textGraphic.value || '').length * h * 0.62);
+        const tx = sx(Number(textGraphic.x) || 0) - width / 2;
+        const ty = sy(Number(textGraphic.y) || 0) - h * 0.85;
+        out.push(`<rect class="${cssClass} dimension-text-hit" x="${tx}" y="${ty}" width="${width}" height="${h * 1.35}" rx="${Math.max(6, h * 0.12)}" fill="transparent" stroke="none" pointer-events="all"><title>${safeTitle}</title></rect>`);
+      }
+      if (mainLine) {
+        out.push(`<line class="${cssClass} dimension-line-hit" x1="${sx(mainLine.x1)}" y1="${sy(mainLine.y1)}" x2="${sx(mainLine.x2)}" y2="${sy(mainLine.y2)}" stroke="transparent" stroke-width="44" stroke-linecap="round" fill="none" pointer-events="stroke"><title>${safeTitle}</title></line>`);
+      }
+      return out.join('');
+    };
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewW} ${viewH}" preserveAspectRatio="xMidYMid meet">`);
     parts.push('<rect x="0" y="0" width="100%" height="100%" fill="white"/>');
-    for (const e of ents) {
+    for (const [entityIndex, e] of ents.entries()) {
       const st = drawing.layerStyle[e.layer] || drawing.layerStyle.OUTLINE;
       const stroke = entityStroke(e, st);
       const sw = previewStrokeWidth(st.width);
@@ -2637,32 +3369,72 @@
           ['data-et', data.et ?? ''],
           ['data-side-post-id', data.sidePostId || ''],
           ['data-side-index', data.sideIndex ?? ''],
+          ['data-side-view-key', data.sideViewKey || ''],
           ['data-placement-id', data.placementId || ''],
           ['data-product-type', data.productType || ''],
           ['data-placement-view', data.placementView || ''],
           ['data-gap-index', data.gapIndex ?? ''],
           ['data-side-gap-index', data.sideGapIndex ?? ''],
           ['data-side-zone', data.sideZone || ''],
-          ['data-poz-no', data.pozNo || '']
+          ['data-poz-no', data.pozNo || ''],
+          ['data-post-extension', data.postExtension ?? ''],
+          ['data-track-length-offset', data.trackLengthOffset ?? ''],
+          ['data-parapet-view', data.parapetView || ''],
+          ['data-parapet-segment-id', data.parapetSegmentId || ''],
+          ['data-parapet-segment-index', data.parapetSegmentIndex ?? ''],
+          ['data-segment-start', data.segmentStart ?? ''],
+          ['data-segment-end', data.segmentEnd ?? ''],
+          ['data-segment-height', data.segmentHeight ?? ''],
+          ['data-side-enabled', data.sideEnabled ? 'true' : 'false'],
+          ['data-triangle-division-count', data.triangleDivisionCount ?? ''],
+          ['data-wall-x-offset', data.wallXOffset ?? ''],
+          ['data-wall-depth', data.wallDepth ?? ''],
+          ['data-wall-height', data.wallHeight ?? ''],
+          ['data-wall-segment-id', data.wallSegmentId || ''],
+          ['data-wall-segment-index', data.wallSegmentIndex ?? '']
         ].map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
         const rx = sx(e.x), ry = sy(e.y + e.h), rw = Math.abs(e.w), rh = Math.abs(e.h);
         const isGlass = (e.kind || '') === 'glassTrackEditor';
         const isProduct = (e.kind || '') === 'productEditor';
+        const isParapet = (e.kind || '') === 'parapetEditor';
+        const isSideEnable = (e.kind || '') === 'sideViewEnable';
+        const isTriangle = (e.kind || '') === 'triangleEditor';
+        const isBackWall = (e.kind || '') === 'backWallEditor';
         const isSupport = isGlass && (data.part || '') === 'support';
         const postTag = Number.isFinite(Number(data.postIndex)) ? `D${Number(data.postIndex) + 1}` : 'D';
-        const tag = isProduct ? String(data.pozNo || 'ÜRÜN') : (isGlass ? (isSupport ? ((data.scope || '').toLowerCase() === 'right' ? 'SD-R' : 'SD-L') : 'CK') : postTag);
-        const groupClass = isProduct ? 'preview-product-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone');
-        const titleText = isProduct ? `Mevcut ürünü düzenle ${tag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle ${(data.scope || '').toLowerCase() === 'right' ? '(sağ)' : '(sol)'}` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`);
-        const tagColor = isProduct ? '#7b1fa2' : (isGlass ? '#0b8043' : '#1a73e8');
-        parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="transparent" stroke="transparent" stroke-width="1.2" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
+        const parapetTag = `${(data.parapetView || '').toLowerCase() === 'side' ? 'YP' : 'PP'}${Number(data.parapetSegmentIndex || 0) + 1}`;
+        const supportSuffix = (data.sideViewKey || data.scope || '').toLowerCase() === 'right' ? 'R' : ((data.sideViewKey || '') === '0' ? 'L' : `P${Number(data.sideIndex || 0) + 1}`);
+        const tag = isSideEnable ? 'YAN GÖRÜNÜŞÜ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? 'DUVAR' : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag)))));
+        const groupClass = isSideEnable ? 'preview-side-enable-zone' : (isTriangle ? 'preview-triangle-zone' : (isBackWall ? 'preview-wall-zone' : (isProduct ? 'preview-product-zone' : (isParapet ? 'preview-parapet-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone')))));
+        const titleText = isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? 'Arka duvarı düzenle' : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`)))));
+        const tagColor = isSideEnable ? (data.sideEnabled ? '#15803d' : '#b91c1c') : (isTriangle ? '#15803d' : (isBackWall ? '#6b4f2a' : (isProduct ? '#7b1fa2' : (isParapet ? '#c62828' : (isGlass ? '#0b8043' : '#1a73e8')))));
+        if (isSideEnable) {
+          const fill = data.sideEnabled ? '#22c55e' : '#ef4444';
+          const strokeColor = data.sideEnabled ? '#166534' : '#991b1b';
+          const textColor = '#ffffff';
+          // Model-uzayında buton 600 mm civarında olduğu için ekran üzerinde
+          // okunabilir metin yüksekliği 50–72 birim aralığında tutulur.
+          const fontSize = Math.max(42, Math.min(72, Math.min(rw / 7.6, rh / 2.45)));
+          const lineGap = Math.max(44, fontSize * 0.92);
+          const centerX = rx + rw / 2;
+          const centerY = ry + rh / 2;
+          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" y="${centerY - lineGap * 0.15}" text-anchor="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" dy="-${lineGap * 0.35}">YAN GÖRÜNÜŞÜ</tspan><tspan x="${centerX}" dy="${lineGap}">DÜZENLE</tspan></text></g>`);
+        } else {
+          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="transparent" stroke="transparent" stroke-width="1.2" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
+        }
       }
       else if (e.type === 'dimension') {
         const edit = e.edit || null;
-        const filterType = String(e.dimensionFilterType || (edit && edit.dimensionType) || '').toLowerCase();
-        const plainGroup = !edit && !!filterType;
+        const filterType = String(e.dimensionFilterType || (edit && edit.dimensionType) || 'main').toLowerCase();
+        const plainGroup = !edit;
+        const previewDimKey = edit && edit.dimId ? String(edit.dimId) : `preview_dimension_${entityIndex}`;
+        const dimensionAxis = String(e.dimensionAxis || 'aligned');
         if (edit) {
           const attrs = [
             ['class', 'editable-dimension'],
+            ['data-preview-dim-key', previewDimKey],
+            ['data-dimension-axis', dimensionAxis],
+            ['data-position-index', inferDimensionPositionIndex(e, edit)],
             ['data-dim-id', edit.dimId || ''],
             ['data-edit-field', edit.field || ''],
             ['data-edit-index', edit.index ?? 0],
@@ -2682,11 +3454,21 @@
             ['data-profile-instance-id', edit.profileInstanceId || ''],
             ['data-side-gap-index', edit.sideGapIndex ?? 0],
             ['data-side-post-id', edit.sidePostId || ''],
+            ['data-ray-system-index', edit.raySystemIndex ?? ''],
+            ['data-ray-interval-index', edit.rayIntervalIndex ?? ''],
+            ['data-ray-span-mode', edit.raySpanMode || ''],
+            ['data-parapet-view', edit.parapetView || ''],
+            ['data-parapet-segment-id', edit.parapetSegmentId || ''],
+            ['data-parapet-segment-index', edit.parapetSegmentIndex ?? ''],
+            ['data-segment-start', edit.segmentStart ?? ''],
+            ['data-segment-end', edit.segmentEnd ?? ''],
+            ['data-side-index', edit.sideIndex ?? ''],
+            ['data-side-view-key', edit.sideViewKey || ''],
             ['data-layer', e.layer || 'DIM']
           ].map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
           parts.push(`<g ${attrs}>`);
         } else if (plainGroup) {
-          parts.push(`<g class="preview-dimension-plain" data-dimension-type="${escXml(filterType)}">`);
+          parts.push(`<g class="preview-dimension-plain" data-preview-dim-key="${escXml(previewDimKey)}" data-dimension-axis="${escXml(dimensionAxis)}" data-dimension-type="${escXml(filterType)}" data-position-index="${inferDimensionPositionIndex(e, null)}">`);
         }
         (e.graphics || []).forEach(ge => {
           const gst = drawing.layerStyle[ge.layer] || drawing.layerStyle.DIM;
@@ -2703,14 +3485,10 @@
           }
         });
         if (edit) {
-          const eb = entityBounds(e, blockLib);
-          const hitPad = 90;
-          const hx = sx(eb[0]) - hitPad, hy = sy(eb[3]) - hitPad;
-          const hw = Math.max(40, Math.abs(eb[2] - eb[0]) + hitPad * 2);
-          const hh = Math.max(40, Math.abs(eb[3] - eb[1]) + hitPad * 2);
-          parts.push(`<rect class="editable-dimension-hit" x="${hx}" y="${hy}" width="${hw}" height="${hh}" fill="transparent" stroke="none" pointer-events="all"><title>${escXml(edit.editable === false ? (edit.passiveReason || 'Bilgi amaçlı ölçü') : ((edit.label || 'Ölçü') + ' değiştir'))}</title></rect></g>`);
+          const titleText = edit.editable === false ? (edit.passiveReason || 'Bilgi amaçlı ölçü') : ((edit.label || 'Ölçü') + ' değiştir');
+          parts.push(`${dimensionHitMarkup(e, 'editable-dimension-hit', titleText)}</g>`);
         } else if (plainGroup) {
-          parts.push('</g>');
+          parts.push(`${dimensionHitMarkup(e, 'preview-dimension-drag-hit', 'Ölçü çizgisini sürükle')}</g>`);
         }
       } else if (e.type === 'insert') {
         const block = blockLib[e.name];
@@ -2764,7 +3542,7 @@
     const out = [];
     const push = e => out.push(e);
     const expand = (e, inheritedLayer) => {
-      if (!e) return;
+      if (!e || e.previewOnly || e.type === 'interaction') return;
       const layer = e.layer || inheritedLayer || 'OUTLINE';
       if (e.type === 'dimension') {
         (e.graphics || []).forEach(ge => expand(ge, layer));

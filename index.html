@@ -4,13 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0d5d5f" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pülümür Automation Studio" />
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.16';
+      const build = '8.9.33';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
@@ -20,10 +21,10 @@
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.16" />
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.33" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.16" />
+  <link rel="stylesheet" href="style.css?v=8.9.33" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -179,10 +180,9 @@
             <div class="preview-control-row">
               <button id="previewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Yenile</button>
               <button id="expandPreviewBtn" class="soft-btn preview-tool-btn" type="button">Önizlemeyi Büyüt</button>
-              <button id="fitPreviewBtn" class="secondary-btn preview-tool-btn" type="button">Çizimi Sığdır</button>
               <div id="historyControlGroup" class="history-control-group" role="group" aria-label="Çizim geçmişi">
-                <button id="undoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled>Geri Al</button>
-                <button id="redoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled>İleri Al</button>
+                <span class="history-tool-wrap"><button id="undoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled><span id="undoPreviewLabel">Geri Al</span><small>Ctrl+Z</small></button></span>
+                <span class="history-tool-wrap"><button id="redoPreviewBtn" class="soft-btn history-tool-btn" type="button" disabled><span id="redoPreviewLabel">İleri Al</span><small>Ctrl+Shift+Z</small></button></span>
               </div>
             </div>
           </div>
@@ -197,15 +197,62 @@
         <div id="preview" class="preview-canvas" role="img" tabindex="-1" aria-label="DXF çizim önizlemesi"></div>
         <aside id="previewToolbox" class="preview-toolbox" aria-label="Hızlı çizim komutları">
           <div class="preview-toolbox-grid">
-            <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span></button>
+            <div id="dimensionFilterControl" class="dimension-filter-control">
+              <button id="showAllDims" class="preview-toggle-btn is-off" type="button" aria-pressed="false" aria-haspopup="true" aria-expanded="false"><span class="toggle-dot" aria-hidden="true"></span><span id="showAllDimsLabel">Tüm ölçüleri göster</span><span class="dimension-filter-chevron" aria-hidden="true">▾</span></button>
+              <div id="dimensionFilterMenu" class="dimension-filter-menu" hidden>
+                <div class="dimension-filter-menu-head"><strong id="dimensionFilterTitle">Ölçü Filtresi</strong><button id="dimensionFilterClose" type="button" aria-label="Kapat">×</button></div>
+                <label class="dimension-filter-master-row">
+                  <input id="dimensionFilterMaster" type="checkbox" checked>
+                  <span id="dimensionFilterMasterLabel">Hepsi</span>
+                </label>
+                <div class="dimension-filter-section">
+                  <span id="dimensionFilterAxisTitle">Yön</span>
+                  <label><input type="checkbox" data-dim-filter="horizontal" checked><span id="dimensionFilterHorizontalLabel">Yatay</span></label>
+                  <label><input type="checkbox" data-dim-filter="vertical" checked><span id="dimensionFilterVerticalLabel">Dikey</span></label>
+                </div>
+                <div class="dimension-filter-section">
+                  <span id="dimensionFilterEditTitle">Durum</span>
+                  <label><input type="checkbox" data-dim-filter="editable" checked><span id="dimensionFilterEditableLabel">Düzenlenebilir</span></label>
+                  <label><input type="checkbox" data-dim-filter="readonly" checked><span id="dimensionFilterReadonlyLabel">Bilgi amaçlı</span></label>
+                </div>
+                <div class="dimension-filter-section dimension-filter-position-section">
+                  <span id="dimensionFilterPositionTitle">Poz</span>
+                  <div id="dimensionFilterPositions" class="dimension-filter-positions"></div>
+                </div>
+              </div>
+            </div>
             <button id="showMainDims" class="preview-toggle-btn is-on" type="button" aria-pressed="true"><span class="toggle-dot" aria-hidden="true"></span><span id="showMainDimsLabel">Ana ölçüleri göster</span></button>
-            <button id="glassTrackQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="glassTrack" aria-pressed="false"><span class="boolean-quick-label">Cam Kaydı</span><span class="boolean-quick-state">HAYIR</span></button>
-            <button id="triangleJoineryQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="triangleJoinery" aria-pressed="false"><span class="boolean-quick-label">Üçgen Doğrama</span><span class="boolean-quick-state">HAYIR</span></button>
+            <div class="side-feature-control">
+              <button id="glassTrackQuickBtn" class="boolean-quick-toggle side-feature-main" type="button" data-boolean-field="glassTrack" aria-pressed="false"><span class="boolean-quick-label">Cam Kaydı</span><span class="boolean-quick-state">HAYIR</span></button>
+              <button id="glassTrackSideMenuBtn" class="side-feature-menu-btn" type="button" aria-label="Cam kaydı taraflarını seç" title="Sol / sağ taraf seçimi">▾</button>
+              <div id="glassTrackSideMenu" class="side-feature-menu" hidden>
+                <strong>Cam Kaydı</strong>
+                <label><input type="checkbox" data-side-feature-field="glassTrack" data-side-key="0"><span>Sol</span></label>
+                <label><input type="checkbox" data-side-feature-field="glassTrack" data-side-key="right"><span>Sağ</span></label>
+              </div>
+            </div>
+            <div class="side-feature-control">
+              <button id="triangleJoineryQuickBtn" class="boolean-quick-toggle side-feature-main" type="button" data-boolean-field="triangleJoinery" aria-pressed="false"><span class="boolean-quick-label">Üçgen Doğrama</span><span class="boolean-quick-state">HAYIR</span></button>
+              <button id="triangleJoinerySideMenuBtn" class="side-feature-menu-btn" type="button" aria-label="Üçgen doğrama taraflarını seç" title="Sol / sağ taraf seçimi">▾</button>
+              <div id="triangleJoinerySideMenu" class="side-feature-menu" hidden>
+                <strong>Üçgen Doğrama</strong>
+                <label><input type="checkbox" data-side-feature-field="triangleJoinery" data-side-key="0"><span>Sol</span></label>
+                <label><input type="checkbox" data-side-feature-field="triangleJoinery" data-side-key="right"><span>Sağ</span></label>
+              </div>
+            </div>
             <button id="waterStandardQuickBtn" class="boolean-quick-toggle" type="button" data-boolean-field="waterStandard" aria-pressed="true"><span class="boolean-quick-label">Su Çıkışı Standart mı?</span><span class="boolean-quick-state">EVET</span></button>
+            <label id="parapetQuickWrap" class="parapet-quick-input is-empty"><span>Parapet H (mm)</span><input id="parapetQuickInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0"></label>
+            <button id="checkDrawingBtn" class="primary-btn preview-toolbox-btn toolbox-wide-btn" type="button">Çizimi Kontrol Et</button>
             <button id="multiProductBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ürün Ekleme</button>
             <button id="multiDimensionBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ölçü Düzenleme</button>
+            <button id="equalizeGapsBtn" class="secondary-btn preview-toolbox-btn" type="button">Aralıkları Eşitle</button>
+            <button id="postSettingsBtn" class="secondary-btn preview-toolbox-btn" type="button">Dikme Ayarları</button>
+            <button id="bulkExtendBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Profil Uzat</button>
+            <button id="bulkPostProfileBtn" class="secondary-btn preview-toolbox-btn is-passive-feature" type="button" disabled aria-disabled="true" title="Yakında aktif edilecek">Dikme Profilini Toplu Değiştir</button>
+            <button id="convertProductBtn" class="secondary-btn preview-toolbox-btn" type="button">Ürün Tipini Değiştir</button>
+            <button id="fitProductsBtn" class="secondary-btn preview-toolbox-btn" type="button">Ürünü Alana Uydur</button>
             <button id="multiDeleteBtn" class="secondary-btn preview-toolbox-btn" type="button">Çoklu Ürün Silme</button>
-            <button id="deleteAllProductsBtn" class="danger-btn preview-toolbox-btn" type="button">Tüm Ürünleri Sil</button>
+            <button id="deleteAllProductsBtn" class="danger-btn preview-toolbox-btn toolbox-wide-btn" type="button">Tüm Ürünleri Sil</button>
           </div>
         </aside>
       </div>
@@ -495,18 +542,18 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.16"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.16"></script>
-  <script src="peri01Geometry.js?v=8.9.16"></script>
-  <script src="modernDxfTemplate.js?v=8.9.16"></script>
-  <script src="dxfModernEngine.js?v=8.9.16"></script>
+  <script src="blocks/filteredBlocks.js?v=8.9.33"></script>
+  <script src="peri01ExcelBridge.js?v=8.9.33"></script>
+  <script src="peri01Geometry.js?v=8.9.33"></script>
+  <script src="modernDxfTemplate.js?v=8.9.33"></script>
+  <script src="dxfModernEngine.js?v=8.9.33"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.16"></script>
-  <script src="adminUsersApi.js?v=8.9.16"></script>
-  <script src="activityTracker.js?v=8.9.16"></script>
-  <script src="app.js?v=8.9.16"></script>
-  <script src="cloudProjects.js?v=8.9.16"></script>
-  <script src="adminPanel.js?v=8.9.16"></script>
+  <script src="supabaseConfig.js?v=8.9.33"></script>
+  <script src="adminUsersApi.js?v=8.9.33"></script>
+  <script src="activityTracker.js?v=8.9.33"></script>
+  <script src="app.js?v=8.9.33"></script>
+  <script src="cloudProjects.js?v=8.9.33"></script>
+  <script src="adminPanel.js?v=8.9.33"></script>
 </body>
 </html>

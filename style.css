@@ -3250,18 +3250,6 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   outline-offset: 1px;
   box-shadow: 0 0 0 4px rgba(26,115,232,.14);
 }
-.toolbox-selection-active .editable-dimension.toolbox-selectable text,
-.toolbox-selection-active .editable-dimension.toolbox-selectable line,
-.toolbox-selection-active .editable-dimension.toolbox-selectable polyline {
-  filter: drop-shadow(0 0 4px rgba(26,115,232,.75));
-}
-.toolbox-selection-active .editable-dimension.toolbox-selected text,
-.toolbox-selection-active .editable-dimension.toolbox-selected line,
-.toolbox-selection-active .editable-dimension.toolbox-selected polyline {
-  stroke: #0b8043 !important;
-  fill: #0b8043 !important;
-  filter: drop-shadow(0 0 5px rgba(11,128,67,.75));
-}
 .preview-interaction-hit.toolbox-selectable {
   fill: rgba(26,115,232,.10) !important;
   stroke: #1a73e8 !important;
@@ -3519,9 +3507,23 @@ body.preview-expanded-open {
   max-width: none !important;
   height: var(--toolbar-btn-h) !important;
   min-height: var(--toolbar-btn-h) !important;
-  padding: 6px 7px !important;
+  padding: 4px 7px !important;
   font-size: 11px !important;
   white-space: nowrap;
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.05;
+}
+.history-tool-btn small {
+  display: block;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 800;
+  opacity: .72;
+  color: inherit;
 }
 .history-tool-btn:disabled {
   opacity: .42;
@@ -3545,4 +3547,652 @@ body.preview-expanded-open {
   .preview-panel:fullscreen .history-control-group {
     grid-column: 1 / -1;
   }
+}
+
+/* v8.9.17 - Üretim kontrolü ve yeni toolbox komutları */
+.toolbox-wide-btn { grid-column: 1 / -1; }
+.preview-toolbox-btn.is-passive-feature,
+.preview-toolbox-btn:disabled {
+  opacity: .48;
+  cursor: not-allowed !important;
+  filter: grayscale(.35);
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.drawing-check-card {
+  width: min(860px, calc(100% - 28px)) !important;
+  max-height: min(86vh, 820px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(100px, 1fr) auto;
+  gap: 12px;
+}
+.drawing-check-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.drawing-check-sub {
+  margin-top: 4px;
+  color: #5f6f7f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.drawing-check-summary {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid #b9c8d5;
+  border-radius: 12px;
+  background: #eef3f7;
+}
+.drawing-check-summary strong { font-size: 15px; }
+.drawing-check-summary span { color: #526171; font-size: 12px; font-weight: 700; }
+.drawing-check-summary.has-errors { border-color: #c94242; background: #fff0f0; }
+.drawing-check-summary.has-warnings { border-color: #d49b20; background: #fff8e5; }
+.drawing-check-summary.is-clean { border-color: #2d8a52; background: #eaf8ef; }
+.drawing-check-list {
+  min-height: 100px;
+  max-height: min(55vh, 540px);
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 3px;
+}
+.drawing-check-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d4dde6;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2d3a;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+.drawing-check-row:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(31,45,58,.10); }
+.drawing-check-row.is-error { border-left: 5px solid #c62828; }
+.drawing-check-row.is-warning { border-left: 5px solid #d28b00; }
+.drawing-check-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #c62828;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 1000;
+}
+.drawing-check-row.is-warning .drawing-check-icon { background: #d28b00; }
+.drawing-check-copy { min-width: 0; display: grid; gap: 3px; }
+.drawing-check-copy strong { font-size: 13px; line-height: 1.25; }
+.drawing-check-copy small { color: #5b6875; font-size: 11.5px; line-height: 1.35; }
+.drawing-check-locate {
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #e8f0f7;
+  color: #17486c;
+  font-size: 10.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.drawing-check-empty {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  border: 1px dashed #57a575;
+  border-radius: 14px;
+  background: #f1fbf5;
+  color: #17643a;
+  font-size: 16px;
+  font-weight: 900;
+}
+.drawing-check-stale-note {
+  padding: 9px 11px;
+  border: 1px solid #d29a25;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #745211;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.drawing-check-highlight {
+  filter: drop-shadow(0 0 8px #ff2d2d) drop-shadow(0 0 16px rgba(255,45,45,.85)) !important;
+  animation: drawing-check-pulse .7s ease-in-out infinite alternate;
+}
+.preview-interaction-hit.drawing-check-highlight {
+  fill: rgba(255,45,45,.20) !important;
+  stroke: #ff1f1f !important;
+  stroke-width: 5 !important;
+}
+.preview-canvas.drawing-check-canvas-highlight {
+  box-shadow: inset 0 0 0 5px rgba(255,45,45,.75) !important;
+}
+@keyframes drawing-check-pulse {
+  from { opacity: .68; }
+  to { opacity: 1; }
+}
+@media (max-width: 620px) {
+  .drawing-check-row { grid-template-columns: 30px minmax(0, 1fr); }
+  .drawing-check-locate { grid-column: 2; justify-self: start; }
+}
+
+.history-tool-wrap{display:inline-flex;align-items:stretch}.parapet-quick-input{display:flex;flex-direction:column;gap:4px;padding:7px;border:1px solid #d33;border-radius:9px;background:rgba(180,20,20,.08)}.parapet-quick-input.is-filled{border-color:#198754;background:rgba(25,135,84,.10)}.parapet-quick-input span{font-size:11px;font-weight:700}.parapet-quick-input input{width:100%;min-width:0;border:1px solid currentColor;border-radius:6px;padding:6px;background:var(--panel);color:var(--text)}
+
+/* v8.9.20 - segmentli parapet ve ön dikme düzenleme */
+.preview-parapet-zone text {
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.preview-parapet-zone:hover text { opacity: 1; }
+.preview-parapet-zone .preview-interaction-hit:hover {
+  fill: rgba(198,40,40,.11) !important;
+  stroke: #c62828 !important;
+  stroke-width: 1.8 !important;
+}
+.parapet-editor-card { width: min(650px, calc(100% - 28px)) !important; }
+.parapet-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 12px 0;
+}
+.parapet-editor-grid label { display: grid; gap: 6px; font-size: 12px; font-weight: 800; }
+.parapet-editor-grid input { width: 100%; min-width: 0; }
+.post-editor-overlay .dim-edit-actions { flex-wrap: wrap; }
+.post-editor-overlay .secondary-btn { min-width: 138px; }
+@media (max-width: 620px) {
+  .parapet-editor-grid { grid-template-columns: 1fr; }
+}
+
+
+/* v8.9.21 - İşleme göre eleman filtresi ve ölçü çizgisi sürükleme */
+.toolbox-filtered-out { display: none !important; }
+.editable-dimension,
+.preview-dimension-plain { cursor: grab; }
+.editable-dimension.is-dimension-dragging,
+.preview-dimension-plain.is-dimension-dragging { cursor: grabbing; }
+.editable-dimension.is-dimension-dragging text,
+.editable-dimension.is-dimension-dragging line,
+.editable-dimension.is-dimension-dragging polyline,
+.preview-dimension-plain.is-dimension-dragging text,
+.preview-dimension-plain.is-dimension-dragging line,
+.preview-dimension-plain.is-dimension-dragging polyline { filter: drop-shadow(0 0 5px rgba(245,124,0,.9)); }
+.preview-dimension-drag-hit { cursor: grab; }
+.toolbox-selection-active .editable-dimension,
+.toolbox-selection-active .preview-dimension-plain { cursor: pointer; }
+
+
+/* v8.9.22 - Kalıcı ölçü filtresi ve çakışmayan hassas tıklama hedefleri */
+.dimension-filter-control {
+  position: relative;
+  min-width: 0;
+}
+.dimension-filter-control > .preview-toggle-btn {
+  width: 100% !important;
+  min-height: 52px;
+  height: 100% !important;
+  padding: 9px 8px !important;
+}
+.dimension-filter-chevron {
+  margin-left: auto;
+  font-size: 14px;
+  line-height: 1;
+}
+.dimension-filter-menu {
+  position: absolute;
+  z-index: 1800;
+  top: calc(100% + 7px);
+  right: 0;
+  width: min(310px, calc(100vw - 34px));
+  padding: 10px;
+  border: 1px solid #aebfca;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(22, 42, 58, .24);
+  text-align: left;
+}
+.dimension-filter-menu[hidden] { display: none !important; }
+.dimension-filter-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--navy);
+}
+.dimension-filter-menu-head button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: #eef3f6;
+  color: #334b5b;
+  cursor: pointer;
+  font-size: 18px;
+}
+.dimension-filter-preset-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 9px;
+}
+.dimension-filter-preset-row button {
+  min-height: 34px;
+  border: 1px solid #9fb2bf;
+  border-radius: 8px;
+  background: #f5f8fa;
+  color: #17394f;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dimension-filter-section {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid #dbe4ea;
+}
+.dimension-filter-section > span {
+  color: #516977;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.dimension-filter-section label,
+.dimension-filter-positions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  color: #18384b;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.dimension-filter-section label:hover,
+.dimension-filter-positions label:hover { background: #eef4f7; }
+.dimension-filter-section input { accent-color: var(--navy); }
+.dimension-filter-positions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 5px;
+  max-height: 190px;
+  overflow: auto;
+}
+.dimension-text-hit,
+.dimension-line-hit { cursor: pointer; }
+.preview-dimension-plain .dimension-text-hit,
+.preview-dimension-plain .dimension-line-hit { cursor: grab; }
+.toolbox-selection-active .dimension-text-hit,
+.toolbox-selection-active .dimension-line-hit { cursor: pointer; }
+@media (max-width: 720px) {
+  .dimension-filter-menu { position: fixed; top: 70px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 90px); overflow: auto; }
+}
+
+
+/* v8.9.23 - Kompakt ölçü filtresi, sade seçim kutuları ve kalıcı hassas imleç */
+.dimension-filter-menu {
+  left: 0 !important;
+  right: auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  max-height: min(54vh, 330px);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 9px;
+  box-shadow: 0 9px 24px rgba(22, 42, 58, .20);
+}
+.dimension-filter-menu-head {
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  line-height: 1.15;
+}
+.dimension-filter-menu-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dimension-filter-menu-head button {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 5px;
+  font-size: 14px;
+  line-height: 1;
+}
+.dimension-filter-master-row,
+.dimension-filter-section label,
+.dimension-filter-positions label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 23px;
+  padding: 3px 4px;
+  border-radius: 5px;
+  color: #18384b;
+  font-size: 9.5px;
+  line-height: 1.15;
+  font-weight: 750;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.dimension-filter-master-row {
+  margin: 0 0 3px;
+  border: 1px solid #c6d2da;
+  background: #f5f8fa;
+  font-weight: 900;
+}
+.dimension-filter-master-row:hover,
+.dimension-filter-section label:hover,
+.dimension-filter-positions label:hover { background: #eaf2f6; }
+.dimension-filter-master-row input,
+.dimension-filter-section input,
+.dimension-filter-positions input {
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  margin: 0;
+  accent-color: var(--navy);
+}
+.dimension-filter-section {
+  gap: 2px;
+  padding: 4px 0;
+}
+.dimension-filter-section > span {
+  font-size: 8.5px;
+  line-height: 1.1;
+  letter-spacing: .03em;
+}
+.dimension-filter-positions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px 2px;
+  max-height: 108px;
+}
+.dimension-filter-positions label {
+  min-width: 0;
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: 9px;
+}
+.dimension-filter-positions label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-toggle-btn.is-mixed {
+  background: #fff2c7 !important;
+  border-color: #c58a00 !important;
+  color: #111 !important;
+}
+.preview-toggle-btn.is-mixed .toggle-dot {
+  position: relative;
+  background: #c58a00 !important;
+  border-color: #c58a00 !important;
+}
+.preview-toggle-btn.is-mixed .toggle-dot::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: #fff;
+  transform: translateY(-50%);
+}
+
+/* Çoklu seçimde çizim geometrisi renklendirilmez; durum yalnız kutucuk/tik ile gösterilir. */
+.toolbox-selection-active .editable-dimension.toolbox-selectable text,
+.toolbox-selection-active .editable-dimension.toolbox-selectable line,
+.toolbox-selection-active .editable-dimension.toolbox-selectable polyline,
+.toolbox-selection-active .editable-dimension.toolbox-selected text,
+.toolbox-selection-active .editable-dimension.toolbox-selected line,
+.toolbox-selection-active .editable-dimension.toolbox-selected polyline {
+  filter: none !important;
+}
+.preview-interaction-hit.toolbox-selectable,
+.preview-interaction-hit.toolbox-selected {
+  fill: transparent !important;
+  stroke: transparent !important;
+  stroke-width: 0 !important;
+}
+.toolbox-selection-marker rect {
+  fill: #fff !important;
+  stroke: #1a73e8 !important;
+  stroke-width: 2.4 !important;
+}
+.toolbox-selection-marker path {
+  stroke: transparent !important;
+  stroke-width: 3.4 !important;
+}
+.toolbox-selection-marker.is-selected rect {
+  fill: #fff !important;
+  stroke: #0b8043 !important;
+}
+.toolbox-selection-marker.is-selected path { stroke: #0b8043 !important; }
+
+/* Önizleme alanında her durumda küçük ve ince hassas imleç kullanılır. */
+.preview-canvas,
+.preview-canvas * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18' viewBox='0 0 14 18'%3E%3Cpath d='M1 1L1.2 14.2L4.2 11.5L6.5 17L8.4 16.2L6.1 10.8L10 10.4Z' fill='white' stroke='%23101820' stroke-width='1' stroke-linejoin='round'/%3E%3C/svg%3E") 1 1, default !important;
+}
+
+
+/* v8.9.24 - Tıklanabilir seçim kutuları ve tek kolon poz filtresi */
+.toolbox-selection-marker {
+  cursor: pointer;
+  pointer-events: all;
+  outline: none;
+}
+.toolbox-selection-marker rect,
+.toolbox-selection-marker path {
+  pointer-events: all;
+}
+.toolbox-selection-marker:hover rect,
+.toolbox-selection-marker:focus rect,
+.toolbox-selection-marker:focus-visible rect {
+  fill: #eef6ff;
+  stroke: #005fcc;
+  stroke-width: 4;
+}
+.toolbox-selection-marker.is-selected:hover rect,
+.toolbox-selection-marker.is-selected:focus rect,
+.toolbox-selection-marker.is-selected:focus-visible rect {
+  fill: #0b8043;
+  stroke: #075f34;
+}
+.dimension-filter-menu-head {
+  font-size: 8px;
+}
+.dimension-filter-master-row,
+.dimension-filter-section label,
+.dimension-filter-positions label {
+  min-height: 20px;
+  padding: 2px 3px;
+  gap: 4px;
+  font-size: 7.5px;
+  line-height: 1.1;
+}
+.dimension-filter-section > span {
+  font-size: 6.5px;
+  line-height: 1;
+}
+.dimension-filter-master-row input,
+.dimension-filter-section input,
+.dimension-filter-positions input {
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
+}
+.dimension-filter-positions {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  max-height: 126px;
+}
+.dimension-filter-positions label {
+  width: 100%;
+  font-size: 7.5px;
+  padding-left: 3px;
+  padding-right: 3px;
+}
+.dimension-filter-positions label span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.toolbox-selection-marker:hover rect,
+.toolbox-selection-marker:focus rect,
+.toolbox-selection-marker:focus-visible rect {
+  fill: #eef6ff !important;
+  stroke: #005fcc !important;
+  stroke-width: 3 !important;
+}
+.toolbox-selection-marker.is-selected:hover rect,
+.toolbox-selection-marker.is-selected:focus rect,
+.toolbox-selection-marker.is-selected:focus-visible rect {
+  fill: #fff !important;
+  stroke: #075f34 !important;
+}
+
+
+/* v8.9.30 — taraf bazlı cam kaydı / üçgen doğrama menüleri */
+.side-feature-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 4px;
+  min-width: 0;
+}
+.side-feature-control .side-feature-main { min-width: 0; width: 100%; }
+.side-feature-menu-btn {
+  min-width: 30px;
+  padding: 0;
+  border: 1px solid #9aa8b5;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #1f2933;
+  font-weight: 900;
+  cursor: pointer;
+}
+.side-feature-menu-btn:hover { background: #eef4f8; }
+.side-feature-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  padding: 8px;
+  border: 1px solid #afbdc9;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .20);
+}
+.side-feature-menu[hidden] { display: none !important; }
+.side-feature-menu strong {
+  display: block;
+  padding: 1px 4px 6px;
+  font-size: 11px;
+}
+.side-feature-menu label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.side-feature-menu label:hover { background: #eef5f7; }
+.side-feature-menu input { width: 15px; height: 15px; accent-color: #0f766e; }
+.boolean-quick-toggle.is-partial {
+  background: #fff2c7;
+  border-color: #b7791f;
+}
+.boolean-quick-toggle.is-partial .boolean-quick-state { background: #b7791f; }
+
+/* Ara poz düzenle etkileşimi çizimde görünür ve okunur kalır. */
+.preview-interaction-hit[data-interaction-type="sideViewEnable"] { cursor: pointer; }
+
+@media (max-width: 850px) {
+  .side-feature-control { grid-template-columns: minmax(0, 1fr) 28px; }
+}
+
+
+/* v8.9.32 — arka duvar editörü okunabilir düzen */
+.back-wall-editor-overlay .parapet-editor-grid {
+  grid-template-columns: 1fr;
+}
+.back-wall-editor-overlay .parapet-editor-grid label {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.back-wall-editor-overlay .dim-edit-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.back-wall-editor-overlay .dim-edit-actions > button {
+  width: 100%;
+}
+
+
+.back-wall-editor-overlay .parapet-editor-grid label span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.back-wall-editor-overlay .parapet-editor-grid input {
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.back-wall-editor-overlay .dim-edit-actions > button {
+  min-height: 44px;
+  white-space: normal;
+  line-height: 1.2;
+  font-size: 13px;
+}
+
+/* v8.9.33 — Ara poz Yan Görünüşü Düzenle anahtarı her zaman dolu renkli butondur.
+   Genel preview-interaction-hit şeffaflık kuralını bilinçli olarak ezer. */
+.preview-side-enable-zone .preview-interaction-hit[data-side-enabled="false"] {
+  fill: #dc2626 !important;
+  stroke: #991b1b !important;
+  stroke-width: 3 !important;
+}
+.preview-side-enable-zone .preview-interaction-hit[data-side-enabled="true"] {
+  fill: #16a34a !important;
+  stroke: #166534 !important;
+  stroke-width: 3 !important;
+}
+.preview-side-enable-zone .preview-interaction-hit[data-side-enabled="false"]:hover {
+  fill: #b91c1c !important;
+  stroke: #7f1d1d !important;
+}
+.preview-side-enable-zone .preview-interaction-hit[data-side-enabled="true"]:hover {
+  fill: #15803d !important;
+  stroke: #14532d !important;
 }
