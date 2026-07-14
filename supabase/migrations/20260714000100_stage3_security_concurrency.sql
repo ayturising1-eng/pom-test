@@ -1,4 +1,4 @@
--- Pülümür Automation Studio V10.2 — Aşama 3
+-- Pülümür Automation Studio V10.3 — Aşama 3
 -- Merkezi limitler, optimistic locking, immutable revizyon geçmişi,
 -- firma izolasyonu, backend payload doğrulaması ve PIN rate limiting.
 
@@ -67,6 +67,7 @@ $$;
 
 -- Direct SELECT policies also reject access tokens issued before a PIN reset.
 drop policy if exists profiles_select_self_or_company_admin on public.profiles;
+drop policy if exists profiles_select_self_or_company_admin_v2 on public.profiles;
 create policy profiles_select_self_or_company_admin_v2
 on public.profiles for select to authenticated
 using (
@@ -81,6 +82,7 @@ using (
 );
 
 drop policy if exists organizations_select_own on public.organizations;
+drop policy if exists organizations_select_own_v2 on public.organizations;
 create policy organizations_select_own_v2
 on public.organizations for select to authenticated
 using (
@@ -89,6 +91,7 @@ using (
 );
 
 drop policy if exists projects_select_own_org on public.projects;
+drop policy if exists projects_select_own_org_v2 on public.projects;
 create policy projects_select_own_org_v2
 on public.projects for select to authenticated
 using (
@@ -97,6 +100,7 @@ using (
 );
 
 drop policy if exists revisions_select_own_org on public.project_revisions;
+drop policy if exists revisions_select_own_org_v2 on public.project_revisions;
 create policy revisions_select_own_org_v2
 on public.project_revisions for select to authenticated
 using (

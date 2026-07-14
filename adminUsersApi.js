@@ -23,11 +23,6 @@
       : '';
     if (bridgeToken) return String(bridgeToken);
 
-    const directToken = window.PulumurCurrentSession && window.PulumurCurrentSession.access_token
-      ? String(window.PulumurCurrentSession.access_token)
-      : '';
-    if (directToken) return directToken;
-
     // 2) Fall back to the active Supabase browser client.
     const client = window.PulumurSupabase || null;
     if (!client || !client.auth) return '';
@@ -82,7 +77,7 @@
       endpoint,
       hasAccessToken: Boolean(accessToken),
       tokenLength: accessToken.length,
-      build: '10.1'
+      build: '10.4'
     };
   }
 

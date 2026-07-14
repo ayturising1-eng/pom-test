@@ -1,30 +1,34 @@
 const CACHE_PREFIX = 'pulumur-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v10_1`;
+const CACHE_NAME = `${CACHE_PREFIX}v10_4`;
 const NETWORK_TIMEOUT_MS = 8000;
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css?v=10.1',
-  './appLimits.js?v=10.1',
-  './core/actions.js?v=10.1',
-  './core/projectModel.js?v=10.1',
-  './core/topologyReconcile.js?v=10.1',
-  './core/validation.js?v=10.1',
-  './core/reducer.js?v=10.1',
-  './history/historyManager.js?v=10.1',
-  './persistence/schema.js?v=10.1',
-  './render/renderPipeline.js?v=10.1',
-  './app.js?v=10.1',
-  './supabaseConfig.js?v=10.1',
-  './cloudProjects.js?v=10.1',
-  './adminUsersApi.js?v=10.1',
-  './activityTracker.js?v=10.1',
-  './adminPanel.js?v=10.1',
-  './peri01ExcelBridge.js?v=10.1',
-  './peri01Geometry.js?v=10.1',
-  './modernDxfTemplate.js?v=10.1',
-  './dxfModernEngine.js?v=10.1',
-  './blocks/filteredBlocks.js?v=10.1',
+  './buildBootstrap.js?v=10.4',
+  './core/backendCompatibility.js?v=10.4',
+  './diagnostics/runtimeMonitor.js?v=10.4',
+  './recovery/recoveryManager.js?v=10.4',
+  './style.css?v=10.4',
+  './appLimits.js?v=10.4',
+  './core/actions.js?v=10.4',
+  './core/projectModel.js?v=10.4',
+  './core/topologyReconcile.js?v=10.4',
+  './core/validation.js?v=10.4',
+  './core/reducer.js?v=10.4',
+  './history/historyManager.js?v=10.4',
+  './persistence/schema.js?v=10.4',
+  './render/renderPipeline.js?v=10.4',
+  './app.js?v=10.4',
+  './supabaseConfig.js?v=10.4',
+  './cloudProjects.js?v=10.4',
+  './adminUsersApi.js?v=10.4',
+  './activityTracker.js?v=10.4',
+  './adminPanel.js?v=10.4',
+  './peri01ExcelBridge.js?v=10.4',
+  './peri01Geometry.js?v=10.4',
+  './modernDxfTemplate.js?v=10.4',
+  './dxfModernEngine.js?v=10.4',
+  './blocks/filteredBlocks.js?v=10.4',
   './assets/plmr-logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -41,10 +45,11 @@ async function cacheCoreAssets() {
     await cache.put(request, response.clone());
   }));
   const criticalAssets = new Set([
-    './index.html', './appLimits.js?v=10.1', './core/actions.js?v=10.1', './core/projectModel.js?v=10.1',
-    './core/topologyReconcile.js?v=10.1', './core/validation.js?v=10.1', './core/reducer.js?v=10.1',
-    './history/historyManager.js?v=10.1', './persistence/schema.js?v=10.1', './render/renderPipeline.js?v=10.1',
-    './app.js?v=10.1', './peri01Geometry.js?v=10.1', './blocks/filteredBlocks.js?v=10.1'
+    './index.html', './buildBootstrap.js?v=10.4', './core/backendCompatibility.js?v=10.4',
+    './diagnostics/runtimeMonitor.js?v=10.4', './recovery/recoveryManager.js?v=10.4', './appLimits.js?v=10.4', './core/actions.js?v=10.4', './core/projectModel.js?v=10.4',
+    './core/topologyReconcile.js?v=10.4', './core/validation.js?v=10.4', './core/reducer.js?v=10.4',
+    './history/historyManager.js?v=10.4', './persistence/schema.js?v=10.4', './render/renderPipeline.js?v=10.4',
+    './app.js?v=10.4', './peri01Geometry.js?v=10.4', './blocks/filteredBlocks.js?v=10.4'
   ]);
   const failures = results.map((result, index) => ({ result, asset: CORE_ASSETS[index] }))
     .filter(item => criticalAssets.has(item.asset) && item.result.status === 'rejected');

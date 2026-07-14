@@ -172,7 +172,7 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V10.1 - PROJECTMODEL, TOPOLOGY RECONCILE AND SAFE EXPORT - 14.07.2026';
+  const BUILD_LABEL = 'WEB DXF V10.4 - PROJECTMODEL, TOPOLOGY RECONCILE AND SAFE EXPORT - 14.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
 
   function runtimeLimits() {
@@ -1026,7 +1026,19 @@
     const x = lx * sx, y = py * sy, ca = Math.cos(a), sa = Math.sin(a);
     return [ins.x + x * ca - y * sa, ins.y + x * sa + y * ca];
   }
-  function transformBlockBounds(block, ins) { const b = block.bounds || { minX: -50, minY: -50, maxX: 50, maxY: 50 }; const pts = [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]].map(p => transformLocalPoint(p[0], p[1], ins)); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+  function transformBlockBounds(block, ins) {
+    const b = block.bounds || { minX: -50, minY: -50, maxX: 50, maxY: 50 };
+    const corners = [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const corner of corners) {
+      const point = transformLocalPoint(corner[0], corner[1], ins);
+      if (point[0] < minX) minX = point[0];
+      if (point[0] > maxX) maxX = point[0];
+      if (point[1] < minY) minY = point[1];
+      if (point[1] > maxY) maxY = point[1];
+    }
+    return [minX, minY, maxX, maxY];
+  }
 
   function mirrorEntityX(e, midX) {
     const mx = x => 2 * midX - x;

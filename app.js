@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '10.1';
+  const APP_VERSION = '10.4';
   const PROJECT_FORMAT = 'PULUMUR_PROJECT';
   const PROJECT_SCHEMA_VERSION = 2;
 
@@ -85,6 +85,9 @@
   function dispatchProjectAction(type, payload, meta = {}) {
     const action = window.PulumurProjectActions.create(type, payload, meta);
     projectStore.dispatch(action);
+    if (window.PulumurRuntimeMonitor && typeof window.PulumurRuntimeMonitor.setLastAction === 'function') {
+      window.PulumurRuntimeMonitor.setLastAction(action);
+    }
     return action;
   }
 
@@ -132,7 +135,7 @@
   function trimProjectHistory() {
     projectHistoryManager.trim();
   }
-  let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
+  let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
   const EXCEL_COMBO_OPTIONS = {
     motor: ['-', 'RISING MOTOR', 'SOMFY RTS', 'SOMFY IO'],
     fabric: [
@@ -733,7 +736,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.1').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4').catch(() => {}), { once: true });
     }
   }
 
@@ -771,7 +774,7 @@
     pendingGuillotinePlacementMeta = null;
     toolboxSelectionMode = null;
     toolboxSelectionItems = new Map();
-    currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
+    currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
     applyAutoRayPost(true);
   }
 
@@ -1119,8 +1122,8 @@
       recordProjectHistoryState();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V10.1: ProjectModel owns persistent state; the final right-side view is the editing master and the final left-side view is its semantic mirror.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V10.1: kalıcı durum merkezi ProjectModel içinde tutulur; son sağ yan görünüş düzenleme kaynağı, son sol yan görünüş semantik aynasıdır.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V10.4: ProjectModel owns persistent state; the final right-side view is the editing master and the final left-side view is its semantic mirror.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V10.4: kalıcı durum merkezi ProjectModel içinde tutulur; son sağ yan görünüş düzenleme kaynağı, son sol yan görünüş semantik aynasıdır.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
@@ -5732,7 +5735,8 @@
       currentProjectRecord = {
         projectId: record.projectId ? String(record.projectId) : null,
         projectCode: record.projectCode ? String(record.projectCode) : null,
-        revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+        revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1,
+        serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0 ? Number(record.serverVersion) : null
       };
 
       if ($('languageSelect')) $('languageSelect').value = nextLanguage;
@@ -5939,7 +5943,7 @@
     const text = await file.text();
     const parsed = parseProjectSnapshot(text);
     const detachedModel = window.PulumurProjectModel.normalize(parsed.projectModel);
-    detachedModel.revisionInfo = { projectId: null, projectCode: null, revisionNo: 1 };
+    detachedModel.revisionInfo = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
     const snapshot = window.PulumurProjectSchema.createEnvelope(detachedModel, { appVersion: APP_VERSION, limits: applicationLimits() });
     restoreProjectSnapshotWithHistory(snapshot, { resetZoom: false, resetHistory: true });
     statusText.textContent = currentLanguage === 'en'
@@ -5962,7 +5966,8 @@
     currentProjectRecord = {
       projectId: record.projectId ? String(record.projectId) : null,
       projectCode: record.projectCode ? String(record.projectCode) : null,
-      revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+      revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1,
+      serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0 ? Number(record.serverVersion) : null
     };
     dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_REVISION_INFO, currentProjectRecord, { source: 'project-record' });
     return getCurrentProjectRecord();
@@ -5979,6 +5984,9 @@
     getProjectActions: () => projectStore.debug(),
     getTopologyReport: () => deepCloneJson(topologyReconcileReport),
     getLastLeftMirror: () => window.PulumurProjectModel.deriveLastLeftMirror(projectStore.getState()),
+    getLastAction: () => deepCloneJson(lastProjectAction),
+    getRuntimeErrors: () => window.PulumurRuntimeMonitor ? window.PulumurRuntimeMonitor.getEntries() : [],
+    downloadRuntimeReport: () => window.PulumurRuntimeMonitor && window.PulumurRuntimeMonitor.downloadReport(),
     validateCurrentState: () => { const raw = collectForm(); assertStateWithinLimits(raw); window.PulumurProjectValidation.validateProjectModel(projectStore.getState()); return true; }
   });
 

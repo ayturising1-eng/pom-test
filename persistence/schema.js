@@ -56,25 +56,40 @@
     };
   }
 
+
+  function byteLength(text) {
+    const value = String(text == null ? '' : text);
+    if (typeof Blob !== 'undefined') return new Blob([value]).size;
+    if (typeof Buffer !== 'undefined') return Buffer.byteLength(value, 'utf8');
+    return new TextEncoder().encode(value).length;
+  }
+
+  function assertFileSize(text, options) {
+    const maxMb = Math.max(1, Number(options && options.maxProjectFileMb) || 10);
+    const bytes = byteLength(text);
+    if (bytes > maxMb * 1024 * 1024) throw new Error(`PROJECT_FILE_TOO_LARGE:${bytes}:${maxMb}`);
+    return bytes;
+  }
+
   function serialize(rawModel, options) {
     const envelope = createEnvelope(rawModel, options);
     const text = JSON.stringify(envelope, null, 2);
-    const maxMb = Math.max(1, Number(options && options.maxProjectFileMb) || 10);
-    const bytes = typeof Blob !== 'undefined' ? new Blob([text]).size : (typeof Buffer !== 'undefined' ? Buffer.byteLength(text, 'utf8') : text.length * 2);
-    if (bytes > maxMb * 1024 * 1024) throw new Error(`PROJECT_FILE_TOO_LARGE:${bytes}:${maxMb}`);
+    assertFileSize(text, options);
     return text;
   }
 
   function parse(text, options) {
+    const source = String(text == null ? '' : text);
+    assertFileSize(source, options);
     let raw;
-    try { raw = JSON.parse(String(text == null ? '' : text)); }
+    try { raw = JSON.parse(source); }
     catch (_) { throw new Error('PROJECT_JSON_INVALID'); }
     return normalizeEnvelope(raw, options);
   }
 
   const api = Object.freeze({
     format: FORMAT, schemaVersion: SCHEMA_VERSION,
-    checksumForModel, createEnvelope, normalizeEnvelope, serialize, parse
+    checksumForModel, createEnvelope, normalizeEnvelope, byteLength, assertFileSize, serialize, parse
   });
   global.PulumurProjectSchema = api;
   if (typeof module !== 'undefined') module.exports = api;

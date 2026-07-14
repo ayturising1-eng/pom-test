@@ -8,6 +8,8 @@
     usersTab: $('adminUsersTab'), organizationsTab: $('adminOrganizationsTab'), activityTab: $('adminActivityTab'), limitsTab: $('adminLimitsTab'),
     usersPane: $('adminUsersPane'), organizationsPane: $('adminOrganizationsPane'), activityPane: $('adminActivityPane'), limitsPane: $('adminLimitsPane'),
     limitsTitle: $('adminLimitsTitle'), limitsSubtitle: $('adminLimitsSubtitle'), limitsForm: $('adminLimitsForm'), limitsGrid: $('adminLimitsGrid'), limitsNote: $('adminLimitsNote'), limitsReset: $('adminLimitsReset'), limitsSave: $('adminLimitsSave'),
+    limitsScope: $('adminLimitsScope'), limitsScopeLabel: $('adminLimitsScopeLabel'), limitsAuditTitle: $('adminLimitsAuditTitle'),
+    limitsAuditBody: $('adminLimitsAuditBody'), limitsAuditEmpty: $('adminLimitsAuditEmpty'),
     usersTitle: $('adminUsersTitle'), inviteTitle: $('adminInviteTitle'),
     inviteForm: $('adminInviteForm'), inviteOrgField: $('adminInviteOrgField'), inviteOrg: $('adminInviteOrg'),
     inviteFullName: $('adminInviteFullName'), inviteUsername: $('adminInviteUsername'),
@@ -35,7 +37,7 @@
 
   const TEXT = {
     tr: {
-      adminPanel: 'Yönetici Paneli', panelSubtitle: 'Firma, kullanıcı, lisans ve uygulama güvenlik ayarları', users: 'Kullanıcılar', firms: 'Firmalar', limits: 'Uygulama Limitleri', limitsSaved: 'Uygulama limitleri kaydedildi.', limitsReset: 'Limitler varsayılan değerlere döndürüldü.',
+      adminPanel: 'Yönetici Paneli', panelSubtitle: 'Firma, kullanıcı, lisans ve uygulama güvenlik ayarları', users: 'Kullanıcılar', firms: 'Firmalar', limits: 'Uygulama Limitleri', limitsSaved: 'Merkezi uygulama limitleri kaydedildi.', limitsReset: 'Seçilen kapsam varsayılan değerlere döndürüldü.', globalLimits: 'Genel varsayılanlar', limitScope: 'Kapsam', limitAudit: 'Limit Değişiklik Geçmişi', noLimitAudit: 'Limit değişiklik kaydı bulunamadı.',
       inviteUser: 'Yeni Kullanıcı Oluştur', fullName: 'Ad Soyad', username: 'Kullanıcı Adı', role: 'Rol', firm: 'Firma',
       invite: 'Kullanıcı Oluştur', refresh: 'Yenile', search: 'Ara', searchPlaceholder: 'Firma, ad veya kullanıcı adı', userCode: 'Kod', status: 'Durum', projects: 'Projeler', actions: 'İşlemler',
       companyAdmin: 'Firma Yöneticisi', designer: 'Tasarımcı', systemAdmin: 'Sistem Yöneticisi', active: 'Aktif', passive: 'Pasif',
@@ -67,7 +69,7 @@
       action_organization_create: 'Firma oluşturdu', action_organization_update: 'Firma güncelledi', action_organization_delete: 'Firma sildi'
     },
     en: {
-      adminPanel: 'Admin Panel', panelSubtitle: 'Company, user, license and application safety settings', users: 'Users', firms: 'Companies', limits: 'Application Limits', limitsSaved: 'Application limits saved.', limitsReset: 'Limits restored to defaults.',
+      adminPanel: 'Admin Panel', panelSubtitle: 'Company, user, license and application safety settings', users: 'Users', firms: 'Companies', limits: 'Application Limits', limitsSaved: 'Central application limits saved.', limitsReset: 'The selected scope was restored to defaults.', globalLimits: 'Global defaults', limitScope: 'Scope', limitAudit: 'Limit Change History', noLimitAudit: 'No limit changes were found.',
       inviteUser: 'Create New User', fullName: 'Full Name', username: 'Username', role: 'Role', firm: 'Company',
       invite: 'Create User', refresh: 'Refresh', search: 'Search', searchPlaceholder: 'Company, name or username', userCode: 'Code', status: 'Status', projects: 'Projects', actions: 'Actions',
       companyAdmin: 'Company Administrator', designer: 'Designer', systemAdmin: 'System Administrator', active: 'Active', passive: 'Inactive',
@@ -110,6 +112,8 @@
   let deleteTargetUserId = null;
   let usageSessions = [];
   let activityRows = [];
+  let limitRows = [];
+  let limitAuditRows = [];
 
   function language() {
     return $('languageSelect') && $('languageSelect').value === 'en' ? 'en' : 'tr';
@@ -149,7 +153,7 @@
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
-    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / V10.1]`;
+    if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / V10.4]`;
     if (/Invalid JWT|Missing authorization header/i.test(raw) || status === 401) {
       return language() === 'en'
         ? 'Authorization was rejected. Sign out and sign in again; if it continues, check the Edge Function logs.'
@@ -234,7 +238,7 @@
 
   function setBusy(value) {
     busy = Boolean(value);
-    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh, ui.passwordSubmit, ui.activityRefresh, ui.deleteSubmit].forEach(button => {
+    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh, ui.passwordSubmit, ui.activityRefresh, ui.deleteSubmit, ui.limitsSave, ui.limitsReset].forEach(button => {
       if (button) button.disabled = busy;
     });
   }
@@ -272,6 +276,8 @@
     if (ui.activityTab) ui.activityTab.textContent = t('activity');
     if (ui.limitsTab) ui.limitsTab.textContent = t('limits');
     if (ui.limitsTitle) ui.limitsTitle.textContent = t('limits');
+    if (ui.limitsScopeLabel) ui.limitsScopeLabel.textContent = t('limitScope');
+    if (ui.limitsAuditTitle) ui.limitsAuditTitle.textContent = t('limitAudit');
     if (ui.limitsSave) ui.limitsSave.textContent = language() === 'en' ? 'Save Limits' : 'Limitleri Kaydet';
     if (ui.limitsReset) ui.limitsReset.textContent = language() === 'en' ? 'Restore Defaults' : 'Varsayılana Sıfırla';
     renderLimits();
@@ -352,6 +358,11 @@
       ui.activityOrg.innerHTML = makeOptions(isSystemAdmin());
       if (previous && (previous === '' || organizations.some(org => org.id === previous))) ui.activityOrg.value = previous;
       else if (currentProfile && !isSystemAdmin()) ui.activityOrg.value = currentProfile.organization_id;
+    }
+    if (ui.limitsScope) {
+      const previous = ui.limitsScope.value;
+      ui.limitsScope.innerHTML = `<option value="">${esc(t('globalLimits'))}</option>${organizations.map(org => `<option value="${esc(org.id)}">${esc(org.name)}</option>`).join('')}`;
+      if (previous && organizations.some(org => org.id === previous)) ui.limitsScope.value = previous;
     }
   }
 
@@ -832,31 +843,96 @@
   };
 
   function renderLimits() {
-    if (!ui.limitsGrid || !window.PulumurLimits) return;
-    const values = window.PulumurLimits.get();
-    const caps = window.PulumurLimits.hardCaps || {};
-    const mins = window.PulumurLimits.minimums || {};
+    if (!ui.limitsGrid) return;
+    const byKey = Object.fromEntries(limitRows.map(row => [row.limit_key, row]));
+    const fallbackValues = window.PulumurLimits ? window.PulumurLimits.get() : {};
+    const fallbackCaps = window.PulumurLimits ? window.PulumurLimits.hardCaps || {} : {};
+    const fallbackMins = window.PulumurLimits ? window.PulumurLimits.minimums || {} : {};
     ui.limitsGrid.innerHTML = Object.keys(LIMIT_LABELS).map(key => {
       const label = LIMIT_LABELS[key][language()] || LIMIT_LABELS[key].tr;
-      return `<label><span>${esc(label)}</span><input type="number" data-limit-key="${esc(key)}" min="${Number(mins[key] || 0)}" max="${Number(caps[key] || 9999)}" step="1" value="${Number(values[key] || 0)}"><small>${language() === 'en' ? 'Safety ceiling' : 'Güvenlik tavanı'}: ${Number(caps[key] || 0)}</small></label>`;
+      const row = byKey[key] || {};
+      const value = Number(row.limit_value ?? fallbackValues[key] ?? 0);
+      const minimum = Number(row.minimum_value ?? fallbackMins[key] ?? 0);
+      const cap = Number(row.hard_cap ?? fallbackCaps[key] ?? 9999);
+      const source = row.source === 'company'
+        ? (language() === 'en' ? 'Company override' : 'Firma istisnası')
+        : (language() === 'en' ? 'Global' : 'Genel');
+      const modifier = row.updated_by_name ? ` · ${esc(row.updated_by_name)} · ${esc(formatDateTime(row.updated_at))}` : '';
+      return `<label><span>${esc(label)}</span><input type="number" data-limit-key="${esc(key)}" min="${minimum}" max="${cap}" step="1" value="${value}"><small>${source} · ${language() === 'en' ? 'Hard cap' : 'Mutlak tavan'}: ${cap}${modifier}</small></label>`;
     }).join('');
+
+    if (ui.limitsAuditBody) {
+      ui.limitsAuditBody.innerHTML = limitAuditRows.map(row => `<tr>
+        <td>${esc(formatDateTime(row.changed_at))}</td>
+        <td>${esc(row.organization_name || t('globalLimits'))}</td>
+        <td>${esc((LIMIT_LABELS[row.limit_key] && (LIMIT_LABELS[row.limit_key][language()] || LIMIT_LABELS[row.limit_key].tr)) || row.limit_key)}</td>
+        <td>${esc(row.old_value == null ? '-' : row.old_value)}</td>
+        <td>${esc(row.new_value == null ? '-' : row.new_value)}</td>
+        <td>${esc(row.changed_by_name || '-')}</td>
+      </tr>`).join('');
+    }
+    if (ui.limitsAuditEmpty) {
+      ui.limitsAuditEmpty.hidden = limitAuditRows.length > 0;
+      ui.limitsAuditEmpty.textContent = t('noLimitAudit');
+    }
   }
 
-  function saveLimits(event) {
-    if (event) event.preventDefault();
-    if (!isSystemAdmin() || !window.PulumurLimits || !ui.limitsGrid) return;
+  async function loadLimits() {
+    if (!isSystemAdmin()) return;
+    const organizationId = ui.limitsScope && ui.limitsScope.value ? ui.limitsScope.value : null;
+    const [rows, audit] = await Promise.all([
+      rpc('admin_list_app_limits_v1', { p_organization_id: organizationId }),
+      rpc('admin_list_app_limit_audit_v1', { p_organization_id: organizationId, p_limit: 200 })
+    ]);
+    limitRows = rows || [];
+    limitAuditRows = audit || [];
+    renderLimits();
+  }
+
+  async function refreshOwnEffectiveLimits() {
+    if (!window.PulumurLimits) return;
+    const rows = await rpc('get_effective_app_limits_v1');
     const values = {};
-    ui.limitsGrid.querySelectorAll('[data-limit-key]').forEach(input => { values[input.dataset.limitKey] = Number(input.value); });
+    (rows || []).forEach(row => { values[row.limit_key] = Number(row.limit_value); });
     window.PulumurLimits.set(values);
-    renderLimits();
-    setMessage(t('limitsSaved'), false);
   }
 
-  function resetLimits() {
-    if (!isSystemAdmin() || !window.PulumurLimits) return;
-    window.PulumurLimits.reset();
-    renderLimits();
-    setMessage(t('limitsReset'), false);
+  async function saveLimits(event) {
+    if (event) event.preventDefault();
+    if (!isSystemAdmin() || !ui.limitsGrid || busy) return;
+    const organizationId = ui.limitsScope && ui.limitsScope.value ? ui.limitsScope.value : null;
+    setBusy(true);
+    try {
+      const changes = Array.from(ui.limitsGrid.querySelectorAll('[data-limit-key]')).map(input => rpc('admin_set_app_limit_v1', {
+        p_limit_key: input.dataset.limitKey,
+        p_limit_value: Number(input.value),
+        p_organization_id: organizationId
+      }));
+      await Promise.all(changes);
+      await Promise.all([loadLimits(), refreshOwnEffectiveLimits()]);
+      setMessage(t('limitsSaved'), false);
+    } catch (error) {
+      console.error(error);
+      setMessage(errorMessage(error), true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetLimits() {
+    if (!isSystemAdmin() || busy) return;
+    const organizationId = ui.limitsScope && ui.limitsScope.value ? ui.limitsScope.value : null;
+    setBusy(true);
+    try {
+      await rpc('admin_reset_app_limits_v1', { p_organization_id: organizationId });
+      await Promise.all([loadLimits(), refreshOwnEffectiveLimits()]);
+      setMessage(t('limitsReset'), false);
+    } catch (error) {
+      console.error(error);
+      setMessage(errorMessage(error), true);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function showTab(tab) {
@@ -872,7 +948,12 @@
     if (ui.organizationsTab) ui.organizationsTab.classList.toggle('is-active', organizationsTab);
     if (ui.activityTab) ui.activityTab.classList.toggle('is-active', activityTab);
     if (ui.limitsTab) ui.limitsTab.classList.toggle('is-active', limitsTab);
-    if (limitsTab) renderLimits();
+    if (limitsTab) {
+      setBusy(true);
+      loadLimits()
+        .catch(error => { console.error(error); setMessage(errorMessage(error), true); })
+        .finally(() => setBusy(false));
+    }
     if (activityTab) {
       setBusy(true);
       loadActivityHistory()
@@ -930,6 +1011,10 @@
     if (ui.limitsTab) ui.limitsTab.addEventListener('click', () => showTab('limits'));
     if (ui.limitsForm) ui.limitsForm.addEventListener('submit', saveLimits);
     if (ui.limitsReset) ui.limitsReset.addEventListener('click', resetLimits);
+    if (ui.limitsScope) ui.limitsScope.addEventListener('change', () => {
+      setBusy(true);
+      loadLimits().catch(error => setMessage(errorMessage(error), true)).finally(() => setBusy(false));
+    });
     if (ui.inviteForm) ui.inviteForm.addEventListener('submit', inviteUser);
     if (ui.passwordForm) ui.passwordForm.addEventListener('submit', submitPasswordChange);
     if (ui.passwordCloseBtn) ui.passwordCloseBtn.addEventListener('click', closePasswordDialog);
