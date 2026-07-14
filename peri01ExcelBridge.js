@@ -336,7 +336,7 @@ Pülümür Automation Studio web sürümü Pergo Rise Module 1 için DXF ve A0 P
     return splitSemi(value);
   }
   function arrayCount(arr) { return Array.isArray(arr) ? arr.length : 0; }
-  function maxPozCount(...arrs) { return Math.max(1, ...arrs.map(arrayCount)); }
+  function maxPozCount(...arrs) { return arrs.reduce((value, item) => Math.max(value, arrayCount(item)), 1); }
   function validPozCount(arr, n) { return arr.length === 0 || arr.length === 1 || arr.length === n; }
   function getPozNumber(arr, idx) {
     if (arr.length === 1) return numericToken(arr[0]);

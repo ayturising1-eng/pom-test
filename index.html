@@ -2,6 +2,8 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0d5d5f" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -11,20 +13,20 @@
   <title>Pülümür Automation Studio</title>
   <script>
     (() => {
-      const build = '8.9.33';
+      const build = '10.2';
       const key = 'plmr_loaded_build';
       if (localStorage.getItem(key) !== build) {
         localStorage.setItem(key, build);
-        if ('caches' in window) caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).catch(() => {});
+        if ('caches' in window) caches.keys().then(keys => Promise.all(keys.filter(name => name.startsWith('pulumur-pwa-')).map(name => caches.delete(name)))).catch(() => {});
         if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(reg => reg.update()))).catch(() => {});
       }
       window.PULUMUR_BUILD = build;
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.33" />
+  <link rel="manifest" href="manifest.webmanifest?v=10.2" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=8.9.33" />
+  <link rel="stylesheet" href="style.css?v=10.2" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -369,6 +371,22 @@
   </dialog>
 
 
+  <dialog id="projectConflictDialog" class="modal project-conflict-modal">
+    <div class="modal-card project-conflict-card">
+      <div class="modal-head">
+        <h2>Proje Kayıt Çakışması</h2>
+      </div>
+      <p id="projectConflictMessage" class="modal-sub">Bu proje başka bir sekmede değiştirildi. Yerel çalışmanız korunuyor.</p>
+      <div class="project-conflict-actions">
+        <button id="projectConflictReloadBtn" type="button" class="soft-btn">Sunucudakini yükle</button>
+        <button id="projectConflictRevisionBtn" type="button" class="primary-btn">Yerel çalışmayı yeni revizyon yap</button>
+        <button id="projectConflictCopyBtn" type="button" class="soft-btn">Yerel çalışmayı kopya olarak kaydet</button>
+        <button id="projectConflictCancelBtn" type="button" class="danger-btn">İptal</button>
+      </div>
+    </div>
+  </dialog>
+
+
   <dialog id="adminPanelDialog" class="modal admin-panel-modal">
     <div class="modal-card admin-panel-card">
       <div class="modal-head admin-panel-head">
@@ -383,6 +401,7 @@
         <button id="adminUsersTab" type="button" class="admin-tab is-active">Kullanıcılar</button>
         <button id="adminOrganizationsTab" type="button" class="admin-tab">Firmalar</button>
         <button id="adminActivityTab" type="button" class="admin-tab">Kullanım Geçmişi</button>
+        <button id="adminLimitsTab" type="button" class="admin-tab">Uygulama Limitleri</button>
       </div>
 
       <section id="adminUsersPane" class="admin-pane">
@@ -500,6 +519,32 @@
         </div>
       </section>
 
+
+      <section id="adminLimitsPane" class="admin-pane" hidden>
+        <div class="admin-section-head">
+          <div><h3 id="adminLimitsTitle">Uygulama Limitleri</h3><p id="adminLimitsSubtitle" class="modal-sub">Genel limitleri veya firma istisnalarını merkezi olarak yönetin.</p></div>
+        </div>
+        <form id="adminLimitsForm" class="admin-form-card admin-limits-card">
+          <label class="admin-limit-scope"><span id="adminLimitsScopeLabel">Kapsam</span><select id="adminLimitsScope"><option value="">Genel varsayılanlar</option></select></label>
+          <div id="adminLimitsGrid" class="admin-form-grid admin-limits-grid"></div>
+          <div class="admin-limits-note" id="adminLimitsNote">Girilen değerler mutlak kod tavanını aşamaz. Firma istisnası yoksa genel değer uygulanır.</div>
+          <div class="admin-form-actions">
+            <button id="adminLimitsReset" type="button" class="soft-btn">Varsayılana Sıfırla</button>
+            <button id="adminLimitsSave" type="submit" class="primary-btn">Limitleri Kaydet</button>
+          </div>
+        </form>
+        <div class="admin-history-section admin-limit-audit-section">
+          <h4 id="adminLimitsAuditTitle">Limit Değişiklik Geçmişi</h4>
+          <div class="admin-table-wrap">
+            <table class="admin-table admin-history-table">
+              <thead><tr><th>Tarih / Saat</th><th>Kapsam</th><th>Limit</th><th>Eski</th><th>Yeni</th><th>Değiştiren</th></tr></thead>
+              <tbody id="adminLimitsAuditBody"></tbody>
+            </table>
+            <p id="adminLimitsAuditEmpty" class="projects-empty">Kayıt bulunamadı.</p>
+          </div>
+        </div>
+      </section>
+
       <p id="adminPanelMessage" class="admin-panel-message" aria-live="polite"></p>
     </div>
   </dialog>
@@ -542,18 +587,27 @@
     </form>
   </dialog>
 
-  <script src="blocks/filteredBlocks.js?v=8.9.33"></script>
-  <script src="peri01ExcelBridge.js?v=8.9.33"></script>
-  <script src="peri01Geometry.js?v=8.9.33"></script>
-  <script src="modernDxfTemplate.js?v=8.9.33"></script>
-  <script src="dxfModernEngine.js?v=8.9.33"></script>
+  <script src="appLimits.js?v=10.2"></script>
+  <script src="core/actions.js?v=10.2"></script>
+  <script src="core/projectModel.js?v=10.2"></script>
+  <script src="core/topologyReconcile.js?v=10.2"></script>
+  <script src="core/validation.js?v=10.2"></script>
+  <script src="core/reducer.js?v=10.2"></script>
+  <script src="history/historyManager.js?v=10.2"></script>
+  <script src="persistence/schema.js?v=10.2"></script>
+  <script src="render/renderPipeline.js?v=10.2"></script>
+  <script src="blocks/filteredBlocks.js?v=10.2"></script>
+  <script src="peri01ExcelBridge.js?v=10.2"></script>
+  <script src="peri01Geometry.js?v=10.2"></script>
+  <script src="modernDxfTemplate.js?v=10.2"></script>
+  <script src="dxfModernEngine.js?v=10.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2"></script>
-  <script src="supabaseConfig.js?v=8.9.33"></script>
-  <script src="adminUsersApi.js?v=8.9.33"></script>
-  <script src="activityTracker.js?v=8.9.33"></script>
-  <script src="app.js?v=8.9.33"></script>
-  <script src="cloudProjects.js?v=8.9.33"></script>
-  <script src="adminPanel.js?v=8.9.33"></script>
+  <script src="supabaseConfig.js?v=10.2"></script>
+  <script src="adminUsersApi.js?v=10.2"></script>
+  <script src="activityTracker.js?v=10.2"></script>
+  <script src="app.js?v=10.2"></script>
+  <script src="cloudProjects.js?v=10.2"></script>
+  <script src="adminPanel.js?v=10.2"></script>
 </body>
 </html>

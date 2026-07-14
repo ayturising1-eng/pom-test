@@ -331,7 +331,7 @@
   function textAsMText(e) {
     const raw = String(e.value || '');
     const lines = raw.replace(/\\P/g, '\n').split(/\r?\n/);
-    const longest = Math.max(1, ...lines.map(line => line.length));
+    const longest = lines.reduce((value, line) => Math.max(value, line.length), 1);
     const height = Math.max(1, Number(e.height) || 80);
     const width = Math.max(height * 1.2, Number(e.width) || longest * height * 0.68);
     const attachment = e.align === 'center' ? 8 : (e.align === 'right' ? 9 : 7);

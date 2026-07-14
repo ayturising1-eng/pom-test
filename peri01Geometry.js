@@ -172,8 +172,44 @@
     };
   }
 
-  const BUILD_LABEL = 'WEB DXF V8.9.33 - HISTORY REDO AND SIDE BUTTON COLOR FIX - 13.07.2026';
+  const BUILD_LABEL = 'WEB DXF V10.2 - PROJECTMODEL, TOPOLOGY RECONCILE AND SAFE EXPORT - 14.07.2026';
   function bridge() { return root.PulumurExcelBridge || null; }
+
+  function runtimeLimits() {
+    const api = root && root.PulumurLimits;
+    return api && typeof api.get === 'function' ? api.get() : {
+      maxSystems: 30, maxRaysPerSystem: 4, maxFrontPosts: 150,
+      maxSideSupportsPerView: 8, maxProducts: 200,
+      maxSegmentsPerView: 50
+    };
+  }
+
+  function safeExtrema(values, mode, fallback = 0) {
+    let found = false;
+    let result = fallback;
+    for (const raw of values || []) {
+      const value = Number(raw);
+      if (!Number.isFinite(value)) continue;
+      if (!found) { result = value; found = true; }
+      else if (mode === 'min' ? value < result : value > result) result = value;
+    }
+    return found ? result : fallback;
+  }
+
+  function assertGeometryLimits(d) {
+    const limits = runtimeLimits();
+    if (d.systemCount > limits.maxSystems || d.positionCount > limits.maxSystems) throw new Error(`Poz/sistem sınırı aşıldı (${Math.max(d.systemCount, d.positionCount)}/${limits.maxSystems}).`);
+    if ((d.systems || []).some(system => Number(system.rayCount) > limits.maxRaysPerSystem)) throw new Error(`Poz başına ray sınırı ${limits.maxRaysPerSystem}.`);
+    if (d.postCount > limits.maxFrontPosts) throw new Error(`Ön dikme sınırı ${limits.maxFrontPosts}.`);
+    if (Object.values(d.sidePosts || {}).some(items => Array.isArray(items) && items.length > limits.maxSideSupportsPerView)) throw new Error(`Görünüş başına destek dikmesi sınırı ${limits.maxSideSupportsPerView}.`);
+    const productCount = (d.slidingPlacements || []).length + (d.sideSlidingPlacements || []).length + (d.guillotinePlacements || []).length + (d.sideGuillotinePlacements || []).length;
+    if (productCount > limits.maxProducts) throw new Error(`Toplam ürün sınırı ${limits.maxProducts}.`);
+    const segmentLists = [];
+    if (d.parapetSegmentsRaw && Array.isArray(d.parapetSegmentsRaw.front)) segmentLists.push(d.parapetSegmentsRaw.front);
+    if (d.parapetSegmentsRaw && d.parapetSegmentsRaw.side) Object.values(d.parapetSegmentsRaw.side).forEach(list => segmentLists.push(list));
+    if (d.backWallSegmentsRaw && d.backWallSegmentsRaw.side) Object.values(d.backWallSegmentsRaw.side).forEach(list => segmentLists.push(list));
+    if (segmentLists.some(list => Array.isArray(list) && list.length > limits.maxSegmentsPerView)) throw new Error(`Görünüş başına duvar/parapet parça sınırı ${limits.maxSegmentsPerView}.`);
+  }
 
   const SAMPLE_INPUT = {
     product: 'Pergo Rise',
@@ -266,6 +302,9 @@
     let sysCount = Math.max(1, Math.round(Number(raw.systemCount) || 1));
     if (explicitWidth) sysCount = Math.max(sysCount, nominalWidths.length);
     if (explicitRay) sysCount = Math.max(sysCount, rayList.length);
+    const limits = runtimeLimits();
+    if (sysCount > limits.maxSystems) throw new Error(`Poz/sistem sınırı aşıldı (${sysCount}/${limits.maxSystems}).`);
+    if (rayList.some(value => value > limits.maxRaysPerSystem)) throw new Error(`Poz başına ray sınırı ${limits.maxRaysPerSystem}.`);
 
     let gapRaw = noMode ? noGapGaps(raw.width) : [];
     let systems = [];
@@ -520,7 +559,7 @@
   function sideBackWallSettings(d, key, rearHeight) {
     const raw = sideScopedValue(d && d.backWallState, key, null) || {};
     const explicitSegments = explicitBackWallSegmentsFor(d, key);
-    const segmentDepth = explicitSegments ? Math.max(...explicitSegments.map(item => Math.max(0, Number(item.end) || 0))) : 0;
+    const segmentDepth = explicitSegments ? safeExtrema(explicitSegments.map(item => Math.max(0, Number(item.end) || 0)), 'max', 0) : 0;
     return {
       xOffset: Number.isFinite(Number(raw.xOffset)) ? Number(raw.xOffset) : 0,
       depth: Math.max(1, Number(raw.depth) || K.sideWallDepth, segmentDepth),
@@ -713,6 +752,7 @@
     // Burada ilk değere indirgemiyoruz; buildSystems tüm listeyi okuyacak.
     d.rayCountText = String(d.rayCount ?? '').trim();
     d.postCount = Math.max(0, intValue(d.postCount, SAMPLE_INPUT.postCount));
+    if (d.postCount > runtimeLimits().maxFrontPosts) throw new Error(`Ön dikme sınırı ${runtimeLimits().maxFrontPosts}.`);
     d.manualPostPlacementMode = String((raw && raw.__manualPostPlacementMode) || 'standard').trim().toLowerCase() === 'equal' ? 'equal' : 'standard';
     d.parapetHeight = yes(d.parapet) ? Math.max(0, numberValue(d.parapetHeight, 0)) : 0;
     d.customer = textValue(d.customer, '-');
@@ -797,9 +837,9 @@
     d.parapetSegments = normalizeParapetSegmentsState(d.parapetSegmentsRaw, d);
     d.backWallSegments = normalizeBackWallSegmentsState(d.backWallSegmentsRaw, d);
     d.frontPostExtensions = Array.from({ length: d.postCount }, (_, i) => Math.max(0, Number(d.frontPostExtensions[i]) || 0));
-    d.maxOpening = Math.max(...d.positions.map(p => p.opening));
+    d.maxOpening = safeExtrema(d.positions.map(p => p.opening), 'max', d.opening);
     d.lastOpening = d.positions[d.positions.length - 1].opening;
-    d.maxRearHeight = Math.max(...d.positions.map(p => p.rearHeight));
+    d.maxRearHeight = safeExtrema(d.positions.map(p => p.rearHeight), 'max', d.rearHeight);
     // Çoklu ve farklı açılımlı sistemlerde üst görünüşün en alt kotu, en büyük açılıma göre oluşur.
     // Ön görünüş bu yüzden maxOpening referansına göre aşağı alınır. Aynı global kayma,
     // yan görünüş grubuna da uygulanır ki ön/yan görünüşler aynı yatay referans sisteminde kalsın.
@@ -821,6 +861,7 @@
     d.postCenterXs = postCenterXs(d);
     d.frontPostProfiles = Array.from({ length: d.postCenterXs.length }, (_, i) => d.frontPostProfiles[i] || null);
     d.frontPostWidths = d.postCenterXs.map((_, i) => frontPostWidthAt(d, i));
+    assertGeometryLimits(d);
     d.sideSupportGeometry = {};
     d.positions.slice(0, d.sidePositionCount).forEach(p => {
       const key = String(p.index);
@@ -1094,7 +1135,7 @@
     for (let i = startIndex; i < endIndex; i += 1) {
       if (g.entities[i] && g.entities[i].layer === 'POST') postVals.push(entityMinY(g.entities[i]));
     }
-    if (postVals.length) return Math.min(...postVals);
+    if (postVals.length) return safeExtrema(postVals, 'min', 0);
     const vals = [];
     for (let i = startIndex; i < endIndex; i += 1) {
       if (entityIsPostLike(g.entities[i])) vals.push(entityMinY(g.entities[i]));
@@ -1102,7 +1143,7 @@
     if (!vals.length) {
       for (let i = startIndex; i < endIndex; i += 1) vals.push(entityMinY(g.entities[i]));
     }
-    return vals.length ? Math.min(...vals) : 0;
+    return vals.length ? safeExtrema(vals, 'min', 0) : 0;
   }
   function moveEntityY(e, dy) {
     if (e.type === 'line') { e.y1 += dy; e.y2 += dy; }
@@ -1125,7 +1166,7 @@
     // Segmentli parapet ve manuel -Y dikme uzatmalarıyla gerçek en alt ön dikme kotu.
     const xs = Array.isArray(d.postCenterXs) ? d.postCenterXs : postCenterXs(d);
     if (!xs.length) return d.commonFrontRectStartY - d.frontHeight + K.onPostHeightCorrection - K.onPostTopDrop + d.parapetHeight;
-    return Math.min(...xs.map((x, index) => {
+    return safeExtrema(xs.map((x, index) => {
       const profile = frontPostProfileAt(d, index);
       const parapetTop = d.commonFrontRectStartY - d.frontHeight + frontParapetHeightAt(d, x);
       const extension = frontPostExtensionAt(d, index);
@@ -1613,7 +1654,7 @@
       const sideTrackRange = topSideTrackTotalRange(d);
       const totalMeasureX1 = sideTrackRange ? sideTrackRange.x1 : firstRange.x1;
       const totalMeasureX2 = sideTrackRange ? sideTrackRange.x2 : lastRange.x2;
-      const wallTopMaxY = Math.max(...d.systems.map(sys => Math.max(topWallYAt(d, sys.index), topWallYAt(d, sys.index) + topWallHAt(d, sys.index))));
+      const wallTopMaxY = safeExtrema(d.systems.map(sys => Math.max(topWallYAt(d, sys.index), topWallYAt(d, sys.index) + topWallHAt(d, sys.index))), 'max', 0);
       const totalDimY = wallTopMaxY + 50;
       addDimH(g, totalMeasureX1, totalMeasureX2, wallTopMaxY, totalDimY, `TOPLAM GENİŞLİK ${formatMm(totalMeasureX2 - totalMeasureX1)}`, { layer: 'Ölçüler - Üst Görünüş', edit: { dimId: 'top_total_measure_width', ruleKey: 'top_total_width', field: 'width', index: 0, label: 'Toplam Genişlik', view: 'Top', relatedZoneId: 'top_total_width_zone' } });
     }
@@ -2523,7 +2564,8 @@
         }
         return [entity];
       });
-      g.entities.splice(viewEntityStart, g.entities.length - viewEntityStart, ...passiveEntities);
+      g.entities.splice(viewEntityStart, g.entities.length - viewEntityStart);
+      passiveEntities.forEach(entity => g.entities.push(entity));
     }
   }
 
@@ -2655,7 +2697,7 @@
     if (!e) return [0, 0, 0, 0];
     if (e.type === 'line') return [Math.min(e.x1, e.x2), Math.min(e.y1, e.y2), Math.max(e.x1, e.x2), Math.max(e.y1, e.y2)];
     if (e.type === 'text' || e.type === 'mtext') return [e.x, e.y - e.height, e.x + Math.max(1, String(e.value || '').length) * e.height * 0.65, e.y + e.height];
-    if (e.type === 'polyline') { const xs = e.points.map(p => p[0]), ys = e.points.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+    if (e.type === 'polyline') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
     if (e.type === 'circle') return [e.x - e.r, e.y - e.r, e.x + e.r, e.y + e.r];
     if (e.type === 'insert') {
       const block = getBlocks()[e.name];
@@ -2665,7 +2707,7 @@
     }
     if (e.type === 'dimension') {
       const gs = (e.graphics || []).map(entityBoundsArray);
-      if (gs.length) return [Math.min(...gs.map(b => b[0])), Math.min(...gs.map(b => b[1])), Math.max(...gs.map(b => b[2])), Math.max(...gs.map(b => b[3]))];
+      if (gs.length) return [safeExtrema(gs.map(b => b[0]), 'min', 0), safeExtrema(gs.map(b => b[1]), 'min', 0), safeExtrema(gs.map(b => b[2]), 'max', 0), safeExtrema(gs.map(b => b[3]), 'max', 0)];
     }
     if (e.type === 'interaction') return [Math.min(e.x, e.x + e.w), Math.min(e.y, e.y + e.h), Math.max(e.x, e.x + e.w), Math.max(e.y, e.y + e.h)];
     return [0, 0, 0, 0];
@@ -2723,7 +2765,7 @@
 
   function pergoTextH(d) {
     const ranges = systemRanges(d);
-    const minInner = Math.min(...ranges.map(r => Math.max(1, r.x2 - r.x1 - 2 * K.pergoTextOffset)));
+    const minInner = safeExtrema(ranges.map(r => Math.max(1, r.x2 - r.x1 - 2 * K.pergoTextOffset)), 'min', 1);
     return clamp(minInner / K.pergoTextRatio, K.pergoTextMinH, K.pergoTextMaxH);
   }
 
@@ -2751,7 +2793,7 @@
   }
 
   function textMaxLineLen(value) {
-    return Math.max(1, ...repeatCharCountText(value).split('\n').map(x => x.length));
+    return repeatCharCountText(value).split('\n').reduce((out, line) => Math.max(out, line.length), 1);
   }
 
   function fitCellText(value, w, rowH, baseH, padX, options = {}) {
@@ -2771,7 +2813,7 @@
     let hh = base;
     let lines = wrapAtHeight(hh);
     for (let step = 0; step < 40; step += 1) {
-      const maxLine = Math.max(1, ...lines.map(x => String(x).length));
+      const maxLine = lines.reduce((out, line) => Math.max(out, String(line).length), 1);
       const byWidth = usable / (maxLine * widthFactor);
       const byHeight = usableH / Math.max(1, lines.length * 1.22);
       const next = clamp(Math.min(base, byWidth, byHeight), minH, base);
@@ -2939,7 +2981,7 @@
     const triLimitY = triangleTableLimitY(d);
     const sideLimitY = sideViewTopLimitY(d);
     const limitCandidates = [triLimitY, sideLimitY].filter(v => v !== null && Number.isFinite(v));
-    const tableLimitY = limitCandidates.length ? Math.max(...limitCandidates) : null;
+    const tableLimitY = limitCandidates.length ? safeExtrema(limitCandidates, 'max', 0) : null;
     if (tableLimitY !== null) {
       const allowedH = tableY - tableLimitY;
       if (allowedH > scaledSt.txtH && tableH > allowedH) {
@@ -2982,8 +3024,8 @@
       ['PROJECT', c1], [d.project, c2], ['DRAWN BY', c3], [d.drawnBy, c4]
     ];
     const cellH = (val, w) => requiredWrappedCellHeight(val, w, st);
-    const row1H = Math.max(st.rowH, ...row1Cells.map(c => cellH(c[0], c[1])));
-    const row2H = Math.max(st.rowH, ...row2Cells.map(c => cellH(c[0], c[1])));
+    const row1H = row1Cells.reduce((out, cell) => Math.max(out, cellH(cell[0], cell[1])), st.rowH);
+    const row2H = row2Cells.reduce((out, cell) => Math.max(out, cellH(cell[0], cell[1])), st.rowH);
     const totalH = row1H + row2H;
 
     g.rect(x, y, frame.w, -totalH, 'TITLE');
@@ -3112,13 +3154,24 @@
       const height = (Number(e.height) || 0) * Math.max(1, lines.length) * 1.2;
       return [e.x, e.y - height, e.x + width, e.y];
     }
-    if (e.type === 'polyline') { const xs = e.points.map(p => p[0]), ys = e.points.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+    if (e.type === 'polyline') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
     if (e.type === 'circle') return [e.x - e.r, e.y - e.r, e.x + e.r, e.y + e.r];
     if (e.type === 'insert') { const block = blocks[e.name]; if (block) return transformBlockBounds(block, e); const w = Math.abs(e.previewW || 120), h = Math.abs(e.previewH || 80); return [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2]; }
-    if (e.type === 'dimension') { const gs = (e.graphics || []).map(ge => entityBounds(ge, blocks)); if (gs.length) return [Math.min(...gs.map(b => b[0])), Math.min(...gs.map(b => b[1])), Math.max(...gs.map(b => b[2])), Math.max(...gs.map(b => b[3]))]; }
+    if (e.type === 'dimension') { const gs = (e.graphics || []).map(ge => entityBounds(ge, blocks)); if (gs.length) return [safeExtrema(gs.map(b => b[0]), 'min', 0), safeExtrema(gs.map(b => b[1]), 'min', 0), safeExtrema(gs.map(b => b[2]), 'max', 0), safeExtrema(gs.map(b => b[3]), 'max', 0)]; }
     return [0, 0, 0, 0];
   }
-  function bounds(entities, blockLib) { const b = entities.map(e => entityBounds(e, blockLib)); const minX = Math.min(...b.map(x => x[0])), minY = Math.min(...b.map(x => x[1])), maxX = Math.max(...b.map(x => x[2])), maxY = Math.max(...b.map(x => x[3])); return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }; }
+  function bounds(entities, blockLib) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const entity of entities || []) {
+      const b = entityBounds(entity, blockLib);
+      if (b[0] < minX) minX = b[0];
+      if (b[1] < minY) minY = b[1];
+      if (b[2] > maxX) maxX = b[2];
+      if (b[3] > maxY) maxY = b[3];
+    }
+    if (!Number.isFinite(minX)) minX = minY = maxX = maxY = 0;
+    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+  }
   function escXml(s) { return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 
   const ACI_HEX = {

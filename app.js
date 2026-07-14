@@ -1,9 +1,9 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '8.9.33';
+  const APP_VERSION = '10.2';
   const PROJECT_FORMAT = 'PULUMUR_PROJECT';
-  const PROJECT_SCHEMA_VERSION = 1;
+  const PROJECT_SCHEMA_VERSION = 2;
 
   const ids = [
     'product', 'moduleName', 'engine', 'customer', 'project', 'version', 'drawnBy', 'date',
@@ -29,6 +29,8 @@
   let deferredInstallPrompt = null;
   let pendingDimensionEdit = null;
   let suppressFormPreviewUpdate = false;
+  let previewUpdateTimer = null;
+  let topologyReconcileReport = null;
 
   let wrappingFields = false;
   const previewState = { zoom: 1, baseScale: 1, minZoom: 0.20, maxZoom: 18, dragActive: false, dragStartX: 0, dragStartY: 0, dragScrollLeft: 0, dragScrollTop: 0, pointerId: null };
@@ -67,8 +69,70 @@
   let previewDimensionOffsets = {};
   let dimensionDragState = null;
   let dimensionFilterMenuBound = false;
-  const projectHistory = { entries: [], index: -1, restoring: false, suspendDepth: 0, dirtyWhileSuspended: false };
-  let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
+  const projectStore = window.PulumurProjectReducer.createStore(window.PulumurProjectModel.createEmpty(), {
+    validate: model => window.PulumurProjectValidation.validateProjectModel(model)
+  });
+  const projectHistoryManager = window.PulumurHistoryManager.create({
+    getLimit: () => Number(applicationLimits().historySteps) || 20
+  });
+  const projectHistory = projectHistoryManager.state;
+  let lastProjectAction = null;
+  projectStore.subscribe((model, action, report) => {
+    lastProjectAction = action || lastProjectAction;
+    if (report) topologyReconcileReport = report;
+  });
+
+  function dispatchProjectAction(type, payload, meta = {}) {
+    const action = window.PulumurProjectActions.create(type, payload, meta);
+    projectStore.dispatch(action);
+    return action;
+  }
+
+  function applicationLimits() {
+    const api = window.PulumurLimits;
+    return api && typeof api.get === 'function' ? api.get() : {
+      maxSystems: 30, maxRaysPerSystem: 4, maxFrontPosts: 150,
+      maxSideSupportsPerView: 8, maxProducts: 200,
+      maxSegmentsPerView: 50, historySteps: 20, maxProjectFileMb: 10
+    };
+  }
+
+  function splitNumericTokens(value) {
+    return String(value == null ? '' : value).split(';').map(token => token.trim()).filter(token => token && token.toLocaleUpperCase('tr-TR') !== 'NO');
+  }
+
+  function stateProductCount() {
+    return slidingPlacements.length + sideSlidingPlacements.length + guillotinePlacements.length + sideGuillotinePlacements.length;
+  }
+
+  function assertStateWithinLimits(raw) {
+    const limits = applicationLimits();
+    const widthText = String(raw && raw.width || '');
+    const widthTokenCount = /(?:^|;)\s*NO\s*(?:;|$)/i.test(widthText)
+      ? Math.ceil(splitNumericTokens(widthText).length / 2)
+      : splitNumericTokens(widthText).length;
+    const systemTokens = Math.max(widthTokenCount, splitNumericTokens(raw && raw.opening).length, splitNumericTokens(raw && raw.rearHeight).length, splitNumericTokens(raw && raw.rayCount).length);
+    const requestedSystems = Math.max(1, Math.round(Number(raw && raw.systemCount) || 1), systemTokens);
+    if (requestedSystems > limits.maxSystems) throw new Error(currentLanguage === 'en' ? `System/position limit exceeded (${requestedSystems}/${limits.maxSystems}).` : `Poz/sistem sınırı aşıldı (${requestedSystems}/${limits.maxSystems}).`);
+    const rays = splitNumericTokens(raw && raw.rayCount).map(Number).filter(Number.isFinite);
+    if (rays.some(value => value > limits.maxRaysPerSystem)) throw new Error(currentLanguage === 'en' ? `The rail limit per position is ${limits.maxRaysPerSystem}.` : `Poz başına ray sınırı ${limits.maxRaysPerSystem}.`);
+    const posts = Math.max(0, Math.round(Number(String(raw && raw.postCount || '').split(';')[0]) || 0));
+    if (posts > limits.maxFrontPosts) throw new Error(currentLanguage === 'en' ? `The front-post limit is ${limits.maxFrontPosts}.` : `Ön dikme sınırı ${limits.maxFrontPosts}.`);
+    Object.entries(customSidePosts || {}).forEach(([key, items]) => {
+      if (Array.isArray(items) && items.length > limits.maxSideSupportsPerView) throw new Error(currentLanguage === 'en' ? `Side support limit exceeded in view ${key}.` : `${key} yan görünüşünde destek dikmesi sınırı aşıldı.`);
+    });
+    if (stateProductCount() > limits.maxProducts) throw new Error(currentLanguage === 'en' ? `The total product limit is ${limits.maxProducts}.` : `Toplam ürün sınırı ${limits.maxProducts}.`);
+    const segmentLists = [];
+    if (parapetSegments && Array.isArray(parapetSegments.front)) segmentLists.push(parapetSegments.front);
+    if (parapetSegments && parapetSegments.side) Object.values(parapetSegments.side).forEach(list => segmentLists.push(list));
+    if (backWallSegments && backWallSegments.side) Object.values(backWallSegments.side).forEach(list => segmentLists.push(list));
+    if (segmentLists.some(list => Array.isArray(list) && list.length > limits.maxSegmentsPerView)) throw new Error(currentLanguage === 'en' ? `The wall/parapet segment limit per view is ${limits.maxSegmentsPerView}.` : `Görünüş başına duvar/parapet parça sınırı ${limits.maxSegmentsPerView}.`);
+  }
+
+  function trimProjectHistory() {
+    projectHistoryManager.trim();
+  }
+  let currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
   const EXCEL_COMBO_OPTIONS = {
     motor: ['-', 'RISING MOTOR', 'SOMFY RTS', 'SOMFY IO'],
     fabric: [
@@ -669,7 +733,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=8.9.33').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.2').catch(() => {}), { once: true });
     }
   }
 
@@ -707,7 +771,7 @@
     pendingGuillotinePlacementMeta = null;
     toolboxSelectionMode = null;
     toolboxSelectionItems = new Map();
-    currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1 };
+    currentProjectRecord = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
     applyAutoRayPost(true);
   }
 
@@ -774,17 +838,9 @@
   }
 
 
-  function historySignature(snapshot) {
-    return JSON.stringify({
-      formData: snapshot && snapshot.formData ? snapshot.formData : {},
-      drawingState: snapshot && snapshot.drawingState ? snapshot.drawingState : {}
-    });
-  }
-
   function createHistoryEntry() {
-    const snapshot = createProjectSnapshot();
-    snapshot.savedAt = '';
-    return { snapshot, signature: historySignature(snapshot) };
+    syncProjectModelFromLegacy(collectForm(), lastDrawing && lastDrawing.input, 'history-capture');
+    return projectHistoryManager.createEntry(projectStore.getState(), lastProjectAction);
   }
 
   function updateHistoryControls() {
@@ -811,10 +867,7 @@
   }
 
   function resetProjectHistory(captureCurrent = false) {
-    projectHistory.entries = [];
-    projectHistory.index = -1;
-    projectHistory.suspendDepth = 0;
-    projectHistory.dirtyWhileSuspended = false;
+    projectHistoryManager.reset();
     if (captureCurrent && lastDrawing) recordProjectHistoryState({ force: true });
     else updateHistoryControls();
   }
@@ -825,37 +878,39 @@
       projectHistory.dirtyWhileSuspended = true;
       return;
     }
-    let entry;
-    try { entry = createHistoryEntry(); }
-    catch (_) { return; }
-    const current = projectHistory.entries[projectHistory.index];
-    if (!options.force && current && current.signature === entry.signature) {
-      updateHistoryControls();
-      return;
-    }
-    if (projectHistory.index < projectHistory.entries.length - 1) {
-      projectHistory.entries.splice(projectHistory.index + 1);
-    }
-    projectHistory.entries.push(entry);
-    projectHistory.index = projectHistory.entries.length - 1;
+    try {
+      syncProjectModelFromLegacy(collectForm(), lastDrawing && lastDrawing.input, 'history-record');
+      projectHistoryManager.record(projectStore.getState(), { force: options.force === true, action: lastProjectAction });
+    } catch (_) { return; }
     updateHistoryControls();
   }
 
   function beginHistoryTransaction() {
-    projectHistory.suspendDepth += 1;
+    projectHistoryManager.begin(lastProjectAction);
   }
 
   function endHistoryTransaction(commit = true) {
-    if (projectHistory.suspendDepth > 0) projectHistory.suspendDepth -= 1;
-    if (projectHistory.suspendDepth > 0) return;
-    const shouldRecord = commit && projectHistory.dirtyWhileSuspended;
-    projectHistory.dirtyWhileSuspended = false;
-    if (shouldRecord) recordProjectHistoryState();
-    else updateHistoryControls();
+    try { syncProjectModelFromLegacy(collectForm(), lastDrawing && lastDrawing.input, 'history-transaction'); }
+    catch (_) {}
+    projectHistoryManager.end(projectStore.getState(), commit);
+    updateHistoryControls();
+  }
+
+  function schedulePreviewUpdate(delay = 350) {
+    if (previewUpdateTimer) window.clearTimeout(previewUpdateTimer);
+    previewUpdateTimer = window.setTimeout(() => {
+      previewUpdateTimer = null;
+      updatePreview(false);
+    }, Math.max(0, Number(delay) || 0));
   }
 
   function clearPendingPreviewTimers() {
     let hadPendingTimer = false;
+    if (previewUpdateTimer) {
+      hadPendingTimer = true;
+      window.clearTimeout(previewUpdateTimer);
+      previewUpdateTimer = null;
+    }
     ids.forEach(id => {
       const el = $(id);
       if (!el || !el._previewTimer) return;
@@ -878,17 +933,15 @@
   }
 
   function snapshotForHistoryRestore(entry) {
-    const snapshot = deepCloneJson(entry.snapshot);
-    snapshot.record = deepCloneJson(currentProjectRecord);
-    snapshot.uiSettings = {
-      language: currentLanguage,
-      dimensions: serializePreviewDimensionFilter()
-    };
-    return snapshot;
+    const model = window.PulumurProjectModel.normalize(entry.model);
+    model.revisionInfo = deepCloneJson(currentProjectRecord);
+    model.language = currentLanguage;
+    model.dimensions.filter = serializePreviewDimensionFilter();
+    return window.PulumurProjectSchema.createEnvelope(model, { appVersion: APP_VERSION });
   }
 
   function restoreHistoryIndex(nextIndex, direction) {
-    const entry = projectHistory.entries[nextIndex];
+    const entry = projectHistoryManager.entryAt(nextIndex);
     if (!entry) return false;
     clearPendingPreviewTimers();
     closeTransientPreviewEditorsForHistory();
@@ -979,6 +1032,10 @@
   }
 
   function validateInput(d) {
+    const oversizedField = ['systemCount', 'width', 'opening', 'rearHeight', 'frontHeight', 'rayCount', 'postCount']
+      .find(key => String(d && d[key] == null ? '' : d[key]).length > 4096);
+    if (oversizedField) throw new Error(currentLanguage === 'en' ? `The ${oversizedField} input is too long.` : `${oversizedField} alanı izin verilenden uzun.`);
+    assertStateWithinLimits(d);
     const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
     const fieldNames = currentLanguage === 'en'
       ? { width: 'Width', opening: 'Projection', rearHeight: 'Rear H', frontHeight: 'Front H' }
@@ -989,6 +1046,18 @@
     if (firstNumber(d.rearHeight) <= 0) missing.push(fieldNames.rearHeight);
     if (firstNumber(d.frontHeight) <= 0) missing.push(fieldNames.frontHeight);
     if (missing.length) throw new Error(currentLanguage === 'en' ? `Fill: ${missing.join(', ')}.` : `${missing.join(', ')} alanlarını doldur.`);
+  }
+
+  function validateBuiltDrawingLimits(drawing) {
+    const limits = applicationLimits();
+    const input = drawing && drawing.input;
+    if (!input) throw new Error(currentLanguage === 'en' ? 'The geometry model is missing.' : 'Geometri modeli oluşturulamadı.');
+    const systems = Array.isArray(input.systems) ? input.systems : [];
+    const systemCount = Math.max(Number(input.systemCount) || 0, systems.length, Array.isArray(input.positions) ? input.positions.length : 0);
+    if (systemCount > limits.maxSystems) throw new Error(currentLanguage === 'en' ? `System/position limit exceeded (${systemCount}/${limits.maxSystems}).` : `Poz/sistem sınırı aşıldı (${systemCount}/${limits.maxSystems}).`);
+    const maxRays = systems.reduce((maximum, system) => Math.max(maximum, Number(system && system.rayCount) || 0), 0);
+    if (maxRays > limits.maxRaysPerSystem) throw new Error(currentLanguage === 'en' ? `The rail limit per position is ${limits.maxRaysPerSystem}.` : `Poz başına ray sınırı ${limits.maxRaysPerSystem}.`);
+    if (Number(input.postCount) > limits.maxFrontPosts) throw new Error(currentLanguage === 'en' ? `The front-post limit is ${limits.maxFrontPosts}.` : `Ön dikme sınırı ${limits.maxFrontPosts}.`);
   }
 
   function autosizeTextarea(el) {
@@ -1015,12 +1084,32 @@
   }
 
   function updatePreview(resetZoom = false) {
+    if (previewUpdateTimer) {
+      window.clearTimeout(previewUpdateTimer);
+      previewUpdateTimer = null;
+    }
     try {
       applyAutoRayPost(false);
-      const data = collectForm();
-      validateInput(data);
-      const drawing = window.PulumurGeometry.buildDrawing(data);
-      syncUpperInputWrap(data);
+      const runtimeForm = collectForm();
+      syncProjectModelFromLegacy(runtimeForm, null, 'preview-input');
+      let pipeline = window.PulumurRenderPipeline.buildFromModel(projectStore.getState(), {
+        limits: applicationLimits(),
+        validateInput,
+        validateDrawing: validateBuiltDrawingLimits,
+        buildGeometry: data => window.PulumurGeometry.buildDrawing(data)
+      });
+      dispatchProjectAction(window.PulumurProjectActions.TYPES.RECONCILE_TOPOLOGY, { normalizedInput: pipeline.drawing.input }, { source: 'preview-topology' });
+      applyProjectModelRuntimeState(projectStore.getState());
+      if (topologyReconcileReport && topologyReconcileReport.orphaned && topologyReconcileReport.orphaned.length) {
+        pipeline = window.PulumurRenderPipeline.buildFromModel(projectStore.getState(), {
+          limits: applicationLimits(),
+          validateInput,
+          validateDrawing: validateBuiltDrawingLimits,
+          buildGeometry: data => window.PulumurGeometry.buildDrawing(data)
+        });
+      }
+      const drawing = pipeline.drawing;
+      syncUpperInputWrap(pipeline.formData);
       lastDrawing = drawing;
       renderPreview(drawing, resetZoom);
       applyPreviewDimensionOffsets();
@@ -1030,8 +1119,8 @@
       recordProjectHistoryState();
       const d = drawing.input;
       statusText.textContent = currentLanguage === 'en'
-        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V8.9.33: left, right and activated intermediate side views use independent support, parapet, product, triangle and wall states. In multi-position drawings the final right-side view is the editing master and the final left-side view is its clean semantic mirror.`
-        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V8.9.33: sol, sağ ve etkinleştirilen ara poz yan görünüşleri destek, parapet, ürün, üçgen doğrama ve arka duvar durumlarını bağımsız saklar. Çoklu pozda son sağ yan görünüş düzenleme kaynağıdır; son sol yan görünüş bunun temiz ve semantik ayna sunumudur.`;
+        ? `Ready: Page1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm projection, ${d.systems.map(s => s.rayCount).join(';')} rails, ${d.postCount} posts, angle ${window.PulumurGeometry.formatDeg(d.angle)}. Use the mouse wheel to zoom and drag with the left button to pan. V10.2: ProjectModel owns persistent state; the final right-side view is the editing master and the final left-side view is its semantic mirror.`
+        : `Hazır: Sayfa1 B1=${d.sayfa1 ? d.sayfa1.B1_width : Math.round(d.width)} | ${Math.round(d.opening)} mm açılım, ${d.systems.map(s => s.rayCount).join(';')} ray, ${d.postCount} dikme, açı ${window.PulumurGeometry.formatDeg(d.angle)}. Tekerlek ile zoom, sol tuş basılı sürükle ile pan. V10.2: kalıcı durum merkezi ProjectModel içinde tutulur; son sağ yan görünüş düzenleme kaynağı, son sol yan görünüş semantik aynasıdır.`;
       return drawing;
     } catch (err) {
       const txt = UI_TEXT[currentLanguage] || UI_TEXT.tr;
@@ -1725,6 +1814,8 @@
     const gapWidth = Number(gap.width) || (Number(gap.right) - Number(gap.left));
     if (gapWidth + 0.001 < nextProfile.en) throw new Error(currentLanguage === 'en' ? 'The selected gap is narrower than the profile.' : 'Seçilen aralık profil genişliğinden daha dar.');
     const posts = materializeSidePosts(meta);
+    const supportLimit = applicationLimits().maxSideSupportsPerView;
+    if (posts.length >= supportLimit) throw new Error(currentLanguage === 'en' ? `The side-support limit per view is ${supportLimit}.` : `Görünüş başına destek dikmesi sınırı ${supportLimit}.`);
     const gapIndex = Math.max(0, Number(meta.sideGapIndex) || 0);
     posts.push({ id: `side_${sideViewKeyFromMeta(meta)}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, centerX: (Number(gap.left) + Number(gap.right)) / 2, profile: nextProfile, extension: 0 });
     storeSidePosts(meta, posts);
@@ -2979,7 +3070,7 @@
     }));
 
     const parapet = Number(context.form.parapetHeight) || 0;
-    const front = Math.max(0, ...numericTokens(context.form.frontHeight));
+    const front = numericTokens(context.form.frontHeight).reduce((value, item) => Math.max(value, item), 0);
     if (parapet > front) warning(
       'parapet-over-front-height', 'Parapet yüksekliği ön H değerini aşıyor', 'Parapet exceeds front height',
       `Parapet ${parapet} mm, ön H ${front} mm.`, `Parapet is ${parapet} mm, front height is ${front} mm.`,
@@ -3357,6 +3448,8 @@
   }
 
   function storeSlidingPlacement(placement) {
+    const existing = [slidingPlacements, sideSlidingPlacements, guillotinePlacements, sideGuillotinePlacements].some(list => list.some(item => String(item.id || '') === String(placement.id || '')));
+    if (!existing && stateProductCount() >= applicationLimits().maxProducts) throw new Error(currentLanguage === 'en' ? `The total product limit is ${applicationLimits().maxProducts}.` : `Toplam ürün sınırı ${applicationLimits().maxProducts}.`);
     const isSide = ['side-left', 'side-right'].includes(String(placement.placementView || ''));
     if (isSide) {
       const key = normalizeSideViewKey(placement.sideViewKey, placement.sideIndex);
@@ -3374,6 +3467,8 @@
   }
 
   function storeGuillotinePlacement(placement) {
+    const existing = [slidingPlacements, sideSlidingPlacements, guillotinePlacements, sideGuillotinePlacements].some(list => list.some(item => String(item.id || '') === String(placement.id || '')));
+    if (!existing && stateProductCount() >= applicationLimits().maxProducts) throw new Error(currentLanguage === 'en' ? `The total product limit is ${applicationLimits().maxProducts}.` : `Toplam ürün sınırı ${applicationLimits().maxProducts}.`);
     const isSide = ['side-left', 'side-right'].includes(String(placement.placementView || ''));
     if (isSide) {
       const key = normalizeSideViewKey(placement.sideViewKey, placement.sideIndex);
@@ -4955,6 +5050,11 @@
       if (after) after.start = end;
       const originalId = String(list[index].id || meta.parapetSegmentId || `parapet_${Date.now()}`);
       const replacement = [];
+      const segmentLimit = applicationLimits().maxSegmentsPerView;
+      if (list.length - 1 + divide > segmentLimit) {
+        error.textContent = currentLanguage === 'en' ? `The segment limit per view is ${segmentLimit}.` : `Görünüş başına parça sınırı ${segmentLimit}.`;
+        return;
+      }
       const piece = (end - start) / divide;
       for (let i = 0; i < divide; i += 1) replacement.push({
         id: divide === 1 ? originalId : `${originalId}_${Date.now()}_${i + 1}`,
@@ -4962,7 +5062,8 @@
         end: i === divide - 1 ? end : start + piece * (i + 1),
         height
       });
-      list.splice(index, 1, ...replacement);
+      list.splice(index, 1);
+      replacement.forEach((item, replacementIndex) => list.splice(index + replacementIndex, 0, item));
       storeParapetSegments(meta, list);
       close();
       updatePreview(false);
@@ -5223,8 +5324,8 @@
       const height = read('#backWallHeightInput');
       const divide = Math.max(1, Math.floor(read('#backWallDivideInput') || 1));
       const error = overlay.querySelector('#backWallEditorError');
-      if (![xOffset, startValue, endValue, height].every(Number.isFinite) || startValue < 0 || endValue <= startValue || height <= 0 || divide > 50) {
-        error.textContent = currentLanguage === 'en' ? 'Enter a valid wall segment and division count (1–50).' : 'Geçerli duvar parçası ve 1–50 arasında bölme sayısı gir.';
+      if (![xOffset, startValue, endValue, height].every(Number.isFinite) || startValue < 0 || endValue <= startValue || height <= 0 || divide > applicationLimits().maxSegmentsPerView) {
+        error.textContent = currentLanguage === 'en' ? `Enter a valid wall segment and division count (1–${applicationLimits().maxSegmentsPerView}).` : `Geçerli duvar parçası ve 1–${applicationLimits().maxSegmentsPerView} arasında bölme sayısı gir.`;
         return;
       }
       const key = normalizeSideViewKey(overlay.dataset.sideViewKey, Number(overlay.dataset.sideIndex || 0));
@@ -5249,6 +5350,11 @@
       if (next) next.start = end;
       const original = list[index] || {};
       const baseId = String(original.id || `back_wall_${key}_${Date.now()}`);
+      const segmentLimit = applicationLimits().maxSegmentsPerView;
+      if (list.length - 1 + divide > segmentLimit) {
+        error.textContent = currentLanguage === 'en' ? `The segment limit per view is ${segmentLimit}.` : `Görünüş başına parça sınırı ${segmentLimit}.`;
+        return;
+      }
       const piece = (end - start) / divide;
       const replacement = Array.from({ length: divide }, (_, i) => ({
         id: divide === 1 ? baseId : `${baseId}_${Date.now()}_${i + 1}`,
@@ -5256,9 +5362,10 @@
         end: i === divide - 1 ? end : start + piece * (i + 1),
         height
       }));
-      list.splice(index, 1, ...replacement);
+      list.splice(index, 1);
+      replacement.forEach((item, replacementIndex) => list.splice(index + replacementIndex, 0, item));
       storeBackWallSegmentsForKey(key, list);
-      const depth = Math.max(1, ...list.map(item => Number(item.end) || 0));
+      const depth = list.reduce((value, item) => Math.max(value, Number(item.end) || 0), 1);
       setSideScopedStateValue(backWallState, key, { xOffset, depth, height: 0 });
       close();
       updatePreview(false);
@@ -5494,7 +5601,7 @@
     return safe || fallback;
   }
 
-  function createProjectSnapshot() {
+  function captureRuntimeFormData() {
     const formData = {};
     ids.forEach(id => {
       const el = $(id);
@@ -5504,51 +5611,46 @@
         ? normalizeYesNo(rawValue)
         : (upperTableFieldIds.includes(id) ? rawValue.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : rawValue);
     });
+    return formData;
+  }
 
+  function captureRuntimeDrawingState() {
     return {
-      format: PROJECT_FORMAT,
-      schemaVersion: PROJECT_SCHEMA_VERSION,
-      appVersion: APP_VERSION,
-      savedAt: new Date().toISOString(),
+      manualPostPlacementMode,
+      glassTrackProfile: sanitizeGlassTrackProfile(glassTrackProfileState),
+      glassTrackSupportProfiles: {
+        left: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.left),
+        right: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.right)
+      },
+      frontPostCenters: Array.isArray(customFrontPostCenters) ? customFrontPostCenters.map(Number) : null,
+      customRayPositions: deepCloneJson(customRayPositions),
+      sideSupportCenters: { ...customSideSupportCenters },
+      sidePosts: deepCloneJson(customSidePosts) || {},
+      frontPostProfiles: deepCloneJson(frontPostProfiles) || [],
+      frontPostExtensions: deepCloneJson(frontPostExtensions) || [],
+      parapetSegments: deepCloneJson(parapetSegments) || { front: [], side: {} },
+      sideFeatureState: deepCloneJson(sideFeatureState) || normalizeSideFeatureStateForApp(),
+      glassTrackLengthOffsets: deepCloneJson(glassTrackLengthOffsets) || { left: 0, right: 0, middle: {} },
+      triangleDivisionState: deepCloneJson(triangleDivisionState) || { left: null, right: null, middle: {} },
+      backWallState: deepCloneJson(backWallState) || { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} },
+      backWallSegments: deepCloneJson(backWallSegments) || { side: {} },
+      previewDimensionOffsets: deepCloneJson(previewDimensionOffsets) || {},
+      slidingPlacements: deepCloneJson(slidingPlacements) || [],
+      sideSlidingPlacements: deepCloneJson(sideSlidingPlacements) || [],
+      guillotinePlacements: deepCloneJson(guillotinePlacements) || [],
+      sideGuillotinePlacements: deepCloneJson(sideGuillotinePlacements) || [],
+      manualInputFlags: {
+        rayCount: Boolean($('rayCount') && $('rayCount').dataset.userEdited === 'true'),
+        postCount: Boolean($('postCount') && $('postCount').dataset.userEdited === 'true')
+      }
+    };
+  }
+
+  function legacyRuntimeEnvelope(formData = captureRuntimeFormData()) {
+    return {
       record: deepCloneJson(currentProjectRecord),
-      metadata: {
-        customerName: formData.customer || '',
-        projectName: formData.project || '',
-        drawingVersion: formData.version || '',
-        productType: formData.product || 'Pergo Rise',
-        moduleName: formData.moduleName || 'Module 1',
-        drawingEngine: formData.engine || 'Web DXF'
-      },
       formData,
-      drawingState: {
-        manualPostPlacementMode,
-        glassTrackProfile: sanitizeGlassTrackProfile(glassTrackProfileState),
-        glassTrackSupportProfiles: {
-          left: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.left),
-          right: sanitizeOptionalGlassTrackProfile(glassSupportProfileState.right)
-        },
-        frontPostCenters: Array.isArray(customFrontPostCenters) ? customFrontPostCenters.map(Number) : null,
-        customRayPositions: deepCloneJson(customRayPositions),
-        sideSupportCenters: { ...customSideSupportCenters },
-        sidePosts: deepCloneJson(customSidePosts) || {},
-        frontPostProfiles: deepCloneJson(frontPostProfiles) || [],
-        frontPostExtensions: deepCloneJson(frontPostExtensions) || [],
-        parapetSegments: deepCloneJson(parapetSegments) || { front: [], side: {} },
-        sideFeatureState: deepCloneJson(sideFeatureState) || normalizeSideFeatureStateForApp(),
-        glassTrackLengthOffsets: deepCloneJson(glassTrackLengthOffsets) || { left: 0, right: 0, middle: {} },
-        triangleDivisionState: deepCloneJson(triangleDivisionState) || { left: null, right: null, middle: {} },
-        backWallState: deepCloneJson(backWallState) || { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} },
-        backWallSegments: deepCloneJson(backWallSegments) || { side: {} },
-        previewDimensionOffsets: deepCloneJson(previewDimensionOffsets) || {},
-        slidingPlacements: deepCloneJson(slidingPlacements) || [],
-        sideSlidingPlacements: deepCloneJson(sideSlidingPlacements) || [],
-        guillotinePlacements: deepCloneJson(guillotinePlacements) || [],
-        sideGuillotinePlacements: deepCloneJson(sideGuillotinePlacements) || [],
-        manualInputFlags: {
-          rayCount: Boolean($('rayCount') && $('rayCount').dataset.userEdited === 'true'),
-          postCount: Boolean($('postCount') && $('postCount').dataset.userEdited === 'true')
-        }
-      },
+      drawingState: captureRuntimeDrawingState(),
       uiSettings: {
         language: currentLanguage,
         dimensions: serializePreviewDimensionFilter()
@@ -5556,34 +5658,73 @@
     };
   }
 
+  function syncProjectModelFromLegacy(formData, normalizedInput, source = 'runtime-sync') {
+    dispatchProjectAction(window.PulumurProjectActions.TYPES.SYNC_LEGACY_STATE, {
+      legacy: legacyRuntimeEnvelope(formData || captureRuntimeFormData()),
+      normalizedInput: normalizedInput || null
+    }, { source, allowInvalid: true });
+    if (normalizedInput) {
+      dispatchProjectAction(window.PulumurProjectActions.TYPES.RECONCILE_TOPOLOGY, { normalizedInput }, { source: `${source}:reconcile` });
+    }
+    return projectStore.getState();
+  }
+
+  function applyProjectModelRuntimeState(model) {
+    const state = window.PulumurProjectModel.toLegacy(model).drawingState;
+    manualPostPlacementMode = typeof state.manualPostPlacementMode === 'string' ? state.manualPostPlacementMode : 'standard';
+    glassTrackProfileState = sanitizeGlassTrackProfile(state.glassTrackProfile);
+    const supports = state.glassTrackSupportProfiles || {};
+    glassSupportProfileState = {
+      left: sanitizeOptionalGlassTrackProfile(supports.left),
+      right: sanitizeOptionalGlassTrackProfile(supports.right)
+    };
+    customFrontPostCenters = Array.isArray(state.frontPostCenters) ? state.frontPostCenters.map(Number).filter(Number.isFinite) : null;
+    customRayPositions = state.customRayPositions && typeof state.customRayPositions === 'object' ? deepCloneJson(state.customRayPositions) : null;
+    customSideSupportCenters = state.sideSupportCenters && typeof state.sideSupportCenters === 'object'
+      ? Object.fromEntries(Object.entries(state.sideSupportCenters).map(([key, value]) => [String(key), Number(value)]).filter(([, value]) => Number.isFinite(value)))
+      : {};
+    customSidePosts = state.sidePosts && typeof state.sidePosts === 'object' ? deepCloneJson(state.sidePosts) || {} : {};
+    frontPostProfiles = Array.isArray(state.frontPostProfiles) ? deepCloneJson(state.frontPostProfiles) || [] : [];
+    frontPostExtensions = Array.isArray(state.frontPostExtensions) ? state.frontPostExtensions.map(value => Math.max(0, Number(value) || 0)) : [];
+    parapetSegments = state.parapetSegments && typeof state.parapetSegments === 'object' ? deepCloneJson(state.parapetSegments) || { front: [], side: {} } : { front: [], side: {} };
+    sideFeatureState = normalizeSideFeatureStateForApp(state.sideFeatureState);
+    glassTrackLengthOffsets = normalizeGlassTrackLengthOffsetsForApp(state.glassTrackLengthOffsets);
+    triangleDivisionState = normalizeTriangleDivisionStateForApp(state.triangleDivisionState);
+    backWallState = normalizeBackWallStateForApp(state.backWallState);
+    backWallSegments = normalizeBackWallSegmentsForApp(state.backWallSegments);
+    previewDimensionOffsets = normalizePreviewDimensionOffsets(state.previewDimensionOffsets);
+    slidingPlacements = Array.isArray(state.slidingPlacements) ? deepCloneJson(state.slidingPlacements) || [] : [];
+    sideSlidingPlacements = Array.isArray(state.sideSlidingPlacements) ? deepCloneJson(state.sideSlidingPlacements) || [] : [];
+    guillotinePlacements = Array.isArray(state.guillotinePlacements) ? deepCloneJson(state.guillotinePlacements) || [] : [];
+    sideGuillotinePlacements = Array.isArray(state.sideGuillotinePlacements) ? deepCloneJson(state.sideGuillotinePlacements) || [] : [];
+  }
+
+  function createProjectSnapshot() {
+    const model = syncProjectModelFromLegacy(captureRuntimeFormData(), lastDrawing && lastDrawing.input, 'snapshot');
+    return window.PulumurProjectSchema.createEnvelope(model, { appVersion: APP_VERSION, limits: applicationLimits() });
+  }
+
   function normalizeProjectSnapshot(raw) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new Error(currentLanguage === 'en' ? 'The project file is not a valid JSON object.' : 'Proje dosyası geçerli bir JSON nesnesi değil.');
+    try {
+      return window.PulumurProjectSchema.normalizeEnvelope(raw, { limits: applicationLimits() });
+    } catch (error) {
+      const code = String(error && error.message || '');
+      if (code.includes('PROJECT_MODEL_MISSING')) throw new Error(currentLanguage === 'en' ? 'The Schema v2 ProjectModel is missing.' : 'Schema v2 ProjectModel verisi eksik.');
+      if (code.includes('PROJECT_SCHEMA')) throw new Error(currentLanguage === 'en' ? `This build accepts only project schema v${PROJECT_SCHEMA_VERSION}.` : `Bu sürüm yalnızca v${PROJECT_SCHEMA_VERSION} proje veri şemasını kabul eder.`);
+      if (code.includes('PROJECT_FORMAT')) throw new Error(currentLanguage === 'en' ? 'This is not a Pülümür project file.' : 'Bu dosya Pülümür proje dosyası değil.');
+      if (code.includes('PROJECT_CHECKSUM')) throw new Error(currentLanguage === 'en' ? 'The project file checksum is invalid.' : 'Proje dosyası bütünlük doğrulamasından geçemedi.');
+      throw error;
     }
-    if (raw.format !== PROJECT_FORMAT) {
-      throw new Error(currentLanguage === 'en' ? 'This is not a Pülümür project file.' : 'Bu dosya Pülümür proje dosyası değil.');
-    }
-    const schemaVersion = Number(raw.schemaVersion);
-    if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
-      throw new Error(currentLanguage === 'en' ? 'The project schema version is invalid.' : 'Proje veri şeması sürümü geçersiz.');
-    }
-    if (schemaVersion > PROJECT_SCHEMA_VERSION) {
-      throw new Error(currentLanguage === 'en'
-        ? `This project was created with a newer data schema (v${schemaVersion}).`
-        : `Bu proje daha yeni bir veri şemasıyla oluşturulmuş (v${schemaVersion}).`);
-    }
-    if (!raw.formData || typeof raw.formData !== 'object' || Array.isArray(raw.formData)) {
-      throw new Error(currentLanguage === 'en' ? 'The project form data is missing.' : 'Projenin form verileri eksik.');
-    }
-    return deepCloneJson(raw);
   }
 
   function restoreProjectSnapshot(rawSnapshot, options = {}) {
     const snapshot = normalizeProjectSnapshot(rawSnapshot);
-    const formData = snapshot.formData || {};
-    const record = snapshot.record || {};
-    const drawingState = snapshot.drawingState || {};
-    const uiSettings = snapshot.uiSettings || {};
+    const restoredModel = window.PulumurProjectModel.normalize(snapshot.projectModel);
+    const legacy = window.PulumurProjectModel.toLegacy(restoredModel);
+    const formData = legacy.formData || {};
+    const record = legacy.record || {};
+    const drawingState = legacy.drawingState || {};
+    const uiSettings = legacy.uiSettings || {};
     const nextLanguage = uiSettings.language === 'en' ? 'en' : 'tr';
 
     suppressFormPreviewUpdate = true;
@@ -5591,7 +5732,8 @@
       currentProjectRecord = {
         projectId: record.projectId ? String(record.projectId) : null,
         projectCode: record.projectCode ? String(record.projectCode) : null,
-        revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+        revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1,
+        serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0 ? Number(record.serverVersion) : null
       };
 
       if ($('languageSelect')) $('languageSelect').value = nextLanguage;
@@ -5672,6 +5814,7 @@
       syncDimensionFilterControls();
 
       document.querySelectorAll('.quick-test-btn.active').forEach(btn => btn.classList.remove('active'));
+      projectStore.replaceSilently(restoredModel);
     } finally {
       suppressFormPreviewUpdate = false;
     }
@@ -5685,42 +5828,77 @@
     return drawing;
   }
 
+  function preflightProjectSnapshot(rawSnapshot) {
+    const normalized = normalizeProjectSnapshot(rawSnapshot);
+    let model = window.PulumurProjectValidation.validateProjectModel(normalized.projectModel, { limits: applicationLimits() });
+    const build = candidate => {
+      const geometryInput = window.PulumurProjectModel.geometryInputFromModel(candidate);
+      const oversizedField = ['systemCount', 'width', 'opening', 'rearHeight', 'frontHeight', 'rayCount', 'postCount']
+        .find(key => String(geometryInput && geometryInput[key] == null ? '' : geometryInput[key]).length > 4096);
+      if (oversizedField) throw new Error(currentLanguage === 'en' ? `The ${oversizedField} input is too long.` : `${oversizedField} alanı izin verilenden uzun.`);
+      const required = ['width', 'opening', 'rearHeight', 'frontHeight'].filter(key => firstNumber(geometryInput[key]) <= 0);
+      if (required.length) throw new Error(currentLanguage === 'en' ? `Required geometry fields are invalid: ${required.join(', ')}.` : `Zorunlu geometri alanları geçersiz: ${required.join(', ')}.`);
+      const drawing = window.PulumurGeometry.buildDrawing(geometryInput);
+      validateBuiltDrawingLimits(drawing);
+      return drawing;
+    };
+    let drawing = build(model);
+    const reconciled = window.PulumurTopologyReconcile.reconcileProjectTopology(model, drawing.input);
+    model = window.PulumurProjectValidation.validateProjectModel(reconciled.model, { limits: applicationLimits() });
+    if (reconciled.report && reconciled.report.orphaned && reconciled.report.orphaned.length) drawing = build(model);
+    if (!drawing || !Array.isArray(drawing.entities)) throw new Error(currentLanguage === 'en' ? 'The temporary geometry could not be built.' : 'Geçici geometri oluşturulamadı.');
+    return window.PulumurProjectSchema.createEnvelope(model, { appVersion: APP_VERSION, limits: applicationLimits() });
+  }
+
 
   function restoreProjectSnapshotWithHistory(rawSnapshot, options = {}) {
+    const preparedSnapshot = options.skipPreflight === true ? rawSnapshot : preflightProjectSnapshot(rawSnapshot);
     const shouldResetHistory = options.resetHistory === true;
+    const rollback = lastDrawing ? createProjectSnapshot() : null;
     const previousRestoring = projectHistory.restoring;
-    if (shouldResetHistory) projectHistory.restoring = true;
+    projectHistory.restoring = true;
     let drawing;
     try {
-      drawing = restoreProjectSnapshot(rawSnapshot, options);
+      drawing = restoreProjectSnapshot(preparedSnapshot, { ...options, requireValidDrawing: true });
+      if (!drawing) throw new Error(currentLanguage === 'en' ? 'The project could not be rebuilt.' : 'Proje çizimi yeniden oluşturulamadı.');
+    } catch (error) {
+      if (rollback) {
+        try { restoreProjectSnapshot(rollback, { resetZoom: false, requireValidDrawing: true }); }
+        catch (rollbackError) { console.error('Project rollback failed', rollbackError); }
+      }
+      throw error;
     } finally {
-      if (shouldResetHistory) projectHistory.restoring = previousRestoring;
+      projectHistory.restoring = previousRestoring;
     }
     if (shouldResetHistory) {
       resetProjectHistory(false);
-      if (drawing) recordProjectHistoryState({ force: true });
+      recordProjectHistoryState({ force: true });
     }
     return drawing;
   }
 
   function serializeProjectSnapshot(snapshot = createProjectSnapshot()) {
-    return JSON.stringify(normalizeProjectSnapshot(snapshot), null, 2);
+    const normalized = normalizeProjectSnapshot(snapshot);
+    const text = JSON.stringify(normalized, null, 2);
+    const maxMb = applicationLimits().maxProjectFileMb;
+    if (new Blob([text]).size > maxMb * 1024 * 1024) throw new Error(currentLanguage === 'en' ? `The project file exceeds the ${maxMb} MB limit.` : `Proje dosyası ${maxMb} MB sınırını aşıyor.`);
+    return text;
   }
 
   function parseProjectSnapshot(text) {
-    let raw;
     try {
-      raw = JSON.parse(String(text ?? ''));
+      return window.PulumurProjectSchema.parse(text, { limits: applicationLimits() });
     } catch (err) {
+      if (!String(err && err.message || '').includes('PROJECT_JSON_INVALID')) throw err;
       throw new Error(currentLanguage === 'en' ? 'The project file contains invalid JSON.' : 'Proje dosyasındaki JSON içeriği geçersiz.');
     }
-    return normalizeProjectSnapshot(raw);
   }
 
   function projectSnapshotFileName(snapshot) {
-    const meta = (snapshot && snapshot.metadata) || {};
-    const record = (snapshot && snapshot.record) || {};
-    const projectName = cleanProjectFileToken(meta.projectName, currentLanguage === 'en' ? 'project' : 'proje');
+    const model = window.PulumurProjectModel.normalize(snapshot && snapshot.projectModel);
+    const meta = model.metadata || {};
+    const record = model.revisionInfo || {};
+    const projectName = cleanProjectFileToken(meta.project, currentLanguage === 'en' ? 'project' : 'proje');
     const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
     const revision = `R${String(revisionNo).padStart(2, '0')}`;
     const projectCode = cleanProjectFileToken(record.projectCode, 'LOCAL');
@@ -5731,7 +5909,11 @@
     try {
       const snapshot = createProjectSnapshot();
       const filename = projectSnapshotFileName(snapshot);
-      downloadText(filename, serializeProjectSnapshot(snapshot), 'application/json;charset=utf-8');
+      const serialized = serializeProjectSnapshot(snapshot);
+      const maxMb = applicationLimits().maxProjectFileMb;
+      const byteSize = new Blob([serialized]).size;
+      if (byteSize > maxMb * 1024 * 1024) throw new Error(currentLanguage === 'en' ? `The project file exceeds the ${maxMb} MB limit.` : `Proje dosyası ${maxMb} MB sınırını aşıyor.`);
+      downloadText(filename, serialized, 'application/json;charset=utf-8');
       statusText.textContent = currentLanguage === 'en'
         ? `Project file downloaded: ${filename}`
         : `Proje dosyası indirildi: ${filename}`;
@@ -5751,11 +5933,15 @@
 
   async function importProjectSnapshotFile(file) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error(currentLanguage === 'en' ? 'The project file is larger than 5 MB.' : 'Proje dosyası 5 MB sınırından büyük.');
+    const maxMb = applicationLimits().maxProjectFileMb;
+    if (file.size > maxMb * 1024 * 1024) {
+      throw new Error(currentLanguage === 'en' ? `The project file is larger than ${maxMb} MB.` : `Proje dosyası ${maxMb} MB sınırından büyük.`);
     }
     const text = await file.text();
-    const snapshot = parseProjectSnapshot(text);
+    const parsed = parseProjectSnapshot(text);
+    const detachedModel = window.PulumurProjectModel.normalize(parsed.projectModel);
+    detachedModel.revisionInfo = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
+    const snapshot = window.PulumurProjectSchema.createEnvelope(detachedModel, { appVersion: APP_VERSION, limits: applicationLimits() });
     restoreProjectSnapshotWithHistory(snapshot, { resetZoom: false, resetHistory: true });
     statusText.textContent = currentLanguage === 'en'
       ? `Project loaded: ${file.name}`
@@ -5777,10 +5963,26 @@
     currentProjectRecord = {
       projectId: record.projectId ? String(record.projectId) : null,
       projectCode: record.projectCode ? String(record.projectCode) : null,
-      revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1
+      revisionNo: Number.isInteger(Number(record.revisionNo)) && Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1,
+      serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0 ? Number(record.serverVersion) : null
     };
+    dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_REVISION_INFO, currentProjectRecord, { source: 'project-record' });
     return getCurrentProjectRecord();
   }
+
+  if (window.PulumurLimits && typeof window.PulumurLimits.subscribe === 'function') {
+    window.PulumurLimits.subscribe(() => { trimProjectHistory(); updateHistoryControls(); schedulePreviewUpdate(0); });
+  }
+
+  window.PulumurDiagnostics = Object.freeze({
+    getHistory: () => ({ index: projectHistory.index, entries: projectHistory.entries.length, limit: applicationLimits().historySteps }),
+    getLimits: () => applicationLimits(),
+    getProjectModel: () => projectStore.getState(),
+    getProjectActions: () => projectStore.debug(),
+    getTopologyReport: () => deepCloneJson(topologyReconcileReport),
+    getLastLeftMirror: () => window.PulumurProjectModel.deriveLastLeftMirror(projectStore.getState()),
+    validateCurrentState: () => { const raw = collectForm(); assertStateWithinLimits(raw); window.PulumurProjectValidation.validateProjectModel(projectStore.getState()); return true; }
+  });
 
   window.PulumurProjectState = Object.freeze({
     format: PROJECT_FORMAT,
@@ -5791,6 +5993,8 @@
     resetHistory: (captureCurrent = true) => resetProjectHistory(captureCurrent),
     serialize: serializeProjectSnapshot,
     parse: parseProjectSnapshot,
+    getModel: () => projectStore.getState(),
+    dispatch: (type, payload, meta) => dispatchProjectAction(type, payload, meta),
     getRecord: getCurrentProjectRecord,
     setRecord: setCurrentProjectRecord
   });
@@ -5823,7 +6027,7 @@
     const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
     const revision = `R${String(revisionNo).padStart(2, '0')}`;
     const projectCode = record.projectCode || 'LOCAL';
-    return window.PulumurModernDXF.safeFileName(`${projectCode}-${drawing.input.project}-${revision}-${drawing.input.product}-web-dxf-v8_6_0-v${drawing.input.version}`);
+    return window.PulumurModernDXF.safeFileName(`${projectCode}-${drawing.input.project}-${revision}-${drawing.input.product}-web-dxf-v${APP_VERSION.replace(/\./g, '_')}-v${drawing.input.version}`);
   }
 
   function currentDxfDimensionHiddenLayers() {
@@ -6426,7 +6630,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
   function applyParapetQuickValue() {
     const quick=$('parapetQuickInput'), source=$('parapetHeight'), select=$('parapet'); if(!quick||!source||!select)return;
     const clean=String(quick.value||'').replace(/[^0-9]/g,''); quick.value=clean;
-    const value=Number(clean||0); const front=Math.max(0,...numericTokens($('frontHeight')?$('frontHeight').value:0));
+    const value=Number(clean||0); const front=numericTokens($('frontHeight')?$('frontHeight').value:0).reduce((out,item)=>Math.max(out,item),0);
     if(value>front && front>0){ quick.value=String(front); source.value=String(front); window.alert(currentLanguage==='en'?'Parapet height cannot exceed front height.':'Parapet yüksekliği ön H değerinden büyük olamaz.'); }
     else source.value=value>0?String(value):'';
     select.value=Number(source.value)>0?'EVET':'HAYIR'; syncToolboxBooleanButtons(); syncParapetQuickInput(); updatePreview(false);
@@ -6520,8 +6724,12 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     };
     const copiedSliding = copyPlacements(sideSlidingPlacements, 'sliding');
     const copiedGuillotine = copyPlacements(sideGuillotinePlacements, 'guillotine');
-    sideSlidingPlacements.push(...copiedSliding);
-    sideGuillotinePlacements.push(...copiedGuillotine);
+    if (stateProductCount() + copiedSliding.length + copiedGuillotine.length > applicationLimits().maxProducts) {
+      sideFeatureState.middleEnabled[key] = false;
+      throw new Error(currentLanguage === 'en' ? `The total product limit is ${applicationLimits().maxProducts}.` : `Toplam ürün sınırı ${applicationLimits().maxProducts}.`);
+    }
+    copiedSliding.forEach(item => sideSlidingPlacements.push(item));
+    copiedGuillotine.forEach(item => sideGuillotinePlacements.push(item));
     updatePreview(false);
     statusText.textContent=currentLanguage==='en'?`Intermediate side view ${index+1} activated from the left-side template.`:`${index+1}. ara poz yan görünüşü sol yan görünüş kopyasıyla düzenlemeye açıldı.`;
   }
@@ -6615,9 +6823,13 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
       }
     });
     $('helpBtn').addEventListener('click', showHelp);
-    $('languageSelect').addEventListener('change', evt => { translateUI(evt.target.value); updatePreview(); });
+    $('languageSelect').addEventListener('change', evt => {
+      translateUI(evt.target.value);
+      dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_LANGUAGE, evt.target.value, { source: 'form-language' });
+      schedulePreviewUpdate(0);
+    });
     $('motor').addEventListener('input', () => { updateRemoteOptions(true); });
-    $('motor').addEventListener('change', () => { updateRemoteOptions(true); updatePreview(); });
+    $('motor').addEventListener('change', () => { updateRemoteOptions(true); schedulePreviewUpdate(0); });
     $('calcComputeBtn').addEventListener('click', () => {
       try { calculateMissing(); } catch (err) { $('calcResult').textContent = err.message; }
     });
@@ -6634,7 +6846,8 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
           if (!syncingSideFeatureForm && (id === 'glassTrack' || id === 'triangleJoinery')) setMainSideFeatureValue(id, normalizeYesNo(el.value) === 'EVET');
           syncToolboxBooleanButtons();
         }
-        updatePreview();
+        dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_FORM_FIELD, { field: id, value: el.value }, { source: 'form-change', allowInvalid: true });
+        schedulePreviewUpdate(0);
       });
       el.addEventListener('input', () => {
         if (suppressFormPreviewUpdate) return;
@@ -6652,18 +6865,11 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
           if ($('rayCount')) $('rayCount').dataset.userEdited = 'false';
           if ($('postCount')) $('postCount').dataset.userEdited = 'false';
         }
-        if (['systemCount', 'width', 'rayCount', 'postCount'].includes(id)) {
-          customFrontPostCenters = null;
-          frontPostProfiles = [];
-          customSidePosts = {};
-          slidingPlacements = [];
-          guillotinePlacements = [];
-        }
         if (['systemCount', 'width', 'frontHeight', 'glassTrack'].includes(id)) {
           applyAutoRayPost(false);
         }
-        window.clearTimeout(el._previewTimer);
-        el._previewTimer = window.setTimeout(updatePreview, 350);
+        dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_FORM_FIELD, { field: id, value: el.value }, { source: 'form-input', allowInvalid: true });
+        schedulePreviewUpdate(350);
       });
     });
   }

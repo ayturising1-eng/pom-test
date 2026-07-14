@@ -54,7 +54,7 @@
 
   async function identify() {
     try {
-      await rpc('identify_usage_session_v1', { p_session_id: getSessionId() });
+      await rpc('identify_usage_session_v2', { p_session_id: getSessionId() });
     } catch (error) {
       console.warn('Usage session could not be identified.', error);
     }
@@ -79,7 +79,7 @@
     const opts = options || {};
     if (!action) return null;
     try {
-      return await rpc('log_activity_v1', {
+      return await rpc('log_activity_v2', {
         p_session_id: getSessionId(),
         p_action: String(action),
         p_project_id: opts.projectId || null,

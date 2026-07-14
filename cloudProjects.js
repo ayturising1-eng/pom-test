@@ -21,7 +21,10 @@
     newRevisionCancelBtn: $('newRevisionCancelBtn'), newRevisionConfirmBtn: $('newRevisionConfirmBtn'),
     revisionFromValue: $('revisionFromValue'), revisionToValue: $('revisionToValue'), revisionChangeNote: $('revisionChangeNote'),
     newRevisionMessage: $('newRevisionMessage'), revisionsDialog: $('revisionsDialog'), revisionsCloseBtn: $('revisionsCloseBtn'),
-    revisionsProjectCode: $('revisionsProjectCode'), revisionsTableBody: $('revisionsTableBody'), revisionsEmpty: $('revisionsEmpty')
+    revisionsProjectCode: $('revisionsProjectCode'), revisionsTableBody: $('revisionsTableBody'), revisionsEmpty: $('revisionsEmpty'),
+    conflictDialog: $('projectConflictDialog'), conflictMessage: $('projectConflictMessage'),
+    conflictReloadBtn: $('projectConflictReloadBtn'), conflictRevisionBtn: $('projectConflictRevisionBtn'),
+    conflictCopyBtn: $('projectConflictCopyBtn'), conflictCancelBtn: $('projectConflictCancelBtn')
   };
 
   const TEXT = {
@@ -30,14 +33,14 @@
       loginUsername: 'Kullanıcı Adı', loginPassword: 'PIN Kodu', rememberMe: 'Beni hatırla', savePassword: 'PIN Kodumu kaydet',
       authNote: 'Kullanıcı adı ve 4 haneli PIN kodu yönetici tarafından tanımlanır. PIN kaydı desteklenen cihazlarda tarayıcının parola yöneticisiyle yapılır.',
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
-      setupMissing: 'Altyapı hazır değil. v8.9.22 Supabase kurulumunu kontrol et.',
+      setupMissing: 'Altyapı hazır değil. Supabase kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
       confirmDiscard: 'Kaydedilmemiş değişiklikler var. Devam edilsin mi?', projectOpened: 'Proje açıldı:',
       projectCreated: 'Yeni proje kaydedildi:', projectUpdated: 'Proje güncellendi:', loginRequired: 'Oturum açman gerekiyor.',
       open: 'Aç', revisions: 'Revizyonlar', unknownUser: 'Kullanıcı', unknownCompany: 'Firma',
-      historical: 'Geçmiş revizyon', historicalEdited: 'Geçmiş revizyon düzenlendi — kaydedilemez', historicalSaveBlocked: 'Geçmiş revizyon doğrudan kaydedilemez. Güncel revizyonu aç.',
+      historical: 'Geçmiş revizyon', historicalEdited: 'Geçmiş revizyon düzenlendi — yeni revizyon olarak kaydedilebilir', historicalSaveBlocked: 'Geçmiş revizyon doğrudan güncel kaydın üzerine yazılamaz.',
       revisionRequired: 'Önce projeyi kaydet.', revisionCreating: 'Revizyon oluşturuluyor…', revisionCreated: 'Yeni revizyon oluşturuldu:',
       revisionFailed: 'Revizyon oluşturulamadı.', revisionLoading: 'Revizyonlar yükleniyor…', noRevisions: 'Revizyon bulunamadı.',
       revisionOpened: 'Geçmiş revizyon açıldı:', currentRevisionOpened: 'Güncel revizyon açıldı:', current: 'Güncel', history: 'Geçmiş',
@@ -45,21 +48,26 @@
       readOnly: 'Salt okunur', noWritePermission: 'Bu kullanıcı yalnız görüntüleme yetkisine sahip.',
       deleteProject: 'Sil', deleteProjectConfirm: 'Bu proje ve tüm revizyonları kalıcı olarak silinecek. Devam edilsin mi?',
       projectDeleted: 'Proje ve revizyonları silindi:', deleteProjectFailed: 'Proje silinemedi.', systemAdminRequired: 'Bu işlem yalnız Sistem Yöneticisi tarafından yapılabilir.',
-      roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.'
+      roleSystemAdmin: 'Sistem Yöneticisi', roleCompanyAdmin: 'Firma Yöneticisi', roleDesigner: 'Tasarımcı', organizationInactive: 'Firma hesabı pasif.', licenseExpired: 'Firma lisans süresi sona ermiş.', licenseNotStarted: 'Firma lisansı henüz başlamamış.',
+      sessionRevoked: 'PIN değişikliği nedeniyle oturum kapatıldı. Lütfen tekrar giriş yap.', loginRateLimited: 'Çok fazla hatalı deneme yapıldı. Geçici kilit süresi dolunca tekrar dene.',
+      conflictTitle: 'Bu proje başka bir sekmede değiştirildi. Yerel çalışman otomatik olarak ezilmedi.',
+      conflictReload: 'Sunucudakini yükle', conflictRevision: 'Yerel çalışmayı yeni revizyon yap', conflictCopy: 'Yerel çalışmayı kopya olarak kaydet',
+      conflictCancelled: 'Çakışma çözülmedi; yerel değişiklikler korunuyor.', changesDuringSave: 'Kayıt tamamlandı; kayıt sırasında yapılan yeni değişiklikler henüz kaydedilmedi.',
+      historicalRevisionHint: 'Bu geçmiş çalışma, güncel kaydı ezmeden yeni revizyon olarak oluşturulacak.'
     },
     en: {
       authLoading: 'Checking session…', loginBusy: 'Signing in…', loginFailed: 'Incorrect username or PIN.',
       loginUsername: 'Username', loginPassword: 'PIN Code', rememberMe: 'Remember me', savePassword: 'Save my PIN',
       authNote: 'The username and 4-digit PIN are assigned by the company administrator. PIN saving uses the browser password manager on supported devices.',
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
-      setupMissing: 'Infrastructure is not ready. Check the v8.9.22 Supabase setup.',
+      setupMissing: 'Infrastructure is not ready. Check the Supabase setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
       confirmDiscard: 'There are unsaved changes. Continue?', projectOpened: 'Project opened:',
       projectCreated: 'New project saved:', projectUpdated: 'Project updated:', loginRequired: 'You need to sign in.',
       open: 'Open', revisions: 'Revisions', unknownUser: 'User', unknownCompany: 'Company',
-      historical: 'Historical revision', historicalEdited: 'Historical revision edited — cannot be saved', historicalSaveBlocked: 'A historical revision cannot be saved directly. Open the current revision.',
+      historical: 'Historical revision', historicalEdited: 'Historical revision edited — can be saved as a new revision', historicalSaveBlocked: 'A historical revision cannot overwrite the current project.',
       revisionRequired: 'Save the project first.', revisionCreating: 'Creating revision…', revisionCreated: 'New revision created:',
       revisionFailed: 'The revision could not be created.', revisionLoading: 'Loading revisions…', noRevisions: 'No revisions found.',
       revisionOpened: 'Historical revision opened:', currentRevisionOpened: 'Current revision opened:', current: 'Current', history: 'History',
@@ -67,7 +75,12 @@
       readOnly: 'Read only', noWritePermission: 'This user has view-only permission.',
       deleteProject: 'Delete', deleteProjectConfirm: 'This project and all of its revisions will be permanently deleted. Continue?',
       projectDeleted: 'Project and revisions deleted:', deleteProjectFailed: 'The project could not be deleted.', systemAdminRequired: 'This action is available only to the System Administrator.',
-      roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', organizationInactive: 'The company account is inactive.', licenseExpired: 'The company license has expired.', licenseNotStarted: 'The company license has not started yet.'
+      roleSystemAdmin: 'System Administrator', roleCompanyAdmin: 'Company Administrator', roleDesigner: 'Designer', organizationInactive: 'The company account is inactive.', licenseExpired: 'The company license has expired.', licenseNotStarted: 'The company license has not started yet.',
+      sessionRevoked: 'Your session was closed because the PIN changed. Sign in again.', loginRateLimited: 'Too many incorrect attempts. Try again after the temporary lock expires.',
+      conflictTitle: 'This project changed in another tab. Your local work was not overwritten.',
+      conflictReload: 'Load server version', conflictRevision: 'Save local work as a new revision', conflictCopy: 'Save local work as a copy',
+      conflictCancelled: 'The conflict is unresolved; local changes are preserved.', changesDuringSave: 'Save completed; changes made during the save are still unsaved.',
+      historicalRevisionHint: 'This historical work will become a new revision without overwriting the current project.'
     }
   };
 
@@ -77,6 +90,7 @@
   let currentOrganization = null;
   let projectRows = [];
   let dirty = false;
+  let dirtyGeneration = 0;
   let authBusy = false;
   let authEpoch = 0;
   let explicitLoginInProgress = false;
@@ -85,6 +99,7 @@
   let historicalCurrentRevision = 1;
   let revisionContext = null;
   let revisionRows = [];
+  let conflictResolver = null;
 
   // Shared auth bridge for admin operations. It exposes only the active session
   // token in memory; nothing is written to localStorage by this bridge.
@@ -165,7 +180,7 @@
   function getRecord() {
     return ProjectState && typeof ProjectState.getRecord === 'function'
       ? ProjectState.getRecord()
-      : { projectId: null, projectCode: null, revisionNo: 1 };
+      : { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
   }
 
   function canWriteProjects() {
@@ -213,19 +228,28 @@
 
     if (ui.newCloudProjectBtn) ui.newCloudProjectBtn.disabled = !writable;
     if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.disabled = historicalMode || !writable;
-    if (ui.newRevisionBtn) ui.newRevisionBtn.disabled = historicalMode || !record.projectId || !writable;
+    if (ui.newRevisionBtn) ui.newRevisionBtn.disabled = !record.projectId || !writable;
     if (ui.revisionHistoryBtn) ui.revisionHistoryBtn.disabled = !record.projectId;
   }
 
   function markDirty() {
     if (suppressDirty || !currentSession || !canWriteProjects()) return;
     dirty = true;
+    dirtyGeneration += 1;
     setSaveState(historicalMode ? t('historicalEdited') : t('unsaved'), historicalMode ? 'history' : 'dirty');
   }
 
-  function markClean() {
+  function markClean(expectedGeneration = null) {
+    if (expectedGeneration !== null && expectedGeneration !== dirtyGeneration) {
+      dirty = true;
+      setSaveState(t('unsaved'), 'dirty');
+      setStatus(t('changesDuringSave'));
+      refreshProjectHeader();
+      return false;
+    }
     dirty = false;
     refreshProjectHeader();
+    return true;
   }
 
   function setAppAccess(allowed) {
@@ -244,6 +268,9 @@
   function friendlyError(error, fallbackKey) {
     const raw = String((error && error.message) || '').trim();
     if (/READ_ONLY_USER/i.test(raw)) return t('noWritePermission');
+    if (/SESSION_REVOKED/i.test(raw)) return t('sessionRevoked');
+    if (/LOGIN_RATE_LIMITED|HTTP_429/i.test(raw)) return t('loginRateLimited');
+    if (/PROJECT_VERSION_CONFLICT/i.test(raw)) return t('conflictTitle');
     if (/SYSTEM_ADMIN_REQUIRED/i.test(raw)) return t('systemAdminRequired');
     if (/ORGANIZATION_INACTIVE/i.test(raw)) return t('organizationInactive');
     if (/LICENSE_EXPIRED/i.test(raw)) return t('licenseExpired');
@@ -327,12 +354,24 @@
     refreshRoleUi();
   }
 
+  async function loadEffectiveLimits() {
+    if (!client || !window.PulumurLimits) return;
+    const result = await client.rpc('get_effective_app_limits_v1');
+    if (result.error) throw result.error;
+    const values = {};
+    (result.data || []).forEach(row => {
+      if (row && row.limit_key) values[row.limit_key] = Number(row.limit_value);
+    });
+    window.PulumurLimits.set(values);
+  }
+
   async function handleAuthenticated(session) {
     currentSession = session;
     window.PulumurCurrentSession = session;
     setAuthMessage(t('authLoading'), false);
     try {
       await loadProfile();
+      await loadEffectiveLimits();
       setAppAccess(true);
       setAuthMessage('', false);
       refreshProjectHeader();
@@ -433,20 +472,111 @@
   }
 
   function projectPayload(snapshot) {
-    const metadata = snapshot.metadata || {};
+    const model = snapshot && snapshot.projectModel ? snapshot.projectModel : {};
+    const metadata = model.metadata || {};
+    const limits = window.PulumurLimits && typeof window.PulumurLimits.get === 'function' ? window.PulumurLimits.get() : { maxProjectFileMb: 10 };
+    const byteSize = new Blob([JSON.stringify(snapshot)]).size;
+    if (byteSize > limits.maxProjectFileMb * 1024 * 1024) throw new Error(`PROJECT_SIZE_LIMIT:${limits.maxProjectFileMb}MB`);
     return {
-      project_name: String(metadata.projectName || '').trim(),
-      customer_name: String(metadata.customerName || '').trim() || null,
+      project_name: String(metadata.project || '').trim(),
+      customer_name: String(metadata.customer || '').trim() || null,
       product_type: 'PERGO_RISE',
       project_data: snapshot,
-      app_version: snapshot.appVersion || '8.9.22',
-      schema_version: Number(snapshot.schemaVersion) || 1
+      app_version: snapshot.appVersion || '10.2',
+      schema_version: Number(snapshot.schemaVersion) || 2
     };
+  }
+
+  function snapshotWithRecord(rawSnapshot, record) {
+    if (!window.PulumurProjectModel || !window.PulumurProjectSchema) throw new Error('PROJECT_MODEL_NOT_READY');
+    const model = window.PulumurProjectModel.normalize(rawSnapshot && rawSnapshot.projectModel);
+    model.revisionInfo = {
+      projectId: record && record.projectId ? String(record.projectId) : null,
+      projectCode: record && record.projectCode ? String(record.projectCode) : null,
+      revisionNo: Math.max(1, Math.round(Number(record && record.revisionNo) || 1)),
+      serverVersion: Number.isInteger(Number(record && record.serverVersion)) && Number(record.serverVersion) > 0
+        ? Number(record.serverVersion)
+        : null
+    };
+    return window.PulumurProjectSchema.createEnvelope(model, { appVersion: '10.2' });
   }
 
   function normalizeRpcRow(data) {
     if (Array.isArray(data)) return data[0] || null;
     return data || null;
+  }
+
+  function chooseConflictAction() {
+    if (!ui.conflictDialog) return Promise.resolve('cancel');
+    if (ui.conflictMessage) ui.conflictMessage.textContent = t('conflictTitle');
+    if (ui.conflictReloadBtn) ui.conflictReloadBtn.textContent = t('conflictReload');
+    if (ui.conflictRevisionBtn) ui.conflictRevisionBtn.textContent = t('conflictRevision');
+    if (ui.conflictCopyBtn) ui.conflictCopyBtn.textContent = t('conflictCopy');
+    return new Promise(resolve => {
+      conflictResolver = resolve;
+      if (!ui.conflictDialog.open) ui.conflictDialog.showModal();
+    });
+  }
+
+  function finishConflictAction(action) {
+    if (ui.conflictDialog && ui.conflictDialog.open) ui.conflictDialog.close();
+    const resolve = conflictResolver;
+    conflictResolver = null;
+    if (resolve) resolve(action || 'cancel');
+  }
+
+  async function resolveVersionConflict(record, saveGeneration) {
+    const action = await chooseConflictAction();
+    if (action === 'reload') {
+      await openProjectById(record.projectId, { force: true });
+      return;
+    }
+    if (action === 'copy') {
+      ProjectState.setRecord({ projectId: null, projectCode: null, revisionNo: 1, serverVersion: null });
+      historicalMode = false;
+      dirty = true;
+      await saveCurrentProject();
+      return;
+    }
+    if (action !== 'revision') {
+      setStatus(t('conflictCancelled'));
+      return;
+    }
+
+    const snapshot = ProjectState.createSnapshot();
+    const payload = projectPayload(snapshot);
+    const latestResult = await client.from('projects')
+      .select('id, project_code, current_revision, server_version')
+      .eq('id', record.projectId)
+      .single();
+    if (latestResult.error) throw latestResult.error;
+    const latest = latestResult.data;
+    const result = await client.rpc('create_revision_from_history_v1', {
+      p_project_id: record.projectId,
+      p_source_revision: Math.max(1, Number(record.revisionNo) || 1),
+      p_expected_server_version: Number(latest.server_version),
+      p_project_name: payload.project_name,
+      p_customer_name: payload.customer_name,
+      p_product_type: payload.product_type,
+      p_project_data: payload.project_data,
+      p_app_version: payload.app_version,
+      p_schema_version: payload.schema_version,
+      p_change_note: language() === 'en' ? 'Conflict-resolved local revision' : 'Çakışmadan korunan yerel revizyon'
+    });
+    if (result.error) throw result.error;
+    const row = normalizeRpcRow(result.data);
+    ProjectState.setRecord({
+      projectId: row.id,
+      projectCode: row.project_code,
+      revisionNo: row.current_revision,
+      serverVersion: Number(row.server_version)
+    });
+    historicalMode = false;
+    historicalCurrentRevision = row.current_revision;
+    const clean = markClean(saveGeneration);
+    setStatus(clean
+      ? `${t('revisionCreated')} ${row.project_code} / R${String(row.current_revision).padStart(2, '0')}`
+      : t('changesDuringSave'));
   }
 
   async function saveCurrentProject(options = {}) {
@@ -478,12 +608,13 @@
     }
 
     const record = getRecord();
+    const saveGeneration = dirtyGeneration;
     setSaveState(t('saving'), 'saving');
     if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.disabled = true;
 
     try {
       if (!record.projectId) {
-        const rpcResult = await client.rpc('create_project_v1', {
+        const rpcResult = await client.rpc('create_project_v2', {
           p_project_name: payload.project_name,
           p_customer_name: payload.customer_name,
           p_product_type: payload.product_type,
@@ -495,11 +626,17 @@
         const row = normalizeRpcRow(rpcResult.data);
         if (!row || !row.id || !row.project_code) throw new Error(t('saveFailed'));
 
-        ProjectState.setRecord({ projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || 1 });
+        ProjectState.setRecord({
+          projectId: row.id,
+          projectCode: row.project_code,
+          revisionNo: row.current_revision || 1,
+          serverVersion: Number(row.server_version) || 1
+        });
         const finalSnapshot = ProjectState.createSnapshot();
         const finalPayload = projectPayload(finalSnapshot);
-        const syncResult = await client.rpc('save_project_v1', {
+        const syncResult = await client.rpc('save_project_v2', {
           p_project_id: row.id,
+          p_expected_server_version: Number(row.server_version) || 1,
           p_project_name: finalPayload.project_name,
           p_customer_name: finalPayload.customer_name,
           p_product_type: finalPayload.product_type,
@@ -512,12 +649,13 @@
         ProjectState.setRecord({
           projectId: synced.id || row.id,
           projectCode: synced.project_code || row.project_code,
-          revisionNo: synced.current_revision || row.current_revision || 1
+          revisionNo: synced.current_revision || row.current_revision || 1,
+          serverVersion: Number(synced.server_version) || Number(row.server_version) || 1
         });
         historicalMode = false;
         historicalCurrentRevision = synced.current_revision || 1;
-        markClean();
-        if (!silent) setStatus(`${t('projectCreated')} ${row.project_code}`);
+        const clean = markClean(saveGeneration);
+        if (!silent) setStatus(clean ? `${t('projectCreated')} ${row.project_code}` : t('changesDuringSave'));
         if (window.PulumurActivity) {
           void window.PulumurActivity.log('project_create', {
             projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || 1,
@@ -527,8 +665,12 @@
       } else {
         const snapshot = ProjectState.createSnapshot();
         const updatePayload = projectPayload(snapshot);
-        const updateResult = await client.rpc('save_project_v1', {
+        if (!Number.isInteger(Number(record.serverVersion)) || Number(record.serverVersion) < 1) {
+          throw new Error('PROJECT_VERSION_TOKEN_MISSING');
+        }
+        const updateResult = await client.rpc('save_project_v2', {
           p_project_id: record.projectId,
+          p_expected_server_version: Number(record.serverVersion),
           p_project_name: updatePayload.project_name,
           p_customer_name: updatePayload.customer_name,
           p_product_type: updatePayload.product_type,
@@ -542,12 +684,13 @@
         ProjectState.setRecord({
           projectId: row.id,
           projectCode: row.project_code,
-          revisionNo: row.current_revision || record.revisionNo || 1
+          revisionNo: row.current_revision || record.revisionNo || 1,
+          serverVersion: Number(row.server_version)
         });
         historicalMode = false;
         historicalCurrentRevision = row.current_revision || record.revisionNo || 1;
-        markClean();
-        if (!silent) setStatus(`${t('projectUpdated')} ${row.project_code}`);
+        const clean = markClean(saveGeneration);
+        if (!silent) setStatus(clean ? `${t('projectUpdated')} ${row.project_code}` : t('changesDuringSave'));
         if (window.PulumurActivity) {
           void window.PulumurActivity.log('project_save', {
             projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision || record.revisionNo || 1,
@@ -557,9 +700,18 @@
       }
       return true;
     } catch (error) {
-      console.error(error);
       setSaveState(t('unsaved'), 'error');
-      if (!silent) window.alert(friendlyError(error, 'saveFailed'));
+      if (/PROJECT_VERSION_CONFLICT/i.test(String(error && error.message || '')) && !silent) {
+        try {
+          await resolveVersionConflict(getRecord(), saveGeneration);
+        } catch (conflictError) {
+          console.error(conflictError);
+          window.alert(friendlyError(conflictError, 'saveFailed'));
+        }
+      } else if (!silent) {
+        console.error(error);
+        window.alert(friendlyError(error, 'saveFailed'));
+      }
       return false;
     } finally {
       refreshProjectHeader();
@@ -655,7 +807,7 @@
     if (ui.projectsTableBody) ui.projectsTableBody.innerHTML = '';
     const result = await client
       .from('projects')
-      .select('id, project_code, customer_name, project_name, product_type, current_revision, app_version, schema_version, created_at, updated_at')
+      .select('id, project_code, customer_name, project_name, product_type, current_revision, server_version, app_version, schema_version, created_at, updated_at')
       .is('archived_at', null)
       .order('updated_at', { ascending: false })
       .limit(500);
@@ -719,12 +871,12 @@
     }
   }
 
-  async function openProjectById(projectId) {
-    if (dirty && !window.confirm(t('confirmDiscard'))) return;
+  async function openProjectById(projectId, options = {}) {
+    if (!options.force && dirty && !window.confirm(t('confirmDiscard'))) return;
     try {
       const result = await client
         .from('projects')
-        .select('id, project_code, customer_name, project_name, product_type, current_revision, project_data, app_version, schema_version, created_at, updated_at')
+        .select('id, project_code, customer_name, project_name, product_type, current_revision, server_version, project_data, app_version, schema_version, created_at, updated_at')
         .eq('id', projectId)
         .single();
       if (result.error) throw result.error;
@@ -732,14 +884,15 @@
       if (!row || !row.project_data) throw new Error(t('openFailed'));
 
       suppressDirty = true;
-      const snapshot = JSON.parse(JSON.stringify(row.project_data));
-      snapshot.record = {
+      const record = {
         projectId: row.id,
         projectCode: row.project_code,
-        revisionNo: row.current_revision || 1
+        revisionNo: row.current_revision || 1,
+        serverVersion: Number(row.server_version) || 1
       };
+      const snapshot = snapshotWithRecord(JSON.parse(JSON.stringify(row.project_data)), record);
       ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
-      ProjectState.setRecord(snapshot.record);
+      ProjectState.setRecord(record);
       historicalMode = false;
       historicalCurrentRevision = row.current_revision || 1;
       dirty = false;
@@ -768,14 +921,10 @@
       window.alert(t('revisionRequired'));
       return;
     }
-    if (historicalMode) {
-      window.alert(t('historicalSaveBlocked'));
-      return;
-    }
     if (ui.revisionFromValue) ui.revisionFromValue.textContent = `R${String(record.revisionNo || 1).padStart(2, '0')}`;
-    if (ui.revisionToValue) ui.revisionToValue.textContent = `R${String((record.revisionNo || 1) + 1).padStart(2, '0')}`;
+    if (ui.revisionToValue) ui.revisionToValue.textContent = `R${String((historicalMode ? historicalCurrentRevision : record.revisionNo || 1) + 1).padStart(2, '0')}`;
     if (ui.revisionChangeNote) ui.revisionChangeNote.value = '';
-    if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = t('confirmRevision');
+    if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = historicalMode ? t('historicalRevisionHint') : t('confirmRevision');
     if (ui.newRevisionDialog && !ui.newRevisionDialog.open) ui.newRevisionDialog.showModal();
     window.setTimeout(() => ui.revisionChangeNote && ui.revisionChangeNote.focus(), 20);
   }
@@ -783,18 +932,33 @@
   async function createNewRevision(event) {
     event.preventDefault();
     if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
-    const recordBeforeSave = getRecord();
-    if (!recordBeforeSave.projectId || historicalMode) return;
+    const record = getRecord();
+    if (!record.projectId) return;
+    if (!Number.isInteger(Number(record.serverVersion)) || Number(record.serverVersion) < 1) {
+      window.alert(t('openFailed'));
+      return;
+    }
     if (ui.newRevisionConfirmBtn) ui.newRevisionConfirmBtn.disabled = true;
     if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = t('revisionCreating');
+    const saveGeneration = dirtyGeneration;
     try {
-      const saved = await saveCurrentProject({ silent: true });
-      if (!saved) throw new Error(t('saveBeforeRevisionFailed'));
-      const record = getRecord();
-      const result = await client.rpc('create_revision_v1', {
+      const snapshot = ProjectState.createSnapshot();
+      const payload = projectPayload(snapshot);
+      if (!payload.project_name) throw new Error(t('projectNameRequired'));
+      const rpcName = historicalMode ? 'create_revision_from_history_v1' : 'create_revision_v2';
+      const args = {
         p_project_id: record.projectId,
+        p_expected_server_version: Number(record.serverVersion),
+        p_project_name: payload.project_name,
+        p_customer_name: payload.customer_name,
+        p_product_type: payload.product_type,
+        p_project_data: payload.project_data,
+        p_app_version: payload.app_version,
+        p_schema_version: payload.schema_version,
         p_change_note: String(ui.revisionChangeNote && ui.revisionChangeNote.value || '').trim() || null
-      });
+      };
+      if (historicalMode) args.p_source_revision = Math.max(1, Number(record.revisionNo) || 1);
+      const result = await client.rpc(rpcName, args);
       if (result.error) throw result.error;
       const row = normalizeRpcRow(result.data);
       if (!row || !row.id) throw new Error(t('revisionFailed'));
@@ -802,15 +966,18 @@
       ProjectState.setRecord({
         projectId: row.id,
         projectCode: row.project_code,
-        revisionNo: row.current_revision
+        revisionNo: row.current_revision,
+        serverVersion: Number(row.server_version)
       });
       historicalMode = false;
       historicalCurrentRevision = row.current_revision;
-      dirty = false;
+      const clean = markClean(saveGeneration);
 
       if (ui.newRevisionDialog && ui.newRevisionDialog.open) ui.newRevisionDialog.close();
       refreshProjectHeader();
-      setStatus(`${t('revisionCreated')} ${row.project_code} / R${String(row.current_revision).padStart(2, '0')}`);
+      setStatus(clean
+        ? `${t('revisionCreated')} ${row.project_code} / R${String(row.current_revision).padStart(2, '0')}`
+        : t('changesDuringSave'));
       if (window.PulumurActivity) {
         void window.PulumurActivity.log('revision_create', {
           projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision,
@@ -818,9 +985,19 @@
         });
       }
     } catch (error) {
-      console.error(error);
-      if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = friendlyError(error, 'revisionFailed');
-      window.alert(friendlyError(error, 'revisionFailed'));
+      if (/PROJECT_VERSION_CONFLICT/i.test(String(error && error.message || ''))) {
+        if (ui.newRevisionDialog && ui.newRevisionDialog.open) ui.newRevisionDialog.close();
+        try {
+          await resolveVersionConflict(record, saveGeneration);
+        } catch (conflictError) {
+          console.error(conflictError);
+          window.alert(friendlyError(conflictError, 'revisionFailed'));
+        }
+      } else {
+        console.error(error);
+        if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = friendlyError(error, 'revisionFailed');
+        window.alert(friendlyError(error, 'revisionFailed'));
+      }
     } finally {
       if (ui.newRevisionConfirmBtn) ui.newRevisionConfirmBtn.disabled = false;
       refreshProjectHeader();
@@ -836,7 +1013,7 @@
 
     const [projectResult, revisionsResult] = await Promise.all([
       client.from('projects')
-        .select('id, project_code, project_name, customer_name, current_revision, updated_at')
+        .select('id, project_code, project_name, customer_name, current_revision, server_version, updated_at')
         .eq('id', projectId)
         .single(),
       client.from('project_revisions')
@@ -912,14 +1089,15 @@
       if (!row || !row.project_data) throw new Error(t('openFailed'));
 
       suppressDirty = true;
-      const snapshot = JSON.parse(JSON.stringify(row.project_data));
-      snapshot.record = {
+      const record = {
         projectId: revisionContext.id,
         projectCode: revisionContext.project_code,
-        revisionNo: Number(row.revision_no) || 1
+        revisionNo: Number(row.revision_no) || 1,
+        serverVersion: Number(revisionContext.server_version) || 1
       };
+      const snapshot = snapshotWithRecord(JSON.parse(JSON.stringify(row.project_data)), record);
       ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
-      ProjectState.setRecord(snapshot.record);
+      ProjectState.setRecord(record);
       historicalMode = true;
       historicalCurrentRevision = currentRevision;
       dirty = false;
@@ -994,6 +1172,14 @@
     if (ui.newRevisionCloseBtn) ui.newRevisionCloseBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.newRevisionCancelBtn) ui.newRevisionCancelBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.revisionsCloseBtn) ui.revisionsCloseBtn.addEventListener('click', () => ui.revisionsDialog && ui.revisionsDialog.close());
+    if (ui.conflictReloadBtn) ui.conflictReloadBtn.addEventListener('click', () => finishConflictAction('reload'));
+    if (ui.conflictRevisionBtn) ui.conflictRevisionBtn.addEventListener('click', () => finishConflictAction('revision'));
+    if (ui.conflictCopyBtn) ui.conflictCopyBtn.addEventListener('click', () => finishConflictAction('copy'));
+    if (ui.conflictCancelBtn) ui.conflictCancelBtn.addEventListener('click', () => finishConflictAction('cancel'));
+    if (ui.conflictDialog) ui.conflictDialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      finishConflictAction('cancel');
+    });
     if ($('languageSelect')) $('languageSelect').addEventListener('change', () => {
       applyLoginLanguage();
       refreshProjectHeader();

@@ -1,19 +1,30 @@
-const CACHE_NAME = 'pulumur-pwa-v8_9_33';
+const CACHE_PREFIX = 'pulumur-pwa-';
+const CACHE_NAME = `${CACHE_PREFIX}v10_2`;
+const NETWORK_TIMEOUT_MS = 8000;
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css?v=8.9.33',
-  './app.js?v=8.9.33',
-  './supabaseConfig.js?v=8.9.33',
-  './cloudProjects.js?v=8.9.33',
-  './adminUsersApi.js?v=8.9.33',
-  './activityTracker.js?v=8.9.33',
-  './adminPanel.js?v=8.9.33',
-  './peri01ExcelBridge.js?v=8.9.33',
-  './peri01Geometry.js?v=8.9.33',
-  './modernDxfTemplate.js?v=8.9.33',
-  './dxfModernEngine.js?v=8.9.33',
-  './blocks/filteredBlocks.js?v=8.9.33',
+  './style.css?v=10.2',
+  './appLimits.js?v=10.2',
+  './core/actions.js?v=10.2',
+  './core/projectModel.js?v=10.2',
+  './core/topologyReconcile.js?v=10.2',
+  './core/validation.js?v=10.2',
+  './core/reducer.js?v=10.2',
+  './history/historyManager.js?v=10.2',
+  './persistence/schema.js?v=10.2',
+  './render/renderPipeline.js?v=10.2',
+  './app.js?v=10.2',
+  './supabaseConfig.js?v=10.2',
+  './cloudProjects.js?v=10.2',
+  './adminUsersApi.js?v=10.2',
+  './activityTracker.js?v=10.2',
+  './adminPanel.js?v=10.2',
+  './peri01ExcelBridge.js?v=10.2',
+  './peri01Geometry.js?v=10.2',
+  './modernDxfTemplate.js?v=10.2',
+  './dxfModernEngine.js?v=10.2',
+  './blocks/filteredBlocks.js?v=10.2',
   './assets/plmr-logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -21,25 +32,46 @@ const CORE_ASSETS = [
   './icons/favicon-64.png'
 ];
 
+async function cacheCoreAssets() {
+  const cache = await caches.open(CACHE_NAME);
+  const results = await Promise.allSettled(CORE_ASSETS.map(async asset => {
+    const request = new Request(asset, { cache: 'reload' });
+    const response = await fetch(request);
+    if (!response || !response.ok) throw new Error(`CACHE_FETCH_FAILED:${asset}`);
+    await cache.put(request, response.clone());
+  }));
+  const criticalAssets = new Set([
+    './index.html', './appLimits.js?v=10.2', './core/actions.js?v=10.2', './core/projectModel.js?v=10.2',
+    './core/topologyReconcile.js?v=10.2', './core/validation.js?v=10.2', './core/reducer.js?v=10.2',
+    './history/historyManager.js?v=10.2', './persistence/schema.js?v=10.2', './render/renderPipeline.js?v=10.2',
+    './app.js?v=10.2', './peri01Geometry.js?v=10.2', './blocks/filteredBlocks.js?v=10.2'
+  ]);
+  const failures = results.map((result, index) => ({ result, asset: CORE_ASSETS[index] }))
+    .filter(item => criticalAssets.has(item.asset) && item.result.status === 'rejected');
+  if (failures.length) throw new Error(`PULUMUR_CRITICAL_CACHE_FAILED:${failures.map(item => item.asset).join(',')}`);
+}
+
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(CORE_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(cacheCoreAssets().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
+function fetchWithTimeout(request, timeoutMs = NETWORK_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { cache: 'no-store', signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function networkFirst(request) {
   try {
-    const response = await fetch(request, { cache: 'no-store' });
+    const response = await fetchWithTimeout(request);
     if (response && response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone()).catch(() => {});
@@ -53,12 +85,16 @@ async function networkFirst(request) {
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
-  const response = await fetch(request);
-  if (response && response.ok) {
-    const cache = await caches.open(CACHE_NAME);
-    cache.put(request, response.clone()).catch(() => {});
+  try {
+    const response = await fetchWithTimeout(request);
+    if (response && response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch (_) {
+    return Response.error();
   }
-  return response;
 }
 
 self.addEventListener('fetch', event => {
