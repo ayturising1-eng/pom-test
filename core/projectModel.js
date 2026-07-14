@@ -150,7 +150,7 @@
         offsets: {}
       },
       drawingOptions: Object.fromEntries(Object.entries(DEFAULT_FORM).filter(([key]) => !META_FIELDS.has(key) && !TOPOLOGY_FIELDS.has(key))),
-      revisionInfo: { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null },
+      revisionInfo: { projectId: null, projectCode: null, revisionNo: 1 },
       manualInputFlags: { rayCount: false, postCount: false },
       language: 'tr',
       orphans: { sideViews: {}, frontProducts: [], notes: [] },
@@ -310,10 +310,7 @@
     model.revisionInfo = {
       projectId: record.projectId ? text(record.projectId) : null,
       projectCode: record.projectCode ? text(record.projectCode) : null,
-      revisionNo: positiveInteger(record.revisionNo, 1),
-      serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0
-        ? Number(record.serverVersion)
-        : null
+      revisionNo: positiveInteger(record.revisionNo, 1)
     };
     model.manualInputFlags = {
       rayCount: !!object(state.manualInputFlags).rayCount,
@@ -501,14 +498,7 @@
     model.products = { front: { sliding: clone(array(object(object(source.products).front).sliding)), guillotine: clone(array(object(object(source.products).front).guillotine)) } };
     model.dimensions = { filter: { ...model.dimensions.filter, ...clone(object(object(source.dimensions).filter)) }, offsets: clone(object(object(source.dimensions).offsets)) };
     model.drawingOptions = { ...model.drawingOptions, ...clone(object(source.drawingOptions)) };
-    model.revisionInfo = {
-      ...model.revisionInfo,
-      ...clone(object(source.revisionInfo)),
-      revisionNo: positiveInteger(object(source.revisionInfo).revisionNo, 1),
-      serverVersion: Number.isInteger(Number(object(source.revisionInfo).serverVersion)) && Number(object(source.revisionInfo).serverVersion) > 0
-        ? Number(object(source.revisionInfo).serverVersion)
-        : null
-    };
+    model.revisionInfo = { ...model.revisionInfo, ...clone(object(source.revisionInfo)), revisionNo: positiveInteger(object(source.revisionInfo).revisionNo, 1) };
     model.manualInputFlags = { ...model.manualInputFlags, ...clone(object(source.manualInputFlags)) };
     model.language = source.language === 'en' ? 'en' : 'tr';
     model.orphans = { ...model.orphans, ...clone(object(source.orphans)), sideViews: clone(object(object(source.orphans).sideViews)), frontProducts: clone(array(object(source.orphans).frontProducts)), notes: clone(array(object(source.orphans).notes)) };
