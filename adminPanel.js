@@ -38,7 +38,14 @@
     loginLockDialog: $('adminLoginLockDialog'), loginLockForm: $('adminLoginLockForm'), loginLockTitle: $('adminLoginLockTitle'),
     loginLockUser: $('adminLoginLockUser'), loginLockCloseBtn: $('adminLoginLockCloseBtn'), loginLockCancelBtn: $('adminLoginLockCancelBtn'),
     loginLockResetBtn: $('adminLoginLockResetBtn'), loginLockSummary: $('adminLoginLockSummary'),
-    loginLockAttempts: $('adminLoginLockAttempts'), loginLockMessage: $('adminLoginLockMessage')
+    loginLockAttempts: $('adminLoginLockAttempts'), loginLockMessage: $('adminLoginLockMessage'),
+    ownSecurityCard: $('adminOwnSecurityCard'), ownSecurityTitle: $('adminOwnSecurityTitle'), ownSecuritySubtitle: $('adminOwnSecuritySubtitle'),
+    changeOwnUsernameBtn: $('adminChangeOwnUsernameBtn'), globalLogoutBtn: $('adminGlobalLogoutBtn'),
+    ownUsernameDialog: $('adminOwnUsernameDialog'), ownUsernameForm: $('adminOwnUsernameForm'), ownUsernameTitle: $('adminOwnUsernameTitle'), ownUsernameCurrent: $('adminOwnUsernameCurrent'),
+    ownUsernameCloseBtn: $('adminOwnUsernameCloseBtn'), ownUsernameCancelBtn: $('adminOwnUsernameCancelBtn'), ownUsernameNew: $('adminOwnUsernameNew'), ownUsernamePin: $('adminOwnUsernamePin'),
+    ownUsernameConfirm: $('adminOwnUsernameConfirm'), ownUsernameMessage: $('adminOwnUsernameMessage'), ownUsernameSubmitBtn: $('adminOwnUsernameSubmitBtn'),
+    globalLogoutDialog: $('adminGlobalLogoutDialog'), globalLogoutForm: $('adminGlobalLogoutForm'), globalLogoutCloseBtn: $('adminGlobalLogoutCloseBtn'), globalLogoutCancelBtn: $('adminGlobalLogoutCancelBtn'),
+    globalLogoutConfirm: $('adminGlobalLogoutConfirm'), globalLogoutMessage: $('adminGlobalLogoutMessage'), globalLogoutSubmitBtn: $('adminGlobalLogoutSubmitBtn')
   };
 
   const TEXT = {
@@ -76,7 +83,7 @@
       action_revision_open: 'Eski revizyonu açtı', action_dxf_download: 'DXF indirdi', action_pdf_download: 'PDF indirdi',
       action_project_file_download: 'Proje dosyası indirdi', action_user_create: 'Kullanıcı oluşturdu',
       action_user_update: 'Kullanıcı güncelledi', action_pin_update: 'PIN değiştirdi', action_user_delete: 'Kullanıcı sildi',
-      loginLock: 'Giriş Kilidi', loginLockTitle: 'Giriş Kilidi ve Deneme Geçmişi', loginLockReset: 'Kilidi Sıfırla', loginLockResetConfirm: 'Bu kullanıcının kullanıcı adı kilidi ve son giriş denemeleriyle ilişkili IP kilitleri sıfırlansın mı?', loginLockResetSuccess: 'Giriş kilidi sıfırlandı.', loginLockNoAttempts: 'Yakın tarihli giriş denemesi bulunamadı.', usernameLocked: 'Kullanıcı adı kilidi', recentIpLocks: 'İlişkili IP kilidi', failureCount: 'Başarısız deneme', lockedUntil: 'Kilit bitişi', notLocked: 'Kilitli değil', usernameChangeSecureOnly: 'Mevcut kullanıcı adı bu ekrandan değiştirilemez; güvenli kullanıcı adı değiştirme akışı gerekir.', action_login_lock_reset: 'Giriş kilidini sıfırladı',
+      loginLock: 'Giriş Kilidi', loginLockTitle: 'Giriş Kilidi ve Deneme Geçmişi', loginLockReset: 'Kilidi Sıfırla', loginLockResetConfirm: 'Bu kullanıcının kullanıcı adı kilidi ve son giriş denemeleriyle ilişkili IP kilitleri sıfırlansın mı?', loginLockResetSuccess: 'Giriş kilidi sıfırlandı.', loginLockNoAttempts: 'Yakın tarihli giriş denemesi bulunamadı.', usernameLocked: 'Kullanıcı adı kilidi', recentIpLocks: 'İlişkili IP kilidi', failureCount: 'Başarısız deneme', lockedUntil: 'Kilit bitişi', notLocked: 'Kilitli değil', usernameChangeSecureOnly: 'Mevcut kullanıcı adı bu ekrandan değiştirilemez; güvenli kullanıcı adı değiştirme akışı gerekir.', action_login_lock_reset: 'Giriş kilidini sıfırladı', ownSecurity: 'Hesap Güvenliği', ownSecuritySubtitle: 'Sistem Yöneticisi hesabının kullanıcı adı ve oturum güvenliği.', changeOwnUsername: 'Kullanıcı Adımı Değiştir', globalLogout: 'Tüm Cihazlardan Çıkış Yap', usernameChangeWarning: 'Bu işlem tüm mevcut oturumları kapatır. Yeni kullanıcı adıyla tekrar giriş yapmanız gerekir.', currentPin: 'Mevcut PIN', newUsername: 'Yeni kullanıcı adı', confirmNewUsername: 'Yeni kullanıcı adını tekrar yaz', globalLogoutConfirmText: 'Tüm cihazlardaki oturumların kapatılmasını onaylıyorum.', usernameConfirmMismatch: 'Yeni kullanıcı adı onayı eşleşmiyor.', currentPinInvalid: 'Mevcut PIN doğrulanamadı.', usernameChanged: 'Kullanıcı adı değiştirildi. Yeni kullanıcı adıyla tekrar giriş yapın.', globalLogoutConfirmRequired: 'Tüm cihazlardan çıkış onayını işaretleyin.', globalLogoutFailed: 'Tüm cihazlardan çıkış işlemi tamamlanamadı.', action_self_username_change: 'Kendi kullanıcı adını değiştirdi', action_global_logout: 'Tüm cihazlardan çıkış yaptı',
       action_organization_create: 'Firma oluşturdu', action_organization_update: 'Firma güncelledi', action_organization_delete: 'Firma sildi'
     },
     en: {
@@ -113,7 +120,7 @@
       action_revision_open: 'Opened old revision', action_dxf_download: 'Downloaded DXF', action_pdf_download: 'Downloaded PDF',
       action_project_file_download: 'Downloaded project file', action_user_create: 'Created user',
       action_user_update: 'Updated user', action_pin_update: 'Changed PIN', action_user_delete: 'Deleted user',
-      loginLock: 'Login Lock', loginLockTitle: 'Login Lock and Attempt History', loginLockReset: 'Reset Lock', loginLockResetConfirm: 'Reset this user’s username lock and IP locks linked to recent login attempts?', loginLockResetSuccess: 'Login lock reset.', loginLockNoAttempts: 'No recent login attempts were found.', usernameLocked: 'Username lock', recentIpLocks: 'Linked IP locks', failureCount: 'Failed attempts', lockedUntil: 'Locked until', notLocked: 'Not locked', usernameChangeSecureOnly: 'An existing username cannot be changed here; a secure username-change flow is required.', action_login_lock_reset: 'Reset login lock',
+      loginLock: 'Login Lock', loginLockTitle: 'Login Lock and Attempt History', loginLockReset: 'Reset Lock', loginLockResetConfirm: 'Reset this user’s username lock and IP locks linked to recent login attempts?', loginLockResetSuccess: 'Login lock reset.', loginLockNoAttempts: 'No recent login attempts were found.', usernameLocked: 'Username lock', recentIpLocks: 'Linked IP locks', failureCount: 'Failed attempts', lockedUntil: 'Locked until', notLocked: 'Not locked', usernameChangeSecureOnly: 'An existing username cannot be changed here; a secure username-change flow is required.', action_login_lock_reset: 'Reset login lock', ownSecurity: 'Account Security', ownSecuritySubtitle: 'Username and session security for the System Administrator account.', changeOwnUsername: 'Change My Username', globalLogout: 'Sign Out on All Devices', usernameChangeWarning: 'This closes all existing sessions. You must sign in again with the new username.', currentPin: 'Current PIN', newUsername: 'New username', confirmNewUsername: 'Type the new username again', globalLogoutConfirmText: 'I confirm that all sessions on every device will be closed.', usernameConfirmMismatch: 'The new username confirmation does not match.', currentPinInvalid: 'The current PIN could not be verified.', usernameChanged: 'Username changed. Sign in again with the new username.', globalLogoutConfirmRequired: 'Confirm signing out on every device.', globalLogoutFailed: 'Global sign-out could not be completed.', action_self_username_change: 'Changed own username', action_global_logout: 'Signed out on all devices',
       action_organization_create: 'Created company', action_organization_update: 'Updated company', action_organization_delete: 'Deleted company'
     }
   };
@@ -172,6 +179,9 @@
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
     if (/LOGIN_RATE_LIMIT_UNAVAILABLE/i.test(raw)) return language() === 'en' ? 'Login security tables or RPC functions are unavailable.' : 'Giriş güvenliği tablolarına veya RPC fonksiyonlarına erişilemiyor.';
     if (/USERNAME_CHANGE_REQUIRES_SECURE_FLOW/i.test(raw)) return t('usernameChangeSecureOnly');
+    if (/CURRENT_PIN_INVALID|INVALID_CURRENT_PIN/i.test(raw)) return t('currentPinInvalid');
+    if (/USERNAME_CONFIRMATION_MISMATCH/i.test(raw)) return t('usernameConfirmMismatch');
+    if (/GLOBAL_SIGNOUT_FAILED/i.test(raw)) return t('globalLogoutFailed');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
     if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / V10.4]`;
@@ -259,7 +269,7 @@
 
   function setBusy(value) {
     busy = Boolean(value);
-    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh, ui.passwordSubmit, ui.activityRefresh, ui.deleteSubmit, ui.limitsSave, ui.limitsReset].forEach(button => {
+    [ui.inviteSubmit, ui.usersRefresh, ui.organizationCreateSubmit, ui.organizationsRefresh, ui.passwordSubmit, ui.activityRefresh, ui.deleteSubmit, ui.limitsSave, ui.limitsReset, ui.ownUsernameSubmitBtn, ui.globalLogoutSubmitBtn].forEach(button => {
       if (button) button.disabled = busy;
     });
   }
@@ -330,6 +340,19 @@
       if (key) node.textContent = t(key);
     });
     if (ui.inviteUsername) ui.inviteUsername.title = t('usernameHint');
+    if (ui.ownSecurityTitle) ui.ownSecurityTitle.textContent = t('ownSecurity');
+    if (ui.ownSecuritySubtitle) ui.ownSecuritySubtitle.textContent = t('ownSecuritySubtitle');
+    if (ui.changeOwnUsernameBtn) ui.changeOwnUsernameBtn.textContent = t('changeOwnUsername');
+    if (ui.globalLogoutBtn) ui.globalLogoutBtn.textContent = t('globalLogout');
+    if (ui.ownUsernameTitle) ui.ownUsernameTitle.textContent = t('changeOwnUsername');
+    if ($('adminOwnUsernameWarning')) $('adminOwnUsernameWarning').textContent = t('usernameChangeWarning');
+    if ($('adminOwnUsernameNewLabel')) $('adminOwnUsernameNewLabel').textContent = t('newUsername');
+    if ($('adminOwnUsernamePinLabel')) $('adminOwnUsernamePinLabel').textContent = t('currentPin');
+    if ($('adminOwnUsernameConfirmLabel')) $('adminOwnUsernameConfirmLabel').textContent = t('confirmNewUsername');
+    if ($('adminGlobalLogoutConfirmText')) $('adminGlobalLogoutConfirmText').textContent = t('globalLogoutConfirmText');
+    if (ui.ownUsernameSubmitBtn) ui.ownUsernameSubmitBtn.textContent = t('changeOwnUsername');
+    if ($('adminGlobalLogoutTitle')) $('adminGlobalLogoutTitle').textContent = t('globalLogout');
+    if (ui.globalLogoutSubmitBtn) ui.globalLogoutSubmitBtn.textContent = t('globalLogout');
     populateOrganizationSelectors();
     renderUsers();
     renderOrganizations();
@@ -810,6 +833,82 @@
     }
   }
 
+  function openOwnUsernameDialog() {
+    if (!isSystemAdmin() || !ui.ownUsernameDialog) return;
+    if (ui.ownUsernameCurrent) ui.ownUsernameCurrent.textContent = `@${currentProfile.username}`;
+    if (ui.ownUsernameNew) ui.ownUsernameNew.value = '';
+    if (ui.ownUsernamePin) ui.ownUsernamePin.value = '';
+    if (ui.ownUsernameConfirm) ui.ownUsernameConfirm.value = '';
+    if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = '';
+    ui.ownUsernameDialog.showModal();
+    window.setTimeout(() => ui.ownUsernameNew && ui.ownUsernameNew.focus(), 0);
+  }
+
+  function closeOwnUsernameDialog() {
+    if (ui.ownUsernameDialog && ui.ownUsernameDialog.open) ui.ownUsernameDialog.close();
+  }
+
+  async function submitOwnUsernameChange(event) {
+    event.preventDefault();
+    if (!isSystemAdmin() || busy) return;
+    const newUsername = String(ui.ownUsernameNew && ui.ownUsernameNew.value || '').trim().toLowerCase();
+    const confirmation = String(ui.ownUsernameConfirm && ui.ownUsernameConfirm.value || '').trim().toLowerCase();
+    const pin = String(ui.ownUsernamePin && ui.ownUsernamePin.value || '').trim();
+    if (!/^[a-z0-9._-]{3,32}$/.test(newUsername)) { if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = t('invalidUsername'); return; }
+    if (!/^\d{4}$/.test(pin)) { if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = t('passwordInvalid'); return; }
+    if (newUsername !== confirmation) { if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = t('usernameConfirmMismatch'); return; }
+    if (newUsername === String(currentProfile.username || '').toLowerCase()) { if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = t('usernameChangeSecureOnly'); return; }
+    setBusy(true);
+    if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = t('loading');
+    try {
+      const result = await window.PulumurAdminUsersApi.invoke('change_own_username', { newUsername, confirmationUsername: confirmation, pin });
+      closeOwnUsernameDialog();
+      if (window.PulumurCloudAuth && typeof window.PulumurCloudAuth.signOutLocal === 'function') {
+        await window.PulumurCloudAuth.signOutLocal({ newUsername });
+      } else if (client && client.auth) {
+        await client.auth.signOut({ scope: 'local' });
+      }
+      return result;
+    } catch (error) {
+      console.error(error);
+      if (ui.ownUsernameMessage) ui.ownUsernameMessage.textContent = errorMessage(error);
+    } finally { setBusy(false); }
+  }
+
+  function openGlobalLogoutDialog() {
+    if (!isSystemAdmin() || !ui.globalLogoutDialog) return;
+    if (ui.globalLogoutConfirm) ui.globalLogoutConfirm.checked = false;
+    if (ui.globalLogoutMessage) ui.globalLogoutMessage.textContent = '';
+    ui.globalLogoutDialog.showModal();
+  }
+
+  function closeGlobalLogoutDialog() {
+    if (ui.globalLogoutDialog && ui.globalLogoutDialog.open) ui.globalLogoutDialog.close();
+  }
+
+  async function submitGlobalLogout(event) {
+    event.preventDefault();
+    if (!isSystemAdmin() || busy) return;
+    if (!ui.globalLogoutConfirm || !ui.globalLogoutConfirm.checked) {
+      if (ui.globalLogoutMessage) ui.globalLogoutMessage.textContent = t('globalLogoutConfirmRequired');
+      return;
+    }
+    setBusy(true);
+    if (ui.globalLogoutMessage) ui.globalLogoutMessage.textContent = t('loading');
+    try {
+      await window.PulumurAdminUsersApi.invoke('global_logout', {});
+      closeGlobalLogoutDialog();
+      if (window.PulumurCloudAuth && typeof window.PulumurCloudAuth.signOutLocal === 'function') {
+        await window.PulumurCloudAuth.signOutLocal({ clearSavedUsername: false });
+      } else if (client && client.auth) {
+        await client.auth.signOut({ scope: 'local' });
+      }
+    } catch (error) {
+      console.error(error);
+      if (ui.globalLogoutMessage) ui.globalLogoutMessage.textContent = errorMessage(error);
+    } finally { setBusy(false); }
+  }
+
   function renderUsageSummary() {
     const identifiedUsers = new Set(usageSessions.filter(row => row.user_id).map(row => row.user_id));
     const latestValues = [];
@@ -1145,6 +1244,7 @@
     if (ui.activityTab) ui.activityTab.hidden = !isSystemAdmin();
     if (ui.limitsTab) ui.limitsTab.hidden = !isSystemAdmin();
     if (ui.organizationCreateForm) ui.organizationCreateForm.hidden = !isSystemAdmin();
+    if (ui.ownSecurityCard) ui.ownSecurityCard.hidden = !isSystemAdmin();
     if (ui.inviteOrgField) ui.inviteOrgField.hidden = !isSystemAdmin();
     if (ui.userFilterOrgField) ui.userFilterOrgField.hidden = !isSystemAdmin();
     if (ui.activityOrgField) ui.activityOrgField.hidden = !isSystemAdmin();
@@ -1170,7 +1270,7 @@
   }
 
   function bind() {
-    [ui.invitePassword, ui.invitePasswordConfirm, ui.newPassword, ui.newPasswordConfirm].forEach(input => {
+    [ui.invitePassword, ui.invitePasswordConfirm, ui.newPassword, ui.newPasswordConfirm, ui.ownUsernamePin].forEach(input => {
       if (!input) return;
       input.addEventListener('input', () => {
         input.value = input.value.replace(/\D/g, '').slice(0, 4);
@@ -1193,6 +1293,14 @@
     if (ui.loginLockForm) ui.loginLockForm.addEventListener('submit', resetLoginLock);
     if (ui.loginLockCloseBtn) ui.loginLockCloseBtn.addEventListener('click', closeLoginLockDialog);
     if (ui.loginLockCancelBtn) ui.loginLockCancelBtn.addEventListener('click', closeLoginLockDialog);
+    if (ui.changeOwnUsernameBtn) ui.changeOwnUsernameBtn.addEventListener('click', openOwnUsernameDialog);
+    if (ui.ownUsernameForm) ui.ownUsernameForm.addEventListener('submit', submitOwnUsernameChange);
+    if (ui.ownUsernameCloseBtn) ui.ownUsernameCloseBtn.addEventListener('click', closeOwnUsernameDialog);
+    if (ui.ownUsernameCancelBtn) ui.ownUsernameCancelBtn.addEventListener('click', closeOwnUsernameDialog);
+    if (ui.globalLogoutBtn) ui.globalLogoutBtn.addEventListener('click', openGlobalLogoutDialog);
+    if (ui.globalLogoutForm) ui.globalLogoutForm.addEventListener('submit', submitGlobalLogout);
+    if (ui.globalLogoutCloseBtn) ui.globalLogoutCloseBtn.addEventListener('click', closeGlobalLogoutDialog);
+    if (ui.globalLogoutCancelBtn) ui.globalLogoutCancelBtn.addEventListener('click', closeGlobalLogoutDialog);
     if (ui.passwordCloseBtn) ui.passwordCloseBtn.addEventListener('click', closePasswordDialog);
     if (ui.passwordCancelBtn) ui.passwordCancelBtn.addEventListener('click', closePasswordDialog);
     if (ui.deleteForm) ui.deleteForm.addEventListener('submit', submitDeleteUser);

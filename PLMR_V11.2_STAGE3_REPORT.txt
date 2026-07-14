@@ -1,0 +1,38 @@
+PLMR VERSION 11.2 - AŞAMA 3 TEST VE UYGULAMA RAPORU
+
+Durum: TAMAMLANDI (yerel/statik test kapsamı)
+Canlı deployment: YAPILMADI
+Production veri değişikliği: YAPILMADI
+
+Kapsam:
+- System Admin güvenli kendi kullanıcı adı değiştirme
+- Auth password + profiles.username senkronizasyonu
+- Compensating rollback
+- session_revoked_at + global refresh-token iptali
+- Activity log
+- Normal local logout davranışının korunması
+
+Değiştirilen dosyalar:
+- adminPanel.js
+- cloudProjects.js
+- index.html
+- style.css
+- supabase/functions/admin-users/index.ts
+
+Eklenen migration:
+- supabase/migrations/20260714000300_stage3_account_security.sql
+
+Testler:
+- 79/79 Aşama 3 otomatik kontrol: PASS
+- JavaScript syntax: PASS
+- Edge TypeScript parse/bundle: PASS
+- Aşama 1 kullanıcı silme regresyon testleri: PASS
+- Geometri/DXF korunan dosya hashleri: PASS
+- Referans PLMR/DXF yapısal kontrol: PASS
+
+Doğrulanamadı:
+- Gerçek Supabase Auth/PostgreSQL entegrasyonu
+- İki gerçek cihaz oturumuyla global logout
+- Gerçek browser render; container Chromium kısıtı
+
+Ayrıntılı kapsam, deployment sırası ve rollback talimatı update.text içindedir.

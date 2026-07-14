@@ -117,6 +117,14 @@
   window.PulumurCloudAuth = Object.freeze({
     getSession: () => currentSession,
     getAccessToken: () => String(currentSession && currentSession.access_token || ''),
+    signOutLocal: async options => {
+      const opts = options || {};
+      sessionStorage.removeItem(SESSION_ONLY_KEY);
+      if (opts.clearSavedUsername) localStorage.removeItem(SAVED_USERNAME_KEY);
+      if (opts.newUsername) localStorage.setItem(SAVED_USERNAME_KEY, normalizeUsername(opts.newUsername));
+      if (window.PulumurActivity) await window.PulumurActivity.end().catch(() => {});
+      if (client && client.auth) await client.auth.signOut({ scope: 'local' });
+    },
   });
 
   const REMEMBER_KEY = 'plmr_auth_remember';

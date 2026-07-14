@@ -4289,3 +4289,11 @@ body:not(.auth-ready) .backend-warning-banner { display: none !important; }
 .admin-security-attempt.is-failure { background: rgba(190, 43, 55, .06); }
 .admin-inline-input[readonly] { background: #f4f6f8; cursor: not-allowed; }
 @media (max-width: 640px) { .admin-security-attempt { grid-template-columns: 1fr; } }
+
+
+/* PLMR V11.2 - isolated System Admin account security controls */
+.admin-own-security-card { margin-bottom: 16px; }
+.admin-own-security-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.admin-own-security-card .modal-sub { margin: 4px 0 0; }
+.admin-security-card > label:not(.admin-delete-option) { display: grid; gap: 6px; margin: 10px 0; font-weight: 700; }
+.admin-security-card > label:not(.admin-delete-option) input { width: 100%; box-sizing: border-box; }

@@ -397,6 +397,15 @@
       </div>
 
       <section id="adminUsersPane" class="admin-pane">
+        <div id="adminOwnSecurityCard" class="admin-form-card admin-own-security-card" hidden>
+          <div class="admin-form-title">
+            <div><h3 id="adminOwnSecurityTitle">Hesap Güvenliği</h3><p id="adminOwnSecuritySubtitle" class="modal-sub">Sistem Yöneticisi hesabının kullanıcı adı ve oturum güvenliği.</p></div>
+          </div>
+          <div class="admin-own-security-actions">
+            <button id="adminChangeOwnUsernameBtn" type="button" class="soft-btn">Kullanıcı Adımı Değiştir</button>
+            <button id="adminGlobalLogoutBtn" type="button" class="danger-btn">Tüm Cihazlardan Çıkış Yap</button>
+          </div>
+        </div>
         <div class="admin-section-head">
           <h3 id="adminUsersTitle">Kullanıcılar</h3>
         </div>
@@ -558,6 +567,40 @@
       <div class="modal-actions">
         <button id="adminDeleteUserSubmit" type="submit" class="danger-btn">Kalıcı Olarak Sil</button>
         <button id="adminDeleteUserCancelBtn" type="button" class="soft-btn">İptal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminOwnUsernameDialog" class="modal admin-security-dialog">
+    <form id="adminOwnUsernameForm" class="modal-card admin-security-card">
+      <div class="modal-head">
+        <div><h2 id="adminOwnUsernameTitle">Kullanıcı Adımı Değiştir</h2><p id="adminOwnUsernameCurrent" class="modal-sub"></p></div>
+        <button id="adminOwnUsernameCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <p id="adminOwnUsernameWarning" class="admin-delete-warning">Bu işlem tüm mevcut oturumları kapatır. Yeni kullanıcı adıyla tekrar giriş yapmanız gerekir.</p>
+      <label><span id="adminOwnUsernameNewLabel">Yeni kullanıcı adı</span><input id="adminOwnUsernameNew" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label><span id="adminOwnUsernamePinLabel">Mevcut PIN</span><input id="adminOwnUsernamePin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="4" required></label>
+      <label><span id="adminOwnUsernameConfirmLabel">Yeni kullanıcı adını tekrar yaz</span><input id="adminOwnUsernameConfirm" autocapitalize="none" spellcheck="false" required></label>
+      <p id="adminOwnUsernameMessage" class="admin-dialog-message" role="alert" aria-live="assertive"></p>
+      <div class="modal-actions">
+        <button id="adminOwnUsernameCancelBtn" type="button" class="secondary-btn">İptal</button>
+        <button id="adminOwnUsernameSubmitBtn" type="submit" class="danger-btn">Değiştir ve Tüm Oturumları Kapat</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminGlobalLogoutDialog" class="modal admin-security-dialog">
+    <form id="adminGlobalLogoutForm" class="modal-card admin-security-card">
+      <div class="modal-head">
+        <div><h2 id="adminGlobalLogoutTitle">Tüm Cihazlardan Çıkış Yap</h2><p id="adminGlobalLogoutSubtitle" class="modal-sub">Bu tarayıcı dahil bütün PLMR oturumları kapatılacaktır.</p></div>
+        <button id="adminGlobalLogoutCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <p id="adminGlobalLogoutWarning" class="admin-delete-warning">Kaydedilmemiş çalışmalar varsa önce kaydedin. İşlemden sonra yeniden giriş gerekir.</p>
+      <label class="admin-delete-option"><input id="adminGlobalLogoutConfirm" type="checkbox"><span><strong id="adminGlobalLogoutConfirmText">Tüm cihazlardaki oturumların kapatılmasını onaylıyorum.</strong></span></label>
+      <p id="adminGlobalLogoutMessage" class="admin-dialog-message" role="alert" aria-live="assertive"></p>
+      <div class="modal-actions">
+        <button id="adminGlobalLogoutCancelBtn" type="button" class="secondary-btn">İptal</button>
+        <button id="adminGlobalLogoutSubmitBtn" type="submit" class="danger-btn">Tüm Cihazlardan Çıkış Yap</button>
       </div>
     </form>
   </dialog>

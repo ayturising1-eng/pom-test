@@ -1,0 +1,14 @@
+{
+  "passed": 79,
+  "total": 79,
+  "failed": [],
+  "changed": [
+    "adminPanel.js",
+    "cloudProjects.js",
+    "index.html",
+    "style.css",
+    "supabase/functions/admin-users/index.ts",
+    "supabase/migrations/20260714000300_stage3_account_security.sql",
+    "tests/stage3_tests.py"
+  ]
+}

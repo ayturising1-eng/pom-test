@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = text(body.action)
-  if (action === 'health') return json({ ok: true, version: '10.2', function: 'admin-users' })
+  if (action === 'health') return json({ ok: true, version: '11.2', function: 'admin-users' })
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -199,7 +199,7 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  if (!['create', 'set_pin', 'delete_user', 'delete_organization', 'login_lock_status', 'reset_login_lock'].includes(action)) {
+  if (!['create', 'set_pin', 'delete_user', 'delete_organization', 'login_lock_status', 'reset_login_lock', 'change_own_username', 'global_logout'].includes(action)) {
     return json({ error: 'ACTION_INVALID' }, 400)
   }
 
@@ -351,6 +351,110 @@ Deno.serve(async (req: Request) => {
         attempted_at: row.attempted_at,
         ip_hash_hint: text(row.ip_hash).slice(0, 12),
       })),
+    })
+  }
+
+  if (action === 'global_logout') {
+    if (actorProfile.role !== 'system_admin') return json({ error: 'SYSTEM_ADMIN_REQUIRED' }, 403)
+    const revokedAt = new Date().toISOString()
+    const commitResult = await adminClient.rpc('commit_global_logout_v1', {
+      p_actor_id: actor.id,
+      p_revoked_at: revokedAt,
+    })
+    if (commitResult.error) return json({ error: commitResult.error.message || 'SESSION_REVOCATION_FAILED' }, 500)
+
+    const globalSignOut = await adminClient.auth.admin.signOut(accessToken, 'global')
+    if (globalSignOut.error) {
+      return json({ ok: true, sessionRevokedAt: revokedAt, refreshTokensRevoked: false, warning: 'GLOBAL_SIGNOUT_FAILED' })
+    }
+    return json({ ok: true, sessionRevokedAt: revokedAt, refreshTokensRevoked: true })
+  }
+
+  if (action === 'change_own_username') {
+    if (actorProfile.role !== 'system_admin') return json({ error: 'SYSTEM_ADMIN_REQUIRED' }, 403)
+    const oldUsername = text(actorProfile.username).toLowerCase()
+    const newUsername = text(body.newUsername).toLowerCase()
+    const confirmationUsername = text(body.confirmationUsername).toLowerCase()
+    const pin = text(body.pin)
+    if (!validUsername(newUsername)) return json({ error: 'USERNAME_INVALID' }, 400)
+    if (!validPin(pin)) return json({ error: 'PIN_INVALID' }, 400)
+    if (newUsername !== confirmationUsername) return json({ error: 'USERNAME_CONFIRMATION_MISMATCH' }, 400)
+    if (newUsername === oldUsername) return json({ error: 'USERNAME_UNCHANGED' }, 409)
+
+    const duplicateResult = await adminClient
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('username', newUsername)
+      .neq('id', actor.id)
+    if (duplicateResult.error) return json({ error: duplicateResult.error.message }, 400)
+    if ((duplicateResult.count ?? 0) > 0) return json({ error: 'USERNAME_ALREADY_EXISTS' }, 409)
+
+    const actorFullResult = await adminClient
+      .from('profiles')
+      .select('id, organization_id, email, username, full_name, role, is_active')
+      .eq('id', actor.id)
+      .single()
+    const actorFull = actorFullResult.data
+    if (actorFullResult.error || !actorFull || actorFull.is_active !== true || !actorFull.email) {
+      return json({ error: 'USER_NOT_FOUND' }, 404)
+    }
+
+    let oldPassword = ''
+    let newPassword = ''
+    try {
+      oldPassword = await deriveAuthPassword(oldUsername, pin)
+      newPassword = await deriveAuthPassword(newUsername, pin)
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : 'PIN_PEPPER_MISSING' }, 500)
+    }
+
+    const verificationClient = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const verification = await verificationClient.auth.signInWithPassword({ email: actorFull.email, password: oldPassword })
+    if (verification.error || !verification.data.session || verification.data.user?.id !== actor.id) {
+      return json({ error: 'CURRENT_PIN_INVALID' }, 401)
+    }
+    await verificationClient.auth.signOut({ scope: 'local' }).catch(() => {})
+
+    const authUpdate = await adminClient.auth.admin.updateUserById(actor.id, { password: newPassword })
+    if (authUpdate.error) return json({ error: authUpdate.error.message || 'AUTH_PASSWORD_UPDATE_FAILED' }, 400)
+
+    const revokedAt = new Date().toISOString()
+    const commitResult = await adminClient.rpc('commit_self_username_change_v1', {
+      p_actor_id: actor.id,
+      p_old_username: oldUsername,
+      p_new_username: newUsername,
+      p_revoked_at: revokedAt,
+    })
+
+    if (commitResult.error) {
+      const rollback = await adminClient.auth.admin.updateUserById(actor.id, { password: oldPassword })
+      return json({
+        error: rollback.error ? 'USERNAME_CHANGE_ROLLBACK_FAILED' : (commitResult.error.message || 'USERNAME_CHANGE_ROLLED_BACK'),
+      }, 500)
+    }
+
+    let oldUsernameHash = ''
+    let newUsernameHash = ''
+    try {
+      oldUsernameHash = await hashLoginBucket('username', oldUsername)
+      newUsernameHash = await hashLoginBucket('username', newUsername)
+      await adminClient.from('pin_login_buckets').delete().eq('bucket_type', 'username').eq('bucket_hash', oldUsernameHash)
+      await adminClient.from('pin_login_buckets').delete().eq('bucket_type', 'username').eq('bucket_hash', newUsernameHash)
+    } catch (_) {
+      // The account change is committed. Bucket cleanup is best-effort and does not expose secrets.
+    }
+
+    const globalSignOut = await adminClient.auth.admin.signOut(accessToken, 'global')
+    return json({
+      ok: true,
+      oldUsername,
+      newUsername,
+      sessionRevokedAt: revokedAt,
+      activityLogRecorded: true,
+      refreshTokensRevoked: !globalSignOut.error,
+      warning: globalSignOut.error ? 'GLOBAL_SIGNOUT_FAILED' : null,
     })
   }
 

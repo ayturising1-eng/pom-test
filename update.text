@@ -267,3 +267,151 @@ AŞAMA DURUMU
 - Aşama 2 tamamlandı.
 - Aşama 3 uygulanmadı.
 - PLMR iç sürüm sabitleri kullanıcı talimatı gereği değiştirilmedi.
+
+======================================================================
+PLMR VERSION 11.2 - AŞAMA 3 / SİSTEM YÖNETİCİSİ HESAP GÜVENLİĞİ
+======================================================================
+
+KULLANICININ İSTEĞİ
+- System Admin kullanıcısının kendi kullanıcı adını güvenli biçimde değiştirebilmesi.
+- profiles.username ve Supabase Auth şifresinin username+PIN+PLMR_PIN_PEPPER kuralıyla birlikte güncellenmesi.
+- İşlem yarıda kalırsa güvenli geri alma/compensating rollback yapılması.
+- Eski kullanıcı adının geçersiz olması.
+- Eski oturumların tamamının kapatılması.
+- Activity log kaydı oluşturulması.
+- Normal yerel Çıkış davranışının korunması.
+- Ayrı bir “Tüm Cihazlardan Çıkış Yap” işlemi eklenmesi.
+- Global refresh-session iptali ile profiles.session_revoked_at kontrolünün birlikte kullanılması.
+- Geometri, SVG, PDF, DXF, toolbox, ürün yerleştirme ve blok kütüphanesine dokunulmaması.
+- Paket adının yalnızca “PLMR Version 11.2.zip” olması.
+- Önceki update.text kayıtlarının silinmeden korunması.
+
+YAPILANLAR
+1. Güvenli kendi kullanıcı adını değiştirme akışı
+- Yalnız system_admin rolü için change_own_username Edge Function aksiyonu eklendi.
+- Yeni kullanıcı adı 3–32 karakter ve mevcut username biçim kuralıyla doğrulanır.
+- Yeni kullanıcı adının tekrar yazılması zorunludur.
+- Mevcut 4 haneli PIN zorunludur.
+- Mevcut PIN, eski kullanıcı adı + PIN + PLMR_PIN_PEPPER ile türetilen parola kullanılarak Supabase Auth üzerinde doğrulanır.
+- Yeni Auth parolası yeni kullanıcı adı + aynı PIN + aynı PLMR_PIN_PEPPER ile türetilir.
+- Önce Auth parolası güncellenir.
+- Ardından commit_self_username_change_v1 RPC fonksiyonu profiles.username, session_revoked_at ve activity_logs kaydını tek veritabanı transaction'ında tamamlar.
+- Veritabanı commit'i başarısız olursa Auth parolası eski türetilmiş parolaya geri alınır.
+- Eski ve yeni kullanıcı adı rate-limit bucket kayıtları best-effort temizlenir.
+- Başarılı işlemden sonra global refresh token iptali çağrılır ve mevcut tarayıcı local sign-out ile giriş ekranına döner.
+- Eski kullanıcı adı profiles tablosunda kalmadığı için login kimlik aramasında geçersiz olur.
+
+2. Tüm cihazlardan çıkış
+- Yalnız system_admin rolü için global_logout Edge Function aksiyonu eklendi.
+- commit_global_logout_v1 RPC fonksiyonu session_revoked_at ve activity log kaydını aynı transaction içinde yazar.
+- Edge Function mevcut access token ile Supabase Admin global sign-out çağrısı yapar.
+- Global refresh token iptali başarısız olsa bile session_revoked_at eski access token'ların PLMR V2 güvenlik kontrollerinden geçmesini engeller; sonuçta açık warning döndürülür.
+- Arayüzde ayrı ve açık onay checkbox'ı bulunan “Tüm Cihazlardan Çıkış Yap” dialog'u eklendi.
+- Mevcut normal Çıkış butonu scope=local davranışıyla aynen korundu.
+
+3. Arayüz
+- Yönetim > Kullanıcılar alanına yalnız System Admin için “Hesap Güvenliği” kartı eklendi.
+- “Kullanıcı Adımı Değiştir” dialog'u eklendi.
+- “Tüm Cihazlardan Çıkış Yap” dialog'u eklendi.
+- Türkçe ve İngilizce metinler eklendi.
+- Güvenlik kontrolleri mevcut modal ve form yapısından izole CSS ile eklendi.
+
+4. Auth bridge
+- cloudProjects.js içindeki PulumurCloudAuth köprüsüne yalnız yerel tarayıcı oturumunu temizleyen signOutLocal yardımcı fonksiyonu eklendi.
+- Normal Çıkış butonunun mevcut scope=local kodu değiştirilmedi.
+- Kullanıcı adı değişikliğinden sonra yeni kullanıcı adının hatırlanan login alanına yazılabilmesi sağlandı.
+
+DEĞİŞTİRİLEN ÜRETİM DOSYALARI
+- adminPanel.js
+- cloudProjects.js
+- index.html
+- style.css
+- supabase/functions/admin-users/index.ts
+
+EKLENEN DOSYALAR
+- supabase/migrations/20260714000300_stage3_account_security.sql
+- tests/stage3_tests.py
+- tests/stage3-test-results.json
+- PLMR_V11.2_STAGE3_REPORT.txt
+
+MIGRATION İÇERİĞİ
+- commit_self_username_change_v1 eklendi.
+- commit_global_logout_v1 eklendi.
+- İki fonksiyon security definer ve sabit search_path kullanır.
+- public, anon ve authenticated execute yetkileri kaldırıldı.
+- Yalnız service_role execute yetkisi verildi.
+- Tablo, kolon, policy, trigger veya mevcut fonksiyon silinmedi.
+- DROP TABLE, DROP COLUMN veya TRUNCATE kullanılmadı.
+
+ROLLBACK GÜVENLİĞİ
+- Auth parolası güncellendikten sonra DB transaction başarısız olursa eski username-derived parola geri yüklenir.
+- DB transaction içinde username güncellemesi ve activity log birlikte başarılı olur veya birlikte geri alınır.
+- Auth ile PostgreSQL arasında dağıtık transaction olmadığı için tam ACID atomiklik teknik olarak mümkün değildir; compensating rollback uygulanmıştır.
+- Rollback'in kendisi başarısız olursa USERNAME_CHANGE_ROLLBACK_FAILED açık hatası döner ve gizlenmez.
+
+TEST SONUÇLARI
+PASS - 79/79 Aşama 3 otomatik statik/davranışsal kontrol.
+PASS - Tüm JavaScript dosyalarında node --check.
+PASS - Edge Function esbuild TypeScript parse/bundle kontrolü.
+PASS - Aşama 1 kullanıcı silme statik testi.
+PASS - Aşama 1 kullanıcı silme UI akış testi.
+PASS - Aşama 1 Edge Function kullanıcı silme yetki testi.
+PASS - Kullanıcı adı değişikliğinde system_admin kontrolü.
+PASS - Mevcut PIN doğrulama akışı.
+PASS - Eski/yeni username-derived parola ayrışması.
+PASS - Auth güncellemesi sonrası DB commit ve Auth rollback kod yolu.
+PASS - Username, session_revoked_at ve activity log için DB transaction fonksiyonu.
+PASS - Eski kullanıcı adının profil güncellemesiyle kaldırılması.
+PASS - Global logout DB commit'i ve Auth Admin global sign-out çağrısı.
+PASS - Normal local logout kodunun korunması.
+PASS - Migration destructive DDL içermiyor.
+PASS - Migration fonksiyonları yalnız service_role erişimine açık.
+PASS - app.js, peri01Geometry.js, dxfModernEngine.js, modernDxfTemplate.js, blocks/filteredBlocks.js, render/renderPipeline.js, core/topologyReconcile.js, persistence/schema.js ve core/projectModel.js Aşama 2 paketiyle hash düzeyinde aynıdır.
+PASS - Referans PLMR dosyası okunabilir ve schemaVersion 2.
+PASS - Referans DXF 6 section ve 50 block değerini koruyor.
+
+DOĞRULANAMAYAN TESTLER
+- Test Supabase projesi verilmediği için gerçek Auth Admin API, gerçek PostgreSQL transaction ve gerçek refresh-token iptali entegrasyon testleri çalıştırılamadı.
+- İki gerçek tarayıcı/cihaz oturumuyla global logout testi çalıştırılamadı.
+- Gerçek art arda login, yanlış PIN ve rate-limit DB entegrasyon testleri Aşama 2'de olduğu gibi test ortamı olmadan çalıştırılamadı.
+- Chromium headless testi denendi ancak container ortamındaki Chromium/DBus/Netlink kısıtları nedeniyle DOM çıktısı alınamadı. Browser testi geçmiş olarak işaretlenmedi.
+- Production deployment yapılmadı ve production verisi değiştirilmedi.
+
+MIGRATION UYGULAMA SIRASI
+1. Stage 3 security/concurrency migration'ın uygulandığını doğrula.
+2. 20260714000200_stage2_login_security.sql migration'ının uygulandığını doğrula.
+3. 20260714000300_stage3_account_security.sql migration'ını önce test Supabase ortamına uygula.
+4. Fonksiyonların yalnız service_role tarafından çağrılabildiğini doğrula.
+5. Test System Admin hesabıyla username change ve global logout testlerini çalıştır.
+6. Testler geçmeden production'a uygulama.
+
+EDGE FUNCTION DEPLOYMENT SIRASI
+1. PLMR_PIN_PEPPER değerinin mevcut ve önceki kullanıcıların oluşturulduğu değerle aynı olduğunu doğrula.
+2. SUPABASE_URL, SUPABASE_ANON_KEY ve SUPABASE_SERVICE_ROLE_KEY secret'larını doğrula.
+3. Yeni migration'ı uygula.
+4. supabase/functions/admin-users/index.ts dosyasını deploy et.
+5. health, login, change_own_username ve global_logout aksiyonlarını test ortamında doğrula.
+6. Web dosyalarını en son yayınla.
+
+ROLLBACK TALİMATI
+1. Web rollback: adminPanel.js, cloudProjects.js, index.html ve style.css dosyalarını PLMR Version 11.1 paketindeki sürümlere döndür.
+2. Edge rollback: PLMR Version 11.1 içindeki admin-users/index.ts dosyasını yeniden deploy et.
+3. Migration fonksiyonları kullanılmıyorsa bırakılabilir; mevcut davranışı etkilemez.
+4. Tam DB rollback istenirse yalnız aşağıdaki iki yeni fonksiyon kaldırılır:
+   - public.commit_self_username_change_v1(uuid,text,text,timestamptz)
+   - public.commit_global_logout_v1(uuid,timestamptz)
+5. Tablo veya kullanıcı verisi silinmez.
+6. Kullanıcı adı değişikliği daha önce başarıyla yapılmış hesaplarda rollback paketi kullanıcı adını otomatik geri çevirmez; bu hesaplar yeni kullanıcı adıyla çalışmaya devam eder.
+
+GEOMETRİ / DXF KORUMA DURUMU
+- Geometri motoruna dokunulmadı.
+- SVG üretim kurallarına dokunulmadı.
+- Toolbox ve ürün yerleştirme mantığına dokunulmadı.
+- PDF motoruna dokunulmadı.
+- DXF motoru, layer adları, block library ve entity sırası değiştirilmedi.
+
+AŞAMA DURUMU
+- Aşama 3 tamamlandı.
+- Canlı deployment yapılmadı.
+- Paket adı: PLMR Version 11.2.zip
+- Uygulama içindeki eski build/version sabitleri bu çalışmada değiştirilmedi; kullanıcının talebi yalnız paket adının 11.2 olmasıydı.
