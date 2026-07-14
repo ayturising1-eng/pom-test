@@ -486,7 +486,8 @@
       setAuthMessage('', false);
       refreshProjectHeader();
       if (window.PulumurActivity) await window.PulumurActivity.identify();
-      await restoreRecoveryIfAvailable();
+      // V10.5: Recovery disabled by default
+      // await restoreRecoveryIfAvailable();
     } catch (error) {
       console.error(error);
       setAppAccess(false);
