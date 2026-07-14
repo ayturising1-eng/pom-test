@@ -1,7 +1,0 @@
-project_id = "pulumur-automation-studio"
-
-# The login action is intentionally public. The function applies its own
-# username+PIN validation and database-backed IP/username rate limiting.
-# Every administrative action still validates the caller's access token.
-[functions.admin-users]
-verify_jwt = false
