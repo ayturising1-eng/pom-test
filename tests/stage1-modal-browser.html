@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../style.css"></head>
+<body>
+<dialog id="adminDeleteUserDialog" class="modal">
+<form class="modal-card admin-delete-card">
+<div class="modal-head"><div><h2>Kullanıcıyı Sil</h2><p class="modal-sub">Sibel Üstün Kazan</p></div><button class="icon-btn">×</button></div>
+<p class="admin-delete-warning">Bu işlem kalıcıdır. Kullanıcının 0 projesi bulunuyor. Bu kullanıcı firmadaki son aktif firma yöneticisidir.</p>
+<label class="admin-delete-option"><input type="radio" checked><span><strong>Kullanıcıyı sil, projeleri koru</strong><small>Projeler firma hesabında kalır.</small></span></label>
+<label class="admin-delete-option"><input type="radio"><span><strong>Kullanıcıyı ve oluşturduğu projeleri sil</strong><small>Projeler de kalıcı olarak silinir.</small></span></label>
+<div class="admin-delete-confirm"><p class="admin-delete-confirm-prompt">Devam etmek için hedef kullanıcı adını eksiksiz yaz: @sibel</p><input class="admin-delete-confirm-input" value="sibel"></div>
+<p class="admin-delete-message is-error">Örnek hata gösterimi</p>
+<div class="modal-actions"><button class="danger-btn">Kalıcı Olarak Sil</button><button class="soft-btn">İptal</button></div>
+</form></dialog>
+<script>document.querySelector('dialog').showModal();</script>
+</body></html>

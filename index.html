@@ -550,10 +550,33 @@
       <p id="adminDeleteUserWarning" class="admin-delete-warning">Bu işlem kalıcıdır ve geri alınamaz.</p>
       <label class="admin-delete-option"><input type="radio" name="adminDeleteMode" value="keep" checked><span><strong>Kullanıcıyı sil, projeleri koru</strong><small>Projeler firma hesabında kalır; kullanıcı bağlantısı kaldırılır.</small></span></label>
       <label class="admin-delete-option"><input type="radio" name="adminDeleteMode" value="all"><span><strong>Kullanıcıyı ve oluşturduğu projeleri sil</strong><small>Test temizliği için proje ve revizyonlar da kalıcı olarak silinir.</small></span></label>
-      <p id="adminDeleteUserMessage" class="modal-sub"></p>
+      <div id="adminDeleteLastAdminConfirm" class="admin-delete-confirm" hidden>
+        <p id="adminDeleteConfirmPrompt" class="admin-delete-confirm-prompt">Devam etmek için hedef kullanıcı adını eksiksiz yaz.</p>
+        <input id="adminDeleteConfirmUsername" class="admin-delete-confirm-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" disabled>
+      </div>
+      <p id="adminDeleteUserMessage" class="admin-delete-message" role="alert" aria-live="assertive"></p>
       <div class="modal-actions">
         <button id="adminDeleteUserSubmit" type="submit" class="danger-btn">Kalıcı Olarak Sil</button>
         <button id="adminDeleteUserCancelBtn" type="button" class="soft-btn">İptal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminLoginLockDialog" class="modal admin-security-dialog">
+    <form id="adminLoginLockForm" method="dialog" class="modal-card admin-security-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="adminLoginLockTitle">Giriş Kilidi</h2>
+          <p id="adminLoginLockUser"></p>
+        </div>
+        <button id="adminLoginLockCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <div id="adminLoginLockSummary" class="admin-security-summary" aria-live="polite"></div>
+      <div id="adminLoginLockAttempts" class="admin-security-attempts"></div>
+      <p id="adminLoginLockMessage" class="admin-dialog-message" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="adminLoginLockCancelBtn" type="button" class="secondary-btn">Kapat</button>
+        <button id="adminLoginLockResetBtn" type="submit" class="danger-btn">Kilidi Sıfırla</button>
       </div>
     </form>
   </dialog>

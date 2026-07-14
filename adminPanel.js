@@ -29,10 +29,16 @@
     deleteDialog: $('adminDeleteUserDialog'), deleteForm: $('adminDeleteUserForm'), deleteTitle: $('adminDeleteUserTitle'),
     deleteUserName: $('adminDeleteUserName'), deleteCloseBtn: $('adminDeleteUserCloseBtn'), deleteCancelBtn: $('adminDeleteUserCancelBtn'),
     deleteMessage: $('adminDeleteUserMessage'), deleteSubmit: $('adminDeleteUserSubmit'),
+    deleteLastAdminConfirm: $('adminDeleteLastAdminConfirm'), deleteConfirmPrompt: $('adminDeleteConfirmPrompt'),
+    deleteConfirmUsername: $('adminDeleteConfirmUsername'),
     passwordDialog: $('adminPasswordDialog'), passwordForm: $('adminPasswordForm'), passwordTitle: $('adminPasswordTitle'),
     passwordUser: $('adminPasswordUser'), passwordCloseBtn: $('adminPasswordCloseBtn'), passwordCancelBtn: $('adminPasswordCancelBtn'),
     newPassword: $('adminNewPassword'), newPasswordConfirm: $('adminNewPasswordConfirm'),
-    passwordMessage: $('adminPasswordMessage'), passwordSubmit: $('adminPasswordSubmit')
+    passwordMessage: $('adminPasswordMessage'), passwordSubmit: $('adminPasswordSubmit'),
+    loginLockDialog: $('adminLoginLockDialog'), loginLockForm: $('adminLoginLockForm'), loginLockTitle: $('adminLoginLockTitle'),
+    loginLockUser: $('adminLoginLockUser'), loginLockCloseBtn: $('adminLoginLockCloseBtn'), loginLockCancelBtn: $('adminLoginLockCancelBtn'),
+    loginLockResetBtn: $('adminLoginLockResetBtn'), loginLockSummary: $('adminLoginLockSummary'),
+    loginLockAttempts: $('adminLoginLockAttempts'), loginLockMessage: $('adminLoginLockMessage')
   };
 
   const TEXT = {
@@ -59,13 +65,18 @@
       noSessions: 'Bu tarih aralığında ziyaret bulunamadı.', noActivity: 'Bu tarih aralığında işlem bulunamadı.',
       deleteUser: 'Sil', deleteTitle: 'Kullanıcıyı Sil', deleteWarning: 'Bu işlem kalıcıdır ve geri alınamaz.',
       deleteSuccess: 'Kullanıcı silindi.', deleteWithProjectsSuccess: 'Kullanıcı ve oluşturduğu projeler silindi.',
+      lastAdminOverrideWarning: 'Bu kullanıcı firmadaki son aktif firma yöneticisidir. Silme işleminden sonra firmada aktif firma yöneticisi kalmayacaktır.',
+      lastAdminConfirmPrompt: 'Devam etmek için hedef kullanıcı adını eksiksiz yaz:',
+      lastAdminConfirmMismatch: 'Son firma yöneticisini silmek için hedef kullanıcı adını eksiksiz yazmalısın.',
+      lastAdminConfirmationRequired: 'Bu hesap son aktif firma yöneticisidir. Güçlü kullanıcı adı onayı gereklidir.',
       selfDelete: 'Kendi hesabını silemezsin.', systemAdminProtected: 'Sistem yöneticisi hesabı silinemez.',
-      deleteFailed: 'Kullanıcı silinemedi.', anonymous: 'Anonim ziyaret', durationMinute: 'dk', durationHour: 'sa',
+      deleteFailed: 'Kullanıcı silinemedi.', deleteLogWarning: 'Kullanıcı silindi ancak işlem günlüğü doğrulanamadı.', anonymous: 'Anonim ziyaret', durationMinute: 'dk', durationHour: 'sa',
       action_site_login: 'Giriş yaptı', action_site_logout: 'Çıkış yaptı', action_project_create: 'Proje oluşturdu',
       action_project_save: 'Projeyi kaydetti', action_project_open: 'Projeyi açtı', action_revision_create: 'Revizyon oluşturdu',
       action_revision_open: 'Eski revizyonu açtı', action_dxf_download: 'DXF indirdi', action_pdf_download: 'PDF indirdi',
       action_project_file_download: 'Proje dosyası indirdi', action_user_create: 'Kullanıcı oluşturdu',
       action_user_update: 'Kullanıcı güncelledi', action_pin_update: 'PIN değiştirdi', action_user_delete: 'Kullanıcı sildi',
+      loginLock: 'Giriş Kilidi', loginLockTitle: 'Giriş Kilidi ve Deneme Geçmişi', loginLockReset: 'Kilidi Sıfırla', loginLockResetConfirm: 'Bu kullanıcının kullanıcı adı kilidi ve son giriş denemeleriyle ilişkili IP kilitleri sıfırlansın mı?', loginLockResetSuccess: 'Giriş kilidi sıfırlandı.', loginLockNoAttempts: 'Yakın tarihli giriş denemesi bulunamadı.', usernameLocked: 'Kullanıcı adı kilidi', recentIpLocks: 'İlişkili IP kilidi', failureCount: 'Başarısız deneme', lockedUntil: 'Kilit bitişi', notLocked: 'Kilitli değil', usernameChangeSecureOnly: 'Mevcut kullanıcı adı bu ekrandan değiştirilemez; güvenli kullanıcı adı değiştirme akışı gerekir.', action_login_lock_reset: 'Giriş kilidini sıfırladı',
       action_organization_create: 'Firma oluşturdu', action_organization_update: 'Firma güncelledi', action_organization_delete: 'Firma sildi'
     },
     en: {
@@ -91,13 +102,18 @@
       noSessions: 'No visits were found in this date range.', noActivity: 'No activity was found in this date range.',
       deleteUser: 'Delete', deleteTitle: 'Delete User', deleteWarning: 'This action is permanent and cannot be undone.',
       deleteSuccess: 'User deleted.', deleteWithProjectsSuccess: 'User and created projects deleted.',
+      lastAdminOverrideWarning: 'This user is the company’s last active company administrator. The company will have no active company administrator after deletion.',
+      lastAdminConfirmPrompt: 'To continue, type the target username exactly:',
+      lastAdminConfirmMismatch: 'Type the target username exactly to delete the last company administrator.',
+      lastAdminConfirmationRequired: 'This account is the last active company administrator. Strong username confirmation is required.',
       selfDelete: 'You cannot delete your own account.', systemAdminProtected: 'The system administrator account cannot be deleted.',
-      deleteFailed: 'The user could not be deleted.', anonymous: 'Anonymous visit', durationMinute: 'min', durationHour: 'h',
+      deleteFailed: 'The user could not be deleted.', deleteLogWarning: 'The user was deleted, but the activity log could not be verified.', anonymous: 'Anonymous visit', durationMinute: 'min', durationHour: 'h',
       action_site_login: 'Signed in', action_site_logout: 'Signed out', action_project_create: 'Created project',
       action_project_save: 'Saved project', action_project_open: 'Opened project', action_revision_create: 'Created revision',
       action_revision_open: 'Opened old revision', action_dxf_download: 'Downloaded DXF', action_pdf_download: 'Downloaded PDF',
       action_project_file_download: 'Downloaded project file', action_user_create: 'Created user',
       action_user_update: 'Updated user', action_pin_update: 'Changed PIN', action_user_delete: 'Deleted user',
+      loginLock: 'Login Lock', loginLockTitle: 'Login Lock and Attempt History', loginLockReset: 'Reset Lock', loginLockResetConfirm: 'Reset this user’s username lock and IP locks linked to recent login attempts?', loginLockResetSuccess: 'Login lock reset.', loginLockNoAttempts: 'No recent login attempts were found.', usernameLocked: 'Username lock', recentIpLocks: 'Linked IP locks', failureCount: 'Failed attempts', lockedUntil: 'Locked until', notLocked: 'Not locked', usernameChangeSecureOnly: 'An existing username cannot be changed here; a secure username-change flow is required.', action_login_lock_reset: 'Reset login lock',
       action_organization_create: 'Created company', action_organization_update: 'Updated company', action_organization_delete: 'Deleted company'
     }
   };
@@ -110,6 +126,8 @@
   let busy = false;
   let passwordTargetUserId = null;
   let deleteTargetUserId = null;
+  let deleteRequiresLastAdminConfirmation = false;
+  let loginLockTargetUserId = null;
   let usageSessions = [];
   let activityRows = [];
   let limitRows = [];
@@ -144,6 +162,7 @@
     if (/USERNAME_ALREADY_EXISTS|duplicate key.*username/i.test(raw)) return t('usernameExists');
     if (/USERNAME_INVALID/i.test(raw)) return t('invalidUsername');
     if (/PIN_INVALID|PASSWORD_INVALID|PASSWORD_TOO_SHORT|PASSWORD_TOO_LONG/i.test(raw)) return t('passwordInvalid');
+    if (/LAST_COMPANY_ADMIN_CONFIRMATION_REQUIRED/i.test(raw)) return t('lastAdminConfirmationRequired');
     if (/LAST_COMPANY_ADMIN_REQUIRED/i.test(raw)) return t('lastAdmin');
     if (/SELF_DELETE_NOT_ALLOWED/i.test(raw)) return t('selfDelete');
     if (/SYSTEM_ADMIN_PROTECTED/i.test(raw)) return t('systemAdminProtected');
@@ -151,6 +170,8 @@
     if (/SYSTEM_ADMIN_REQUIRED/i.test(raw)) return t('adminRequired');
     if (/SELF_MANAGEMENT_NOT_ALLOWED/i.test(raw)) return t('selfManagement');
     if (/USER_DELETE_FAILED|PROJECT_DELETE_FAILED/i.test(raw)) return t('deleteFailed');
+    if (/LOGIN_RATE_LIMIT_UNAVAILABLE/i.test(raw)) return language() === 'en' ? 'Login security tables or RPC functions are unavailable.' : 'Giriş güvenliği tablolarına veya RPC fonksiyonlarına erişilemiyor.';
+    if (/USERNAME_CHANGE_REQUIRES_SECURE_FLOW/i.test(raw)) return t('usernameChangeSecureOnly');
     if (/PIN_PEPPER_MISSING/i.test(raw)) return language() === 'en' ? 'The PLMR_PIN_PEPPER secret is missing under Edge Functions > Secrets.' : 'Edge Functions > Secrets bölümünde PLMR_PIN_PEPPER eksik.';
     if (/FUNCTION_SECRETS_MISSING/i.test(raw)) return language() === 'en' ? 'Supabase function environment variables are missing.' : 'Supabase Edge Function sistem anahtarları bulunamadı.';
     if (/AUTH_REQUIRED|AUTH_INVALID/i.test(raw)) return `${t('functionJwt')} [${raw || 'AUTH_REQUIRED'} / HTTP ${status || 401} / V10.4]`;
@@ -399,13 +420,14 @@
       return `<tr data-user-id="${esc(user.id)}">
         <td class="admin-company-cell"><strong>${esc(user.organization_name || '-')}</strong></td>
         <td><input class="admin-inline-input js-user-fullname" value="${esc(user.full_name || '')}" ${protectedAccount ? 'disabled' : ''}><small>@${esc(user.username || '-')}</small></td>
-        <td><input class="admin-inline-input js-user-username" value="${esc(user.username || '')}" ${protectedAccount ? 'disabled' : ''}></td>
+        <td><input class="admin-inline-input js-user-username" value="${esc(user.username || '')}" readonly title="${esc(t('usernameChangeSecureOnly'))}"></td>
         <td><select class="admin-inline-select js-user-role" ${protectedAccount ? 'disabled' : ''}>${roleOptions}</select></td>
         <td><label class="admin-toggle"><input class="js-user-active" type="checkbox" ${user.is_active ? 'checked' : ''} ${protectedAccount ? 'disabled' : ''}><span>${esc(user.is_active ? t('active') : t('passive'))}</span></label></td>
         <td>${esc(user.project_count || 0)}</td>
         <td class="admin-row-actions">
           <button type="button" class="primary-btn js-user-save" ${protectedAccount ? 'disabled title="' + esc(t('protectedUser')) + '"' : ''}>${esc(t('save'))}</button>
           <button type="button" class="soft-btn js-user-password" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}">${esc(t('password'))}</button>
+          ${isSystemAdmin() ? `<button type="button" class="soft-btn js-user-login-lock" data-user-id="${esc(user.id)}" data-user-name="${esc(user.full_name || user.username || '')}">${esc(t('loginLock'))}</button>` : ''}
           ${deleteButton}
         </td>
       </tr>`;
@@ -424,6 +446,7 @@
     ui.usersBody.querySelectorAll('.js-user-save').forEach(button => button.addEventListener('click', () => saveUserRow(button.closest('tr'))));
     ui.usersBody.querySelectorAll('.js-user-password').forEach(button => button.addEventListener('click', () => openPasswordDialog(button.dataset.userId, button.dataset.userName)));
     ui.usersBody.querySelectorAll('.js-user-delete').forEach(button => button.addEventListener('click', () => openDeleteDialog(button.dataset.userId, button.dataset.userName)));
+    ui.usersBody.querySelectorAll('.js-user-login-lock').forEach(button => button.addEventListener('click', () => openLoginLockDialog(button.dataset.userId, button.dataset.userName)));
   }
 
   function renderOrganizations() {
@@ -510,7 +533,7 @@
       await rpc('admin_update_user_v1', {
         p_user_id: row.dataset.userId,
         p_full_name: row.querySelector('.js-user-fullname').value.trim(),
-        p_username: row.querySelector('.js-user-username').value.trim().toLowerCase(),
+        p_username: current && current.username || row.querySelector('.js-user-username').value.trim().toLowerCase(),
         p_role: row.querySelector('.js-user-role').value,
         p_is_active: Boolean(activeInput && activeInput.checked)
       });
@@ -518,7 +541,7 @@
       if (window.PulumurActivity) {
         void window.PulumurActivity.log('user_update', { detail: {
           target_user_id: row.dataset.userId,
-          target_username: row.querySelector('.js-user-username').value.trim().toLowerCase(),
+          target_username: current && current.username || row.querySelector('.js-user-username').value.trim().toLowerCase(),
           target_full_name: row.querySelector('.js-user-fullname').value.trim(),
           target_role: row.querySelector('.js-user-role').value,
           target_active: Boolean(activeInput && activeInput.checked)
@@ -580,58 +603,208 @@
     }
   }
 
+  function isLastActiveCompanyAdmin(target) {
+    if (!target || target.role !== 'company_admin' || target.is_active !== true) return false;
+    return !users.some(user =>
+      user.id !== target.id &&
+      user.organization_id === target.organization_id &&
+      user.role === 'company_admin' &&
+      user.is_active === true
+    );
+  }
+
+  function setDeleteMessage(message, isError) {
+    if (!ui.deleteMessage) return;
+    ui.deleteMessage.textContent = message || '';
+    ui.deleteMessage.classList.toggle('is-error', Boolean(isError));
+  }
+
   function openDeleteDialog(userId, userName) {
-    if (!userId || !ui.deleteDialog) return;
-    deleteTargetUserId = userId;
+    if (!userId || !ui.deleteDialog || !isSystemAdmin()) return;
     const target = users.find(item => item.id === userId);
+    if (!target) return;
+    if (target.id === (currentUser && currentUser.id) || target.role === 'system_admin') {
+      setMessage(target.role === 'system_admin' ? t('systemAdminProtected') : t('selfDelete'), true);
+      return;
+    }
+
+    deleteTargetUserId = userId;
+    deleteRequiresLastAdminConfirmation = isLastActiveCompanyAdmin(target);
     if (ui.deleteUserName) ui.deleteUserName.textContent = userName || t('username');
     const warning = $('adminDeleteUserWarning');
     if (warning) {
-      const count = Number(target && target.project_count || 0);
-      warning.textContent = language() === 'en'
+      const count = Number(target.project_count || 0);
+      const projectText = language() === 'en'
         ? `This action is permanent. This user has ${count} project(s).`
         : `Bu işlem kalıcıdır. Kullanıcının ${count} projesi bulunuyor.`;
+      warning.textContent = deleteRequiresLastAdminConfirmation
+        ? `${projectText} ${t('lastAdminOverrideWarning')}`
+        : projectText;
     }
-    if (ui.deleteMessage) ui.deleteMessage.textContent = '';
+
+    if (ui.deleteLastAdminConfirm) ui.deleteLastAdminConfirm.hidden = !deleteRequiresLastAdminConfirmation;
+    if (ui.deleteConfirmPrompt) {
+      ui.deleteConfirmPrompt.textContent = `${t('lastAdminConfirmPrompt')} ${target.username}`;
+    }
+    if (ui.deleteConfirmUsername) {
+      ui.deleteConfirmUsername.value = '';
+      ui.deleteConfirmUsername.disabled = !deleteRequiresLastAdminConfirmation;
+    }
+    setDeleteMessage('', false);
     const keepOption = ui.deleteForm && ui.deleteForm.querySelector('input[name="adminDeleteMode"][value="keep"]');
     if (keepOption) keepOption.checked = true;
     ui.deleteDialog.showModal();
+    window.setTimeout(() => {
+      if (deleteRequiresLastAdminConfirmation && ui.deleteConfirmUsername) ui.deleteConfirmUsername.focus();
+    }, 0);
   }
 
   function closeDeleteDialog() {
     deleteTargetUserId = null;
+    deleteRequiresLastAdminConfirmation = false;
+    if (ui.deleteConfirmUsername) {
+      ui.deleteConfirmUsername.value = '';
+      ui.deleteConfirmUsername.disabled = true;
+    }
+    if (ui.deleteLastAdminConfirm) ui.deleteLastAdminConfirm.hidden = true;
+    setDeleteMessage('', false);
     if (ui.deleteDialog && ui.deleteDialog.open) ui.deleteDialog.close();
   }
 
   async function submitDeleteUser(event) {
     event.preventDefault();
-    if (!deleteTargetUserId || busy) return;
+    if (!deleteTargetUserId || busy || !isSystemAdmin()) return;
     const target = users.find(item => item.id === deleteTargetUserId);
+    if (!target) {
+      setDeleteMessage(t('deleteFailed'), true);
+      return;
+    }
+    if (target.id === (currentUser && currentUser.id) || target.role === 'system_admin') {
+      setDeleteMessage(target.role === 'system_admin' ? t('systemAdminProtected') : t('selfDelete'), true);
+      return;
+    }
+
+    const confirmationUsername = String(ui.deleteConfirmUsername && ui.deleteConfirmUsername.value || '').trim().toLowerCase();
+    if (deleteRequiresLastAdminConfirmation && confirmationUsername !== String(target.username || '').trim().toLowerCase()) {
+      setDeleteMessage(t('lastAdminConfirmMismatch'), true);
+      if (ui.deleteConfirmUsername) ui.deleteConfirmUsername.focus();
+      return;
+    }
+
     const mode = ui.deleteForm && ui.deleteForm.querySelector('input[name="adminDeleteMode"]:checked');
     const deleteProjects = Boolean(mode && mode.value === 'all');
     const confirmText = language() === 'en'
-      ? `Permanently delete ${target && (target.full_name || target.username) || 'this user'}${deleteProjects ? ' and all projects created by this user' : ''}?`
-      : `${target && (target.full_name || target.username) || 'Bu kullanıcı'}${deleteProjects ? ' ve oluşturduğu tüm projeler' : ''} kalıcı olarak silinsin mi?`;
+      ? `Permanently delete ${target.full_name || target.username || 'this user'}${deleteProjects ? ' and all projects created by this user' : ''}?`
+      : `${target.full_name || target.username || 'Bu kullanıcı'}${deleteProjects ? ' ve oluşturduğu tüm projeler' : ''} kalıcı olarak silinsin mi?`;
     if (!window.confirm(confirmText)) return;
 
     setBusy(true);
-    if (ui.deleteMessage) ui.deleteMessage.textContent = t('loading');
+    setDeleteMessage(t('loading'), false);
     try {
       if (!window.PulumurAdminUsersApi) throw new Error('ADMIN_USERS_API_MISSING');
       const result = await window.PulumurAdminUsersApi.invoke('delete_user', {
         userId: deleteTargetUserId,
-        deleteProjects
+        deleteProjects,
+        confirmLastCompanyAdmin: deleteRequiresLastAdminConfirmation,
+        confirmationUsername: deleteRequiresLastAdminConfirmation ? confirmationUsername : ''
       });
       closeDeleteDialog();
-      setMessage(deleteProjects ? t('deleteWithProjectsSuccess') : t('deleteSuccess'), false);
+      const successMessage = deleteProjects ? t('deleteWithProjectsSuccess') : t('deleteSuccess');
+      setMessage(result && result.activityLogRecorded === false ? `${successMessage} ${t('deleteLogWarning')}` : successMessage, Boolean(result && result.activityLogRecorded === false));
       await Promise.all([loadOrganizations(), loadUsers()]);
-      if (window.PulumurActivity) {
-        void window.PulumurActivity.touch();
-      }
+      if (window.PulumurActivity) void window.PulumurActivity.touch();
       return result;
     } catch (error) {
       console.error(error);
-      if (ui.deleteMessage) ui.deleteMessage.textContent = errorMessage(error);
+      const rawError = String((error && (error.message || error.error || error.code)) || error || '');
+      if (/LAST_COMPANY_ADMIN_CONFIRMATION_REQUIRED/i.test(rawError)) {
+        deleteRequiresLastAdminConfirmation = true;
+        if (ui.deleteLastAdminConfirm) ui.deleteLastAdminConfirm.hidden = false;
+        if (ui.deleteConfirmPrompt) ui.deleteConfirmPrompt.textContent = `${t('lastAdminConfirmPrompt')} ${target.username}`;
+        if (ui.deleteConfirmUsername) {
+          ui.deleteConfirmUsername.disabled = false;
+          ui.deleteConfirmUsername.focus();
+        }
+        const warning = $('adminDeleteUserWarning');
+        if (warning && !warning.textContent.includes(t('lastAdminOverrideWarning'))) {
+          warning.textContent = `${warning.textContent} ${t('lastAdminOverrideWarning')}`.trim();
+        }
+      }
+      setDeleteMessage(errorMessage(error), true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function formatLockDate(value) {
+    if (!value) return t('notLocked');
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString(language() === 'en' ? 'en-US' : 'tr-TR');
+  }
+
+  function setLoginLockMessage(message, isError) {
+    if (!ui.loginLockMessage) return;
+    ui.loginLockMessage.textContent = message || '';
+    ui.loginLockMessage.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function renderLoginLockStatus(status) {
+    const usernameBucket = status && status.usernameBucket;
+    const ipBuckets = status && Array.isArray(status.recentIpBuckets) ? status.recentIpBuckets : [];
+    const attempts = status && Array.isArray(status.recentAttempts) ? status.recentAttempts : [];
+    if (ui.loginLockSummary) {
+      ui.loginLockSummary.innerHTML = `
+        <div class="admin-security-summary-row"><strong>${esc(t('usernameLocked'))}</strong><span>${esc(usernameBucket && usernameBucket.locked_until ? formatLockDate(usernameBucket.locked_until) : t('notLocked'))}</span></div>
+        <div class="admin-security-summary-row"><strong>${esc(t('failureCount'))}</strong><span>${esc(usernameBucket && usernameBucket.failure_count || 0)}</span></div>
+        <div class="admin-security-summary-row"><strong>${esc(t('recentIpLocks'))}</strong><span>${esc(ipBuckets.filter(row => row.locked_until).length)}</span></div>`;
+    }
+    if (ui.loginLockAttempts) {
+      ui.loginLockAttempts.innerHTML = attempts.length ? attempts.map(row => `<div class="admin-security-attempt ${row.success ? 'is-success' : 'is-failure'}"><span>${esc(formatLockDate(row.attempted_at))}</span><strong>${esc(row.reason || '-')}</strong><span>IP ${esc(row.ip_hash_hint || '-')}</span></div>`).join('') : `<p class="admin-empty-state">${esc(t('loginLockNoAttempts'))}</p>`;
+    }
+  }
+
+  async function openLoginLockDialog(userId, userName) {
+    if (!isSystemAdmin() || !userId || !ui.loginLockDialog || busy) return;
+    loginLockTargetUserId = userId;
+    if (ui.loginLockTitle) ui.loginLockTitle.textContent = t('loginLockTitle');
+    if (ui.loginLockUser) ui.loginLockUser.textContent = userName || '';
+    if (ui.loginLockResetBtn) ui.loginLockResetBtn.textContent = t('loginLockReset');
+    setLoginLockMessage(t('loading'), false);
+    if (ui.loginLockSummary) ui.loginLockSummary.innerHTML = '';
+    if (ui.loginLockAttempts) ui.loginLockAttempts.innerHTML = '';
+    ui.loginLockDialog.showModal();
+    try {
+      const status = await window.PulumurAdminUsersApi.invoke('login_lock_status', { userId });
+      renderLoginLockStatus(status);
+      setLoginLockMessage('', false);
+    } catch (error) {
+      console.error(error);
+      setLoginLockMessage(errorMessage(error), true);
+    }
+  }
+
+  function closeLoginLockDialog() {
+    loginLockTargetUserId = null;
+    if (ui.loginLockDialog && ui.loginLockDialog.open) ui.loginLockDialog.close();
+  }
+
+  async function resetLoginLock(event) {
+    event.preventDefault();
+    if (!isSystemAdmin() || !loginLockTargetUserId || busy) return;
+    if (!window.confirm(t('loginLockResetConfirm'))) return;
+    setBusy(true);
+    setLoginLockMessage(t('loading'), false);
+    try {
+      const result = await window.PulumurAdminUsersApi.invoke('reset_login_lock', {
+        userId: loginLockTargetUserId,
+        includeRecentIpBuckets: true
+      });
+      setLoginLockMessage(result && result.logRecorded === false ? `${t('loginLockResetSuccess')} ${t('deleteLogWarning')}` : t('loginLockResetSuccess'), false);
+      const status = await window.PulumurAdminUsersApi.invoke('login_lock_status', { userId: loginLockTargetUserId });
+      renderLoginLockStatus(status);
+    } catch (error) {
+      console.error(error);
+      setLoginLockMessage(errorMessage(error), true);
     } finally {
       setBusy(false);
     }
@@ -1017,6 +1190,9 @@
     });
     if (ui.inviteForm) ui.inviteForm.addEventListener('submit', inviteUser);
     if (ui.passwordForm) ui.passwordForm.addEventListener('submit', submitPasswordChange);
+    if (ui.loginLockForm) ui.loginLockForm.addEventListener('submit', resetLoginLock);
+    if (ui.loginLockCloseBtn) ui.loginLockCloseBtn.addEventListener('click', closeLoginLockDialog);
+    if (ui.loginLockCancelBtn) ui.loginLockCancelBtn.addEventListener('click', closeLoginLockDialog);
     if (ui.passwordCloseBtn) ui.passwordCloseBtn.addEventListener('click', closePasswordDialog);
     if (ui.passwordCancelBtn) ui.passwordCancelBtn.addEventListener('click', closePasswordDialog);
     if (ui.deleteForm) ui.deleteForm.addEventListener('submit', submitDeleteUser);

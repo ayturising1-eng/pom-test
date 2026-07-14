@@ -1,0 +1,4 @@
+PASS stage1-edge-delete: authorization, last-admin confirmation, project modes and audit behavior
+PASS stage1-ui-static: modal structure, confirmation flow, protection and error presentation
+PASS stage1-ui-flow: strong confirmation, project modes, system-only access and protected accounts
+PASS stage1-regression: 31 baseline files protected; geometry/DXF/PDF/project references unchanged

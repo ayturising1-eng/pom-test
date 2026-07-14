@@ -2988,9 +2988,16 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   font-weight: 900;
   white-space: nowrap;
 }
-.admin-delete-card { width: min(620px, calc(100vw - 24px)); }
+#adminDeleteUserDialog {
+  width: min(620px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+}
+.admin-delete-card {
+  width: 100%;
+  box-sizing: border-box;
+}
 .admin-delete-warning {
-  margin: 16px 0;
+  margin: 16px 22px;
   padding: 11px 13px;
   border: 1px solid rgba(190, 30, 45, .25);
   border-radius: 10px;
@@ -3004,7 +3011,7 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
   align-items: start;
   gap: 10px;
   min-height: 0;
-  margin: 8px 0;
+  margin: 8px 22px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -3015,6 +3022,43 @@ body.cloud-readonly .cloud-project-actions #newRevisionBtn { display: none; }
 .admin-delete-option span { display: grid; gap: 4px; padding: 0; }
 .admin-delete-option strong { color: var(--navy); }
 .admin-delete-option small { color: var(--muted); line-height: 1.35; }
+.admin-delete-confirm {
+  margin: 14px 22px 8px;
+  padding: 14px;
+  border: 2px solid rgba(190, 30, 45, .38);
+  border-radius: 12px;
+  background: #fff5f6;
+}
+.admin-delete-confirm[hidden] { display: none; }
+.admin-delete-confirm-prompt {
+  margin: 0 0 10px;
+  color: var(--red);
+  font-weight: 900;
+  line-height: 1.45;
+}
+.admin-delete-confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(190, 30, 45, .48);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 900;
+}
+.admin-delete-confirm-input:focus {
+  outline: 3px solid rgba(190, 30, 45, .16);
+  border-color: var(--red);
+}
+.admin-delete-message {
+  min-height: 20px;
+  margin: 12px 22px;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.4;
+}
+.admin-delete-message.is-error { color: var(--red); }
 .admin-row-actions { min-width: 290px; flex-wrap: wrap; }
 
 @media (max-width: 900px) {
@@ -4231,3 +4275,17 @@ body.preview-expanded-open {
   text-align: center;
 }
 body:not(.auth-ready) .backend-warning-banner { display: none !important; }
+
+
+/* V11.1 Stage 2: isolated login security diagnostics */
+.admin-security-dialog { width: min(720px, calc(100vw - 28px)); }
+.admin-security-card { width: 100%; max-width: none; box-sizing: border-box; }
+.admin-security-summary { display: grid; gap: 8px; margin: 12px 0; }
+.admin-security-summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 11px; border: 1px solid var(--line, #d7dce2); border-radius: 8px; }
+.admin-security-attempts { max-height: 260px; overflow: auto; border: 1px solid var(--line, #d7dce2); border-radius: 8px; }
+.admin-security-attempt { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(120px, .7fr) minmax(110px, .6fr); gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line, #d7dce2); font-size: 12px; }
+.admin-security-attempt:last-child { border-bottom: 0; }
+.admin-security-attempt.is-success { background: rgba(34, 139, 94, .07); }
+.admin-security-attempt.is-failure { background: rgba(190, 43, 55, .06); }
+.admin-inline-input[readonly] { background: #f4f6f8; cursor: not-allowed; }
+@media (max-width: 640px) { .admin-security-attempt { grid-template-columns: 1fr; } }
