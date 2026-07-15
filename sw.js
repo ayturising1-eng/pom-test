@@ -1,34 +1,34 @@
 const CACHE_PREFIX = 'pulumur-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v10_4_r12_12_4`;
+const CACHE_NAME = `${CACHE_PREFIX}v10_4_r12_12_5`;
 const NETWORK_TIMEOUT_MS = 8000;
 const CORE_ASSETS = [
   './',
   './index.html',
-  './buildBootstrap.js?v=10.4-r12.12.4',
-  './core/backendCompatibility.js?v=10.4-r12.12.4',
-  './diagnostics/runtimeMonitor.js?v=10.4-r12.12.4',
-  './recovery/recoveryManager.js?v=10.4-r12.12.4',
-  './style.css?v=10.4-r12.12.4',
-  './appLimits.js?v=10.4-r12.12.4',
-  './core/actions.js?v=10.4-r12.12.4',
-  './core/projectModel.js?v=10.4-r12.12.4',
-  './core/topologyReconcile.js?v=10.4-r12.12.4',
-  './core/validation.js?v=10.4-r12.12.4',
-  './core/reducer.js?v=10.4-r12.12.4',
-  './history/historyManager.js?v=10.4-r12.12.4',
-  './persistence/schema.js?v=10.4-r12.12.4',
-  './render/renderPipeline.js?v=10.4-r12.12.4',
-  './app.js?v=10.4-r12.12.4',
-  './supabaseConfig.js?v=10.4-r12.12.4',
-  './cloudProjects.js?v=10.4-r12.12.4',
-  './adminUsersApi.js?v=10.4-r12.12.4',
-  './activityTracker.js?v=10.4-r12.12.4',
-  './adminPanel.js?v=10.4-r12.12.4',
-  './peri01ExcelBridge.js?v=10.4-r12.12.4',
-  './peri01Geometry.js?v=10.4-r12.12.4',
-  './modernDxfTemplate.js?v=10.4-r12.12.4',
-  './dxfModernEngine.js?v=10.4-r12.12.4',
-  './blocks/filteredBlocks.js?v=10.4-r12.12.4',
+  './buildBootstrap.js?v=10.4-r12.12.5',
+  './core/backendCompatibility.js?v=10.4-r12.12.5',
+  './diagnostics/runtimeMonitor.js?v=10.4-r12.12.5',
+  './recovery/recoveryManager.js?v=10.4-r12.12.5',
+  './style.css?v=10.4-r12.12.5',
+  './appLimits.js?v=10.4-r12.12.5',
+  './core/actions.js?v=10.4-r12.12.5',
+  './core/projectModel.js?v=10.4-r12.12.5',
+  './core/topologyReconcile.js?v=10.4-r12.12.5',
+  './core/validation.js?v=10.4-r12.12.5',
+  './core/reducer.js?v=10.4-r12.12.5',
+  './history/historyManager.js?v=10.4-r12.12.5',
+  './persistence/schema.js?v=10.4-r12.12.5',
+  './render/renderPipeline.js?v=10.4-r12.12.5',
+  './app.js?v=10.4-r12.12.5',
+  './supabaseConfig.js?v=10.4-r12.12.5',
+  './cloudProjects.js?v=10.4-r12.12.5',
+  './adminUsersApi.js?v=10.4-r12.12.5',
+  './activityTracker.js?v=10.4-r12.12.5',
+  './adminPanel.js?v=10.4-r12.12.5',
+  './peri01ExcelBridge.js?v=10.4-r12.12.5',
+  './peri01Geometry.js?v=10.4-r12.12.5',
+  './modernDxfTemplate.js?v=10.4-r12.12.5',
+  './dxfModernEngine.js?v=10.4-r12.12.5',
+  './blocks/filteredBlocks.js?v=10.4-r12.12.5',
   './assets/plmr-logo-header.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -45,11 +45,11 @@ async function cacheCoreAssets() {
     await cache.put(request, response.clone());
   }));
   const criticalAssets = new Set([
-    './index.html', './buildBootstrap.js?v=10.4-r12.12.4', './core/backendCompatibility.js?v=10.4-r12.12.4',
-    './diagnostics/runtimeMonitor.js?v=10.4-r12.12.4', './recovery/recoveryManager.js?v=10.4-r12.12.4', './appLimits.js?v=10.4-r12.12.4', './core/actions.js?v=10.4-r12.12.4', './core/projectModel.js?v=10.4-r12.12.4',
-    './core/topologyReconcile.js?v=10.4-r12.12.4', './core/validation.js?v=10.4-r12.12.4', './core/reducer.js?v=10.4-r12.12.4',
-    './history/historyManager.js?v=10.4-r12.12.4', './persistence/schema.js?v=10.4-r12.12.4', './render/renderPipeline.js?v=10.4-r12.12.4',
-    './app.js?v=10.4-r12.12.4', './peri01Geometry.js?v=10.4-r12.12.4', './blocks/filteredBlocks.js?v=10.4-r12.12.4'
+    './index.html', './buildBootstrap.js?v=10.4-r12.12.5', './core/backendCompatibility.js?v=10.4-r12.12.5',
+    './diagnostics/runtimeMonitor.js?v=10.4-r12.12.5', './recovery/recoveryManager.js?v=10.4-r12.12.5', './appLimits.js?v=10.4-r12.12.5', './core/actions.js?v=10.4-r12.12.5', './core/projectModel.js?v=10.4-r12.12.5',
+    './core/topologyReconcile.js?v=10.4-r12.12.5', './core/validation.js?v=10.4-r12.12.5', './core/reducer.js?v=10.4-r12.12.5',
+    './history/historyManager.js?v=10.4-r12.12.5', './persistence/schema.js?v=10.4-r12.12.5', './render/renderPipeline.js?v=10.4-r12.12.5',
+    './app.js?v=10.4-r12.12.5', './peri01Geometry.js?v=10.4-r12.12.5', './blocks/filteredBlocks.js?v=10.4-r12.12.5'
   ]);
   const failures = results.map((result, index) => ({ result, asset: CORE_ASSETS[index] }))
     .filter(item => criticalAssets.has(item.asset) && item.result.status === 'rejected');

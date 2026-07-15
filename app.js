@@ -892,7 +892,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.4').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.5').catch(() => {}), { once: true });
     }
   }
 
@@ -5665,14 +5665,16 @@
     });
     overlay.querySelector('#backWallEditorDelete').addEventListener('click', () => {
       const key = normalizeSideViewKey(overlay.dataset.sideViewKey, Number(overlay.dataset.sideIndex || 0));
+      const sideIndex = Number(overlay.dataset.sideIndex || 0);
+      const rearHeight = Number(overlay.dataset.rearHeight || 1);
       const current = sideScopedStateValue(backWallState, key, { enabled: true, xOffset: 0, depth: 600, height: 0 }) || {};
       beginHistoryTransaction();
       try {
         setSideScopedStateValue(backWallState, key, { ...current, enabled: false });
-        close();
         updatePreview(false);
       } finally { endHistoryTransaction(true); }
-      statusText.textContent = currentLanguage === 'en' ? 'Back wall deleted. Use ADD WALL to restore it.' : 'Arka duvar silindi. Yeniden oluşturmak için DUVAR EKLE alanını kullan.';
+      showBackWallEditorOverlay({ sideViewKey: key, sideIndex, wallHeight: rearHeight });
+      statusText.textContent = currentLanguage === 'en' ? 'Back wall deleted. Default restores it; no drawing-area restore target remains.' : 'Arka duvar silindi. Default ile geri yüklenebilir; çizim alanında yeniden ekleme hedefi bırakılmadı.';
     });
     overlay.querySelector('#backWallEditorForm').addEventListener('submit', evt => {
       evt.preventDefault();
@@ -5788,12 +5790,13 @@
     overlay.querySelector('#backWallRowsLabel').textContent = isEn ? 'Horizontal Divisions' : 'Yatay Bölme';
     overlay.querySelector('#backWallEditorNote').textContent = state.enabled
       ? (isEn ? 'Blank width or height leaves that size unchanged. Changing division counts rebuilds the grid and resets individual part edits.' : 'Boş bırakılan genişlik veya yükseklik değişmez. Bölme sayıları değiştirildiğinde grid yeniden kurulur ve bağımsız parça düzenlemeleri sıfırlanır.')
-      : (isEn ? 'This wall is deleted. Apply or Default to restore it.' : 'Bu duvar silinmiş durumda. Yeniden oluşturmak için Tamam veya Default kullan.');
+      : (isEn ? 'This wall is deleted. Use Default to restore the original wall; no restore target remains on the drawing.' : 'Bu duvar silinmiş durumda. Başlangıç duvarını geri getirmek için Default kullan; çizim üzerinde yeniden ekleme hedefi yoktur.');
     overlay.querySelector('#backWallEditorReset').textContent = 'Default';
     overlay.querySelector('#backWallEditorDelete').textContent = isEn ? 'Delete Wall' : 'Duvarı Sil';
     overlay.querySelector('#backWallEditorDelete').hidden = !state.enabled;
     overlay.querySelector('#backWallEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
-    overlay.querySelector('#backWallEditorApply').textContent = isEn ? (state.enabled ? 'OK' : 'Restore') : (state.enabled ? 'Tamam' : 'Duvarı Ekle');
+    overlay.querySelector('#backWallEditorApply').textContent = isEn ? 'OK' : 'Tamam';
+    overlay.querySelector('#backWallEditorApply').hidden = !state.enabled;
     overlay.querySelector('#backWallWidthDirection').value = 'equal';
     overlay.querySelector('#backWallHeightDirection').value = 'equal';
     overlay.querySelector('#backWallWidthOperation').value = 'extend';
@@ -5873,10 +5876,10 @@
       try {
         storeBackWallGridForKey(key, nextGrid);
         syncBackWallCompatibilityFromGrid(key, nextGrid);
-        close();
         updatePreview(false);
       } finally { endHistoryTransaction(true); }
-      statusText.textContent = currentLanguage === 'en' ? 'Back-wall part deleted. Use ADD WALL PART to restore it.' : 'Arka duvar parçası silindi. Yeniden oluşturmak için DUVAR PARÇASI EKLE alanını kullan.';
+      showBackWallCellEditorOverlay({ ...meta, wallCellEnabled: false });
+      statusText.textContent = currentLanguage === 'en' ? 'Back-wall part deleted. Default in the whole-wall editor restores the initial wall; no drawing-area restore target remains.' : 'Arka duvar parçası silindi. Başlangıç duvarı Tüm Duvarı Düzenle içindeki Default ile geri getirilebilir; çizim alanında yeniden ekleme hedefi bırakılmadı.';
     });
     overlay.querySelector('#backWallCellEditorForm').addEventListener('submit', evt => {
       evt.preventDefault();
@@ -5899,6 +5902,10 @@
       const index = grid.cells.findIndex(cell => String(cell.id) === String(meta.wallCellId));
       if (index < 0) { error.textContent = currentLanguage === 'en' ? 'Wall part could not be found.' : 'Arka duvar parçası bulunamadı.'; return; }
       const cell = grid.cells[index];
+      if (cell.enabled === false) {
+        error.textContent = currentLanguage === 'en' ? 'This part is deleted. Use Default in the whole-wall editor to restore the initial wall.' : 'Bu parça silinmiş durumda. Başlangıç duvarını geri getirmek için Tüm Duvarı Düzenle içindeki Default düğmesini kullan.';
+        return;
+      }
       const currentBounds = { minX: Number(cell.minX), maxX: Number(cell.maxX), minY: Number(cell.minY), maxY: Number(cell.maxY) };
       const widthDirection = overlay.querySelector('#backWallCellWidthDirection').value;
       const heightDirection = overlay.querySelector('#backWallCellHeightDirection').value;
@@ -5942,9 +5949,7 @@
         close();
         updatePreview(false);
       } finally { endHistoryTransaction(true); }
-      statusText.textContent = cell.enabled === false
-        ? (currentLanguage === 'en' ? 'Back-wall part restored.' : 'Arka duvar parçası yeniden eklendi.')
-        : (currentLanguage === 'en' ? 'Back-wall part updated.' : 'Arka duvar parçası güncellendi.');
+      statusText.textContent = currentLanguage === 'en' ? 'Back-wall part updated.' : 'Arka duvar parçası güncellendi.';
     });
     return overlay;
   }
@@ -5986,12 +5991,13 @@
     });
     overlay.querySelector('#backWallCellEditorNote').textContent = active
       ? (isEn ? 'Only this part changes. Neighbouring part boundaries remain independent; overlapping visible parts are not allowed.' : 'Yalnız bu parça değişir. Komşu parçaların sınırları bağımsız kalır; görünür parçaların üst üste gelmesine izin verilmez.')
-      : (isEn ? 'This part is deleted. Apply restores it with its saved dimensions.' : 'Bu parça silinmiş durumda. Tamam, kayıtlı ölçüleriyle yeniden ekler.');
+      : (isEn ? 'This part is deleted and leaves no restore target on the drawing. Use Edit Whole Wall > Default to restore the initial wall.' : 'Bu parça silinmiştir ve çizim üzerinde yeniden ekleme hedefi bırakmaz. Başlangıç duvarını geri getirmek için Tüm Duvarı Düzenle > Default kullan.');
     overlay.querySelector('#backWallCellEditorWhole').textContent = isEn ? 'Edit Whole Wall' : 'Tüm Duvarı Düzenle';
     overlay.querySelector('#backWallCellEditorDelete').textContent = isEn ? 'Delete Part' : 'Parçayı Sil';
     overlay.querySelector('#backWallCellEditorDelete').hidden = !active;
     overlay.querySelector('#backWallCellEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
-    overlay.querySelector('#backWallCellEditorApply').textContent = isEn ? (active ? 'OK' : 'Restore Part') : (active ? 'Tamam' : 'Parçayı Ekle');
+    overlay.querySelector('#backWallCellEditorApply').textContent = isEn ? 'OK' : 'Tamam';
+    overlay.querySelector('#backWallCellEditorApply').hidden = !active;
     overlay.querySelector('#backWallCellWidthDirection').value = 'equal';
     overlay.querySelector('#backWallCellHeightDirection').value = 'equal';
     overlay.querySelector('#backWallCellWidthOperation').value = 'extend';
@@ -6004,10 +6010,9 @@
   }
 
   function showBackWallInteractionOverlay(meta) {
-    if (meta.wallEnabled === false) { showBackWallEditorOverlay(meta); return; }
     const key = normalizeSideViewKey(meta.sideViewKey, meta.sideIndex);
     const grid = backWallGridForKey(key, Number(meta.wallHeight || 1));
-    if (meta.wallCellId && (grid.cells.length > 1 || meta.wallCellEnabled === false)) showBackWallCellEditorOverlay(meta);
+    if (meta.wallCellId && grid.cells.length > 1) showBackWallCellEditorOverlay(meta);
     else showBackWallEditorOverlay(meta);
   }
 

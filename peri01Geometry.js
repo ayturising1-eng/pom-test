@@ -2772,7 +2772,8 @@
       void sideParapetWidthDim;
     });
     const wallGrid = backWallCellsFor(d, sideViewKey, p.rearHeight);
-    const pushWallInteraction = (cell, wallCellIndex, cellEnabled, wallEnabled = true) => {
+    const pushWallInteraction = (cell, wallCellIndex) => {
+      if (wallSettings.enabled === false || cell.enabled === false) return;
       const minX = Number(cell.minX) || 0;
       const maxX = Number(cell.maxX) || 0;
       const minY = Number(cell.minY) || 0;
@@ -2783,21 +2784,15 @@
       const wallRightX = duvarX - minX;
       const wallLeftX = duvarX - maxX;
       const wallBottomY = duvarY + minY;
-      if (wallEnabled && cellEnabled) {
-        g.rect(wallRightX, wallBottomY, -wallW, wallH, 'Duvar - Yan Görünüş');
-        safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, wallBottomY, -wallW, wallH, 'HATCH_WALL');
-      }
+      g.rect(wallRightX, wallBottomY, -wallW, wallH, 'Duvar - Yan Görünüş');
+      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, wallBottomY, -wallW, wallH, 'HATCH_WALL');
       g.entities.push({ type: 'interaction', kind: 'backWallEditor', x: wallLeftX, y: wallBottomY, w: wallW, h: wallH, data: {
-        sideIndex: p.index, sideViewKey, wallEnabled, wallCellEnabled: cellEnabled, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
+        sideIndex: p.index, sideViewKey, wallEnabled: true, wallCellEnabled: true, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
         wallCellId: cell.id, wallCellIndex, wallCellCount: wallGrid.cells.length, cellMinX: minX, cellMaxX: maxX, cellMinY: minY, cellMaxY: maxY,
         wallMinX: wallGrid.bounds.minX, wallMaxX: wallGrid.bounds.maxX, wallMinY: wallGrid.bounds.minY, wallMaxY: wallGrid.bounds.maxY
       } });
     };
-    if (wallSettings.enabled === false) {
-      pushWallInteraction({ id: `back_wall_add_${sideViewKey}`, enabled: false, ...wallGrid.bounds }, 0, false, false);
-    } else {
-      wallGrid.cells.forEach((cell, wallCellIndex) => pushWallInteraction(cell, wallCellIndex, cell.enabled !== false, true));
-    }
+    if (wallSettings.enabled !== false) wallGrid.cells.forEach((cell, wallCellIndex) => pushWallInteraction(cell, wallCellIndex));
     blockRef(g, 'PergoRise Ray Duvar Bağlantı Set', bagX, bagY, 120, 95, 'Blok - Yan Görünüş'); blockRef(g, 'PergoRise Ray Arka Mekanizma Yan Görünüş', arkaMekX, arkaMekY, 135, 90, 'Blok - Yan Görünüş', normDeg(aci * 180 / Math.PI));
     rotatedRect(g, startRayX, startRayY, rayLen, -K.sideRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş'); rotatedRect(g, startRayX, startRayY - K.sideInnerRayOffsetY, rayLen, -K.sideInnerRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş');
     const kafa = rotatePoint(startRayX + rayLen, startRayY, arkaMekX, arkaMekY, aci); const rotDeg = normDeg(aci * 180 / Math.PI); blockRef(g, 'PergoRise Ray Kafası Yan Görünüş', kafa[0], kafa[1], 130, 90, 'Blok - Yan Görünüş', rotDeg);
@@ -3937,10 +3932,10 @@
         const postTag = Number.isFinite(Number(data.postIndex)) ? `D${Number(data.postIndex) + 1}` : 'D';
         const parapetTag = `${(data.parapetView || '').toLowerCase() === 'side' ? 'YP' : 'PP'}${Number(data.parapetSegmentIndex || 0) + 1}`;
         const supportSuffix = (data.sideViewKey || data.scope || '').toLowerCase() === 'right' ? 'R' : ((data.sideViewKey || '') === '0' ? 'L' : `P${Number(data.sideIndex || 0) + 1}`);
-        const backWallTag = data.wallEnabled === false ? 'DUVAR EKLE' : (data.wallCellEnabled === false ? 'DUVAR PARÇASI EKLE' : (Number(data.wallCellCount || 1) > 1 ? `DP${Number(data.wallCellIndex || 0) + 1}` : 'DUVAR'));
+        const backWallTag = Number(data.wallCellCount || 1) > 1 ? `DP${Number(data.wallCellIndex || 0) + 1}` : 'DUVAR';
         const tag = isTrapezSheet ? `TS${Number(data.systemIndex||0)+1}` : (isSideEnable ? 'YÖN GÖRÜNÜŞ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? backWallTag : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag))))));
         const groupClass = isTrapezSheet ? 'preview-trapez-sheet-zone' : (isSideEnable ? 'preview-side-enable-zone' : (isTriangle ? 'preview-triangle-zone' : (isBackWall ? 'preview-wall-zone' : (isProduct ? 'preview-product-zone' : (isParapet ? 'preview-parapet-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone'))))));
-        const backWallTitle = data.wallEnabled === false ? 'Arka duvarı yeniden ekle' : (data.wallCellEnabled === false ? 'Arka duvar parçasını yeniden ekle' : (Number(data.wallCellCount || 1) > 1 ? `Arka duvar parçasını düzenle ${Number(data.wallCellIndex || 0) + 1}` : 'Arka duvarı düzenle'));
+        const backWallTitle = Number(data.wallCellCount || 1) > 1 ? `Arka duvar parçasını düzenle ${Number(data.wallCellIndex || 0) + 1}` : 'Arka duvarı düzenle';
         const titleText = isTrapezSheet ? 'Trapez sac alanını düzenle' : (isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? backWallTitle : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`))))));
         const tagColor = isTrapezSheet ? '#d97706' : (isSideEnable ? (data.sideEnabled ? '#15803d' : '#b91c1c') : (isTriangle ? '#15803d' : (isBackWall ? '#6b4f2a' : (isProduct ? '#7b1fa2' : (isParapet ? '#c62828' : (isGlass ? '#0b8043' : '#1a73e8'))))));
         if (isSideEnable) {
@@ -3955,11 +3950,7 @@
           const centerY = ry + rh / 2;
           parts.push(`<g class="${groupClass}" ${groupAttrs}><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" y="${centerY - lineGap / 2}">YÖN GÖRÜNÜŞ</tspan><tspan x="${centerX}" y="${centerY + lineGap / 2}">DÜZENLE</tspan></text></g>`);
         } else {
-          const deletedWall = isBackWall && data.wallEnabled === false;
-          const zoneFill = deletedWall ? '#fff3c9' : 'transparent';
-          const zoneFillOpacity = deletedWall ? '0.35' : '1';
-          const zoneStroke = deletedWall ? '#b45309' : 'transparent';
-          parts.push(`<g class="${groupClass}" ${groupAttrs}><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${zoneFill}" fill-opacity="${zoneFillOpacity}" stroke="${zoneStroke}" stroke-width="${deletedWall ? 2 : 1.2}" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
+          parts.push(`<g class="${groupClass}" ${groupAttrs}><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="transparent" stroke="transparent" stroke-width="1.2" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
         }
       }
       else if (e.type === 'dimension') {
