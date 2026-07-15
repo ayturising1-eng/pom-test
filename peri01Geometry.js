@@ -208,6 +208,7 @@
     if (d.parapetSegmentsRaw && Array.isArray(d.parapetSegmentsRaw.front)) segmentLists.push(d.parapetSegmentsRaw.front);
     if (d.parapetSegmentsRaw && d.parapetSegmentsRaw.side) Object.values(d.parapetSegmentsRaw.side).forEach(list => segmentLists.push(list));
     if (d.backWallSegmentsRaw && d.backWallSegmentsRaw.side) Object.values(d.backWallSegmentsRaw.side).forEach(list => segmentLists.push(list));
+    if (d.backWallGridStateRaw && d.backWallGridStateRaw.side) Object.values(d.backWallGridStateRaw.side).forEach(grid => segmentLists.push(grid && grid.cells));
     if (segmentLists.some(list => Array.isArray(list) && list.length > limits.maxSegmentsPerView)) throw new Error(`Görünüş başına duvar/parapet parça sınırı ${limits.maxSegmentsPerView}.`);
   }
 
@@ -269,6 +270,150 @@
   function formatMm(value) { return `${Math.round(value)} mm`; }
   function formatDeg(value) { return `${Number(value).toFixed(2)}°`; }
   function normDeg(value) { return ((value % 360) + 360) % 360; }
+
+  function parapetAngleDegrees(start, end, startHeight, endHeight) {
+    const width = Number(end) - Number(start);
+    if (!Number.isFinite(width) || Math.abs(width) < 1e-9) return 0;
+    return Math.atan2(Number(endHeight) - Number(startHeight), width) * 180 / Math.PI;
+  }
+
+  function parapetAngleDirection(parapetView, sideViewKey) {
+    return String(parapetView || '').toLowerCase() === 'side' && String(sideViewKey || '').toLowerCase() === 'right' ? -1 : 1;
+  }
+
+  function parapetDisplayAngleDegrees(modelAngle, parapetView, sideViewKey) {
+    const value = Number(modelAngle);
+    return Number.isFinite(value) ? value * parapetAngleDirection(parapetView, sideViewKey) : value;
+  }
+
+  function parapetModelAngleDegrees(displayAngle, parapetView, sideViewKey) {
+    const value = Number(displayAngle);
+    return Number.isFinite(value) ? value * parapetAngleDirection(parapetView, sideViewKey) : value;
+  }
+
+  function resolveParapetEndHeight(start, end, startHeight, endHeight, angleText, source = 'heights') {
+    const direct = Number(endHeight);
+    if (source !== 'angle') return direct;
+    const angle = Number(String(angleText == null ? '' : angleText).replace(',', '.'));
+    const width = Number(end) - Number(start);
+    const fixedHeight = Number(startHeight);
+    if (![angle, width, fixedHeight].every(Number.isFinite)) return direct;
+    return fixedHeight + Math.tan(angle * Math.PI / 180) * width;
+  }
+
+  function alignParapetNeighborEndpoints(list, index, start, end) {
+    if (!Array.isArray(list)) return list;
+    const before = index > 0 ? list[index - 1] : null;
+    const after = index < list.length - 1 ? list[index + 1] : null;
+    // Ortak topology sınırı yalnız X koordinatıdır. Komşu parçaların yükseklik
+    // uçları bağımsız kalır; aynı X noktasında farklı kotlar bilinçli olarak
+    // düşey bir parapet kademesi oluşturabilir.
+    if (before) before.end = start;
+    if (after) after.start = end;
+    return list;
+  }
+
+  function sanitizeSignedDecimalInput(value) {
+    const source = String(value == null ? '' : value).replace(/[\u2212\u2013\u2014]/g, '-');
+    const sign = source.includes('-') ? '-' : (source.includes('+') ? '+' : '');
+    let separatorSeen = false;
+    let body = '';
+    for (const char of source.replace(/[+-]/g, '')) {
+      if (/[0-9]/.test(char)) body += char;
+      else if ((char === ',' || char === '.') && !separatorSeen) {
+        body += char;
+        separatorSeen = true;
+      }
+    }
+    return sign + body;
+  }
+
+  function trapezSheetExtensions(defaultBounds, currentBounds) {
+    const base = defaultBounds && typeof defaultBounds === 'object' ? defaultBounds : {};
+    const current = currentBounds && typeof currentBounds === 'object' ? currentBounds : base;
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const minX = number(base.minX), maxX = number(base.maxX), minY = number(base.minY), maxY = number(base.maxY);
+    return {
+      minusX: minX - number(current.minX, minX),
+      plusX: number(current.maxX, maxX) - maxX,
+      minusY: minY - number(current.minY, minY),
+      plusY: number(current.maxY, maxY) - maxY
+    };
+  }
+
+  function trapezSheetBoundsFromExtensions(defaultBounds, extensions) {
+    const base = defaultBounds && typeof defaultBounds === 'object' ? defaultBounds : {};
+    const delta = extensions && typeof extensions === 'object' ? extensions : {};
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const minX = number(base.minX), maxX = number(base.maxX), minY = number(base.minY), maxY = number(base.maxY);
+    return {
+      minX: minX - number(delta.minusX),
+      maxX: maxX + number(delta.plusX),
+      minY: minY - number(delta.minusY),
+      maxY: maxY + number(delta.plusY)
+    };
+  }
+
+
+  function trapezSheetEditorAxisState(defaultMin, defaultMax, currentMin, currentMax, minPlacement = 'left', maxPlacement = 'right') {
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const baseMin = number(defaultMin), baseMax = number(defaultMax);
+    const min = number(currentMin, baseMin), max = number(currentMax, baseMax);
+    const minDelta = baseMin - min;
+    const maxDelta = max - baseMax;
+    const epsilon = 0.001;
+    const clean = value => Math.abs(value) <= epsilon ? 0 : value;
+    const lower = clean(minDelta), upper = clean(maxDelta);
+    const whole = value => Number.isInteger(Math.abs(value));
+    if (lower === 0 && upper === 0) return { placement: 'equal', operation: 'extend', value: '', custom: false };
+    if (lower !== 0 && upper !== 0 && Math.sign(lower) === Math.sign(upper) && Math.abs(Math.abs(lower) - Math.abs(upper)) <= epsilon && whole(lower)) {
+      return { placement: 'equal', operation: lower > 0 ? 'extend' : 'shorten', value: String(Math.abs(lower)), custom: false };
+    }
+    if (lower !== 0 && upper === 0 && whole(lower)) return { placement: minPlacement, operation: lower > 0 ? 'extend' : 'shorten', value: String(Math.abs(lower)), custom: false };
+    if (lower === 0 && upper !== 0 && whole(upper)) return { placement: maxPlacement, operation: upper > 0 ? 'extend' : 'shorten', value: String(Math.abs(upper)), custom: false };
+    return { placement: 'equal', operation: 'extend', value: '', custom: true };
+  }
+
+  function trapezSheetEditorState(defaultBounds, currentBounds) {
+    const base = defaultBounds && typeof defaultBounds === 'object' ? defaultBounds : {};
+    const current = currentBounds && typeof currentBounds === 'object' ? currentBounds : base;
+    return {
+      width: trapezSheetEditorAxisState(base.minX, base.maxX, current.minX, current.maxX, 'left', 'right'),
+      length: trapezSheetEditorAxisState(base.minY, base.maxY, current.minY, current.maxY, 'down', 'up')
+    };
+  }
+
+  function trapezSheetBoundsFromEditor(defaultBounds, currentBounds, settings) {
+    const base = defaultBounds && typeof defaultBounds === 'object' ? defaultBounds : {};
+    const current = currentBounds && typeof currentBounds === 'object' ? currentBounds : base;
+    const source = settings && typeof settings === 'object' ? settings : {};
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const applyAxis = (baseMin, baseMax, currentMin, currentMax, axis, minPlacement = 'left', maxPlacement = 'right') => {
+      const valueText = axis && axis.value != null ? String(axis.value).trim() : '';
+      if (valueText === '') return { min: number(currentMin, number(baseMin)), max: number(currentMax, number(baseMax)) };
+      const value = Number(valueText);
+      if (!Number.isInteger(value) || value <= 0) return { min: NaN, max: NaN };
+      const rawPlacement = String(axis && axis.placement || '');
+      const legacyMinAlias = minPlacement === 'down' && rawPlacement === 'left';
+      const legacyMaxAlias = maxPlacement === 'up' && rawPlacement === 'right';
+      const placement = rawPlacement === 'equal'
+        ? 'equal'
+        : (rawPlacement === minPlacement || legacyMinAlias)
+          ? minPlacement
+          : (rawPlacement === maxPlacement || legacyMaxAlias)
+            ? maxPlacement
+            : 'equal';
+      const operation = String(axis && axis.operation || '') === 'shorten' ? 'shorten' : 'extend';
+      const direction = operation === 'shorten' ? -1 : 1;
+      let min = number(baseMin), max = number(baseMax);
+      if (placement === 'equal' || placement === minPlacement) min -= direction * value;
+      if (placement === 'equal' || placement === maxPlacement) max += direction * value;
+      return { min, max };
+    };
+    const width = applyAxis(base.minX, base.maxX, current.minX, current.maxX, source.width, 'left', 'right');
+    const length = applyAxis(base.minY, base.maxY, current.minY, current.maxY, source.length, 'down', 'up');
+    return { minX: width.min, maxX: width.max, minY: length.min, maxY: length.max };
+  }
 
   function noGapModeActive(raw) {
     const parts = splitSemi(raw);
@@ -481,6 +626,7 @@
   function normalizeSideScopedNumbers(raw, fallback = null, minValue = null) {
     const source = raw && typeof raw === 'object' ? raw : {};
     const norm = value => {
+      if (value === undefined || value === null || String(value).trim() === '') return fallback;
       const n = Number(value);
       if (!Number.isFinite(n)) return fallback;
       return minValue == null ? n : Math.max(minValue, n);
@@ -504,6 +650,7 @@
       const wall = value && typeof value === 'object' ? value : {};
       const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
       return {
+        enabled: wall.enabled !== false,
         xOffset: finite(wall.xOffset, 0),
         depth: Math.max(1, finite(wall.depth, K.sideWallDepth)),
         height: Math.max(0, finite(wall.height, 0))
@@ -536,6 +683,27 @@
   }
 
 
+  function backWallGridCellsAreValid(cells, bounds) {
+    if (!Array.isArray(cells) || !cells.length) return false;
+    const epsilon = 1e-7;
+    const ids = new Set();
+    for (const cell of cells) {
+      if (!cell || ids.has(cell.id)) return false;
+      ids.add(cell.id);
+      if (!(cell.maxX > cell.minX && cell.maxY > cell.minY)) return false;
+      if (cell.minX < bounds.minX - epsilon || cell.maxX > bounds.maxX + epsilon || cell.minY < bounds.minY - epsilon || cell.maxY > bounds.maxY + epsilon) return false;
+    }
+    const enabledCells = cells.filter(cell => cell.enabled !== false);
+    for (let left = 0; left < enabledCells.length; left += 1) {
+      for (let right = left + 1; right < enabledCells.length; right += 1) {
+        const overlapX = Math.min(enabledCells[left].maxX, enabledCells[right].maxX) - Math.max(enabledCells[left].minX, enabledCells[right].minX);
+        const overlapY = Math.min(enabledCells[left].maxY, enabledCells[right].maxY) - Math.max(enabledCells[left].minY, enabledCells[right].minY);
+        if (overlapX > epsilon && overlapY > epsilon) return false;
+      }
+    }
+    return true;
+  }
+
   function normalizeBackWallGridState(rawState) {
     const raw = rawState && typeof rawState === 'object' ? rawState : {};
     const sourceMap = raw.side && typeof raw.side === 'object' ? raw.side : {};
@@ -546,13 +714,24 @@
       const bounds = item.bounds && typeof item.bounds === 'object' ? item.bounds : {};
       const minX = Number(bounds.minX), maxX = Number(bounds.maxX), minY = Number(bounds.minY), maxY = Number(bounds.maxY);
       if (![minX, maxX, minY, maxY].every(Number.isFinite) || !(maxX > minX && maxY > minY)) return;
-      const cells = Array.isArray(item.cells) ? item.cells.map((cell, index) => {
+      const rawCells = Array.isArray(item.cells) ? item.cells : [];
+      const cells = rawCells.map((cell, index) => {
         const c = cell && typeof cell === 'object' ? cell : {};
         const x1 = Number(c.minX), x2 = Number(c.maxX), y1 = Number(c.minY), y2 = Number(c.maxY);
         if (![x1, x2, y1, y2].every(Number.isFinite) || !(x2 > x1 && y2 > y1)) return null;
-        return { id: String(c.id || `back_wall_cell_${key}_${index + 1}`), minX: x1, maxX: x2, minY: y1, maxY: y2 };
-      }).filter(Boolean) : [];
-      side[key] = { version: 1, bounds: { minX, maxX, minY, maxY }, cells };
+        return { id: String(c.id || `back_wall_cell_${key}_${index + 1}`), ...(c.enabled === false ? { enabled: false } : {}), minX: x1, maxX: x2, minY: y1, maxY: y2 };
+      }).filter(Boolean);
+      const gridBounds = { minX, maxX, minY, maxY };
+      if (cells.length === rawCells.length && backWallGridCellsAreValid(cells, gridBounds)) {
+        const xs = new Set(cells.flatMap(cell => [cell.minX, cell.maxX]).map(value => Number(value).toFixed(6)));
+        const ys = new Set(cells.flatMap(cell => [cell.minY, cell.maxY]).map(value => Number(value).toFixed(6)));
+        side[key] = {
+          version: 1, autoHeight: item.autoHeight === true,
+          columns: Math.max(1, Math.floor(Number(item.columns) || Math.max(1, xs.size - 1))),
+          rows: Math.max(1, Math.floor(Number(item.rows) || Math.max(1, ys.size - 1))),
+          bounds: gridBounds, cells
+        };
+      }
     });
     return { side };
   }
@@ -565,12 +744,37 @@
 
   function backWallCellsFor(d, key, rearHeight) {
     const grid = explicitBackWallGridFor(d, key);
-    if (grid) return grid;
+    if (grid) {
+      const normalized = normalizeSideViewKey(key, 0);
+      const rawWall = sideScopedValue(d && d.backWallState, normalized, null) || {};
+      const storedSegments = explicitBackWallSegmentsFor(d, normalized);
+      const bounds = grid.bounds || {};
+      const legacyAutomaticPlaceholder = !(Number(rawWall.height) > 0)
+        && !storedSegments
+        && Number(bounds.minY) === 0
+        && Number(bounds.maxY) <= 1.000001;
+      if (grid.autoHeight === true || legacyAutomaticPlaceholder) {
+        const resolvedMaxY = Math.max(1, Number(rearHeight) || sideBackWallSettings(d, normalized, rearHeight).height);
+        const oldMaxY = Number(bounds.maxY) || 1;
+        return {
+          ...grid,
+          autoHeight: true,
+          bounds: { ...bounds, minY: 0, maxY: resolvedMaxY },
+          cells: grid.cells.map(cell => ({
+            ...cell,
+            minY: Number(cell.minY) <= 0.000001 ? 0 : Number(cell.minY) / oldMaxY * resolvedMaxY,
+            maxY: Number(cell.maxY) >= oldMaxY - 0.000001 ? resolvedMaxY : Number(cell.maxY) / oldMaxY * resolvedMaxY
+          }))
+        };
+      }
+      return grid;
+    }
     const segments = backWallSegmentsFor(d, key, rearHeight);
     const maxX = segments.reduce((value, item) => Math.max(value, Number(item.end) || 0), 1);
     const maxY = segments.reduce((value, item) => Math.max(value, Number(item.height) || 0), Math.max(1, Number(rearHeight) || 1));
     return {
       version: 1,
+      columns: Math.max(1, segments.length), rows: 1,
       bounds: { minX: 0, maxX, minY: 0, maxY },
       cells: segments.map((item, index) => ({ id: String(item.id || `back_wall_cell_${index + 1}`), minX: Number(item.start) || 0, maxX: Number(item.end) || 0, minY: 0, maxY: Number(item.height) || maxY }))
     };
@@ -602,6 +806,7 @@
     const explicitSegments = explicitBackWallSegmentsFor(d, key);
     const segmentDepth = explicitSegments ? safeExtrema(explicitSegments.map(item => Math.max(0, Number(item.end) || 0)), 'max', 0) : 0;
     return {
+      enabled: raw.enabled !== false,
       xOffset: Number.isFinite(Number(raw.xOffset)) ? Number(raw.xOffset) : 0,
       depth: Math.max(1, Number(raw.depth) || K.sideWallDepth, segmentDepth),
       height: Math.max(1, Number(raw.height) || Number(rearHeight) || 1)
@@ -688,15 +893,17 @@
     const explicitMap = d.sidePosts && typeof d.sidePosts === 'object' ? d.sidePosts : {};
     const hasExplicit = Object.prototype.hasOwnProperty.call(explicitMap, sideViewKey);
     let rawPosts = hasExplicit && Array.isArray(explicitMap[sideViewKey]) ? explicitMap[sideViewKey] : null;
-    // 5000 mm üzerindeki cam kaydı açıklığında en az bir destek dikmesi zorunludur.
-    // Dolu manuel liste korunur; eski/boş state otomatik desteği bastıramaz.
-    if (!rawPosts || (camW > 5000 && rawPosts.length === 0)) {
-      rawPosts = camW > 5000 ? [{
+    const autoSupportSuppressed = !!(d.sideAutoSupportSuppressed && d.sideAutoSupportSuppressed[sideViewKey] === true);
+    // 5000 mm üzerindeki cam kaydı açıklığında destek ilk kez otomatik gelir.
+    // Eski/boş state otomatik davranışı korur; yalnız açık kullanıcı silme intent'i
+    // bu yan görünüş için otomatik desteğin yeniden oluşmasını bastırır.
+    if (camW > 5000 && !autoSupportSuppressed && (!rawPosts || rawPosts.length === 0)) {
+      rawPosts = [{
         id: `auto_side_${sideViewKey}_0`,
         centerX: Number(d.sideSupportCenters && d.sideSupportCenters[sideViewKey]) || defaultCenterX,
         profile: supportProfileFor(d, scope)
-      }] : [];
-    }
+      }];
+    } else if (!rawPosts) rawPosts = [];
     const posts = rawPosts.map((raw, i) => {
       const profile = normalizeGlassTrackProfile(raw && raw.profile ? raw.profile : supportProfileFor(d, scope));
       const extension = Number(raw && raw.extension);
@@ -838,6 +1045,9 @@
           const extension = Number(item && item.extension);
           return { id: String((item && item.id) || `side_${key}_${i}`), centerX: Number(item && item.centerX), profile: normalizeGlassTrackProfile(item && item.profile), extension: Number.isFinite(extension) ? extension : 0 };
         }).filter(item => Number.isFinite(item.centerX)) : []]))
+      : {};
+    d.sideAutoSupportSuppressed = raw && raw.__sideAutoSupportSuppressed && typeof raw.__sideAutoSupportSuppressed === 'object'
+      ? Object.fromEntries(Object.entries(raw.__sideAutoSupportSuppressed).filter(([, value]) => value === true).map(([key]) => [String(key), true]))
       : {};
     d.customRayPositions = raw && raw.__customRayPositions && typeof raw.__customRayPositions === 'object' ? raw.__customRayPositions : null;
     d.frontPostExtensions = Array.isArray(raw && raw.__frontPostExtensions) ? raw.__frontPostExtensions.map(value => Math.max(0, Number(value) || 0)) : [];
@@ -1100,6 +1310,7 @@
     };
     if (e.type === 'line') return { ...e, x1: mx(e.x1), x2: mx(e.x2) };
     if (e.type === 'polyline') return { ...e, points: (e.points || []).map(p => [mx(p[0]), p[1]]) };
+    if (e.type === 'hatch') return { ...e, points: (e.points || []).map(p => [mx(p[0]), p[1]]).reverse() };
     if (e.type === 'circle') return { ...e, x: mx(e.x) };
     if (e.type === 'text') {
       const mirroredRot = normDeg(180 - (Number(e.rotation) || 0));
@@ -1336,6 +1547,38 @@
       ? clamp(preferred, safeInset, width - safeInset)
       : width / 2;
     return start + local;
+  }
+
+  function parapetDimensionStations(segments) {
+    const stations = [];
+    (Array.isArray(segments) ? segments : []).forEach((segment, segmentIndex) => {
+      const start = Number(segment && segment.start);
+      const end = Number(segment && segment.end);
+      if (![start, end].every(Number.isFinite) || !(end > start + 0.001)) return;
+      const fallbackHeight = Math.max(0, Number(segment && segment.height) || 0);
+      const startHeight = Math.max(0, Number.isFinite(Number(segment && segment.startHeight)) ? Number(segment.startHeight) : fallbackHeight);
+      const endHeight = Math.max(0, Number.isFinite(Number(segment && segment.endHeight)) ? Number(segment.endHeight) : fallbackHeight);
+      const width = end - start;
+      const inset = Math.min(Math.max(55, width * 0.08), width / 2);
+      const sloped = Math.abs(startHeight - endHeight) > 0.001;
+      const candidates = sloped
+        ? [
+            { coordinate: start, dimensionCoordinate: start + inset, height: startHeight, kind: 'start' },
+            { coordinate: end, dimensionCoordinate: end - inset, height: endHeight, kind: 'end' }
+          ]
+        : [{ coordinate: start + width / 2, dimensionCoordinate: parapetSegmentVerticalDimX(start, width), height: startHeight, kind: 'center' }];
+      candidates.forEach(candidate => {
+        const sameCoordinate = stations.filter(item => Math.abs(item.coordinate - candidate.coordinate) <= 0.001);
+        const sameHeight = sameCoordinate.find(item => Math.abs(item.height - candidate.height) <= 0.001);
+        if (sameHeight) {
+          sameHeight.shared = true;
+          return;
+        }
+        if (sameCoordinate.length) sameCoordinate.forEach(item => { item.discontinuous = true; });
+        stations.push({ ...candidate, segment, segmentIndex, shared: false, discontinuous: sameCoordinate.length > 0 });
+      });
+    });
+    return stations.sort((a, b) => a.coordinate - b.coordinate || a.dimensionCoordinate - b.dimensionCoordinate || a.height - b.height);
   }
 
   function frontPositionIndexAtX(d, absoluteX) {
@@ -1612,10 +1855,23 @@
     rayIntervals(d).forEach(interval => {
       if (interval.len <= 1) return;
       const p = d.positions[interval.system] || d.positions[0];
+      const sys = d.systems[interval.system] || d.systems[0];
       const y = topCatiProfilYAt(d, interval.system);
       const shift = (p.rayLength / K.catiProfilRayRatioBase) * K.catiProfilRayRatioMove + K.catiProfilExtraOffset;
-      g.rect(interval.x, y, interval.len, K.catiProfilH, 'FABRIC');
-      g.rect(interval.x, y - shift, interval.len, K.catiProfilH, 'FABRIC');
+      const defaultBounds = sys ? defaultTopTrapezBounds(d, sys) : null;
+      const currentBounds = sys ? topTrapezBoundsForSystem(d, sys) : defaultBounds;
+      const fixedProfile = g.rect(interval.x, y, interval.len, K.catiProfilH, 'FABRIC');
+      fixedProfile.roofProfileRole = 'fixed';
+      fixedProfile.systemIndex = interval.system;
+      // Trapez sacın -Y sınırı bu çatı kayıt profiliyle aynı koordinattır.
+      // Delta türetmek yerine doğrudan güncel minY değerini kullanmak; SVG, PDF ve
+      // DXF ortak modelinde profil ile sac sınırının ayrışmasını engeller.
+      const alignedMinusY = currentBounds && Number.isFinite(Number(currentBounds.minY))
+        ? Number(currentBounds.minY)
+        : y - shift;
+      const movingProfile = g.rect(interval.x, alignedMinusY, interval.len, K.catiProfilH, 'FABRIC');
+      movingProfile.roofProfileRole = 'trapezMinusY';
+      movingProfile.systemIndex = interval.system;
     });
   }
 
@@ -1627,7 +1883,12 @@
     const rayStartY = rayEndY + (p.opening - K.rayLengthFrontDeduct);
     const roofY = topCatiProfilYAt(d, sys.index);
     const shift = (p.rayLength / K.catiProfilRayRatioBase) * K.catiProfilRayRatioMove + K.catiProfilExtraOffset;
-    return { minX:firstRayX + 40, maxX:lastRayX + 40 + 95, minY:roofY - shift, maxY:rayStartY + 72 };
+    const rearMechanism = getBlocks()['PergoRise Ray Arka Mekanizma Üst Görünüş'] || {
+      bounds: { minX: -46, minY: -131, maxX: 46, maxY: 215 }
+    };
+    const firstBounds = transformBlockBounds(rearMechanism, { x: firstRayX + 40, y: rayStartY, scaleX: 1, scaleY: 1, rotation: 0 });
+    const lastBounds = transformBlockBounds(rearMechanism, { x: lastRayX + 40, y: rayStartY, scaleX: 1, scaleY: 1, rotation: 0 });
+    return { minX:firstBounds[0], maxX:lastBounds[2], minY:roofY - shift, maxY:Math.max(firstBounds[3], lastBounds[3]) };
   }
   function topTrapezBoundsForSystem(d, sys) {
     const base=defaultTopTrapezBounds(d,sys), raw=d.trapezSheetBounds && d.trapezSheetBounds[String(sys.index)];
@@ -1637,12 +1898,16 @@
   }
   function drawTopTrapezSafeHatch(g, d) {
     d.systems.forEach(sys => {
-      const b=topTrapezBoundsForSystem(d,sys); const w=b.maxX-b.minX, h=b.maxY-b.minY;
+      const defaults=defaultTopTrapezBounds(d,sys), b=topTrapezBoundsForSystem(d,sys); const w=b.maxX-b.minX, h=b.maxY-b.minY;
       const boundary=g.rect(b.minX,b.minY,w,h,'HATCH_FABRIC');
       g.entities.push({type:'hatch',layer:'HATCH_FABRIC',points:[[b.minX,b.minY],[b.maxX,b.minY],[b.maxX,b.maxY],[b.minX,b.maxY]],patternKind:'fabric'});
       const preview=safeHatchBlock(g, 'PULUMUR TRAPEZ SAFE HATCH', b.minX, b.minY, w, h, 'HATCH_FABRIC');
       if(preview) preview.previewOnly=true;
-      g.entities.push({type:'interaction',kind:'trapezSheetEditor',x:b.minX,y:b.minY,w,h,data:{systemIndex:sys.index,boundMinX:b.minX,boundMaxX:b.maxX,boundMinY:b.minY,boundMaxY:b.maxY}});
+      g.entities.push({type:'interaction',kind:'trapezSheetEditor',x:b.minX,y:b.minY,w,h,data:{
+        systemIndex:sys.index,
+        boundMinX:b.minX,boundMaxX:b.maxX,boundMinY:b.minY,boundMaxY:b.maxY,
+        defaultBoundMinX:defaults.minX,defaultBoundMaxX:defaults.maxX,defaultBoundMinY:defaults.minY,defaultBoundMaxY:defaults.maxY
+      }});
     });
   }
 
@@ -2183,35 +2448,36 @@
     if (!frontSegments.length) {
       addDimV(g, rectStartY, frontBaseY, K.systemStartX - 100, K.systemStartX - 360, `ÖN ${formatMm(d.frontHeight)}`, { layer: 'Ölçüler - Ön Görünüş', edit: { dimId: 'front_height', ruleKey: 'front_front_height', field: 'frontHeight', index: 0, label: 'Ön H', view: 'Front', relatedZoneId: 'front_height_zone' } });
     } else {
-      // v8.9.25: Her parapet segmenti kendi alanında iki parçalı zincir
-      // ölçü taşır: parapet yüksekliği ve oluk altı-parapet üstü mesafesi.
-      // Aynı yüksekliğe sahip segmentler de ayrı ayrı ölçülür.
-      frontSegments.forEach((segment, segmentIndex) => {
-        const height = Math.max(0, Number(segment.height) || 0);
-        const x = K.systemStartX + Number(segment.start || 0);
-        const width = Math.max(1, Number(segment.end || 0) - Number(segment.start || 0));
-        const refX = x + width / 2;
+      // Düz parçalarda önceki merkez zinciri korunur. Eğimli parçalarda ise
+      // gerçek başlangıç/bitiş kotları ölçülür; ortak PP sınırı tek istasyon
+      // olduğundan komşu parçaların kesişim ölçüsü üst üste binmez.
+      parapetDimensionStations(frontSegments).forEach(station => {
+        const segment = station.segment;
+        const segmentIndex = station.segmentIndex;
+        const height = Math.max(0, Number(station.height) || 0);
+        const refX = K.systemStartX + station.coordinate;
         const topY = frontBaseY + height;
-        const dimX = parapetSegmentVerticalDimX(x, width);
+        const dimX = K.systemStartX + station.dimensionCoordinate;
         const positionIndex = frontPositionIndexAtX(d, refX);
-        addDimV(g, frontBaseY, topY, refX, dimX, formatMm(height), {
+        const stationSuffix = station.kind === 'center' ? '' : `_${station.kind}`;
+        if (height > 0.001) addDimV(g, frontBaseY, topY, refX, dimX, formatMm(height), {
           scale: 0.72,
           layer: 'Ölçüler - Ön Görünüş',
           positionIndex,
           edit: {
-            dimId: `front_parapet_height_${segment.id}`,
+            dimId: `front_parapet_height_${segment.id}${stationSuffix}`,
             ruleKey: 'parapet_height_info', field: '__parapet__', index: segmentIndex,
             label: 'Parapet H', view: 'Front', relatedZoneId: `front_parapet_zone_${segment.id}`,
             parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
             editable: false, dimensionType: 'detail'
           }
         });
-        addDimV(g, topY, rectStartY, refX, dimX, formatMm(rectStartY - topY), {
+        if (rectStartY - topY > 0.001) addDimV(g, topY, rectStartY, refX, dimX, formatMm(rectStartY - topY), {
           scale: 0.72,
           layer: 'Ölçüler - Ön Görünüş',
           positionIndex,
           edit: {
-            dimId: `front_post_height_${segment.id}`,
+            dimId: `front_post_height_${segment.id}${stationSuffix}`,
             ruleKey: 'info_only', field: '__info__', index: segmentIndex,
             label: 'Oluk - Parapet Arası', view: 'Front', relatedZoneId: `front_post_height_zone_${segment.id}`,
             parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
@@ -2389,7 +2655,11 @@
     const duvarY = rectStartY - d.frontHeight;
     const isMiddlePosition = p.index > 0 && p.index < d.sidePositionCount - 1;
     const middleEnabled = !isMiddlePosition || sideViewEnabled(d, sideViewKey, p.index);
-    const frontPostIndex = sideViewKey === 'right' ? Math.max(0, d.postCount - 1) : 0;
+    const postXs = Array.isArray(d.postCenterXs) ? d.postCenterXs : postCenterXs(d);
+    const physicalStartX = d.systems && d.systems[p.index] ? Number(d.systems[p.index].startX) : Number(postXs[0]);
+    const frontPostIndex = sideViewKey === 'right'
+      ? Math.max(0, postXs.length - 1)
+      : postXs.reduce((best, x, index) => Math.abs(Number(x) - physicalStartX) < Math.abs(Number(postXs[best]) - physicalStartX) ? index : best, 0);
     const sideFrontProfile = frontPostProfileAt(d, frontPostIndex);
     const sideFrontWidth = Math.max(1, Number(sideFrontProfile.boy) || K.postSize);
     const sideFrontExtension = frontPostExtensionAt(d, frontPostIndex);
@@ -2502,7 +2772,7 @@
       void sideParapetWidthDim;
     });
     const wallGrid = backWallCellsFor(d, sideViewKey, p.rearHeight);
-    wallGrid.cells.forEach((cell, wallCellIndex) => {
+    const pushWallInteraction = (cell, wallCellIndex, cellEnabled, wallEnabled = true) => {
       const minX = Number(cell.minX) || 0;
       const maxX = Number(cell.maxX) || 0;
       const minY = Number(cell.minY) || 0;
@@ -2513,14 +2783,21 @@
       const wallRightX = duvarX - minX;
       const wallLeftX = duvarX - maxX;
       const wallBottomY = duvarY + minY;
-      g.rect(wallRightX, wallBottomY, -wallW, wallH, 'Duvar - Yan Görünüş');
-      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, wallBottomY, -wallW, wallH, 'HATCH_WALL');
+      if (wallEnabled && cellEnabled) {
+        g.rect(wallRightX, wallBottomY, -wallW, wallH, 'Duvar - Yan Görünüş');
+        safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, wallBottomY, -wallW, wallH, 'HATCH_WALL');
+      }
       g.entities.push({ type: 'interaction', kind: 'backWallEditor', x: wallLeftX, y: wallBottomY, w: wallW, h: wallH, data: {
-        sideIndex: p.index, sideViewKey, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
-        wallCellId: cell.id, wallCellIndex, cellMinX: minX, cellMaxX: maxX, cellMinY: minY, cellMaxY: maxY,
+        sideIndex: p.index, sideViewKey, wallEnabled, wallCellEnabled: cellEnabled, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
+        wallCellId: cell.id, wallCellIndex, wallCellCount: wallGrid.cells.length, cellMinX: minX, cellMaxX: maxX, cellMinY: minY, cellMaxY: maxY,
         wallMinX: wallGrid.bounds.minX, wallMaxX: wallGrid.bounds.maxX, wallMinY: wallGrid.bounds.minY, wallMaxY: wallGrid.bounds.maxY
       } });
-    });
+    };
+    if (wallSettings.enabled === false) {
+      pushWallInteraction({ id: `back_wall_add_${sideViewKey}`, enabled: false, ...wallGrid.bounds }, 0, false, false);
+    } else {
+      wallGrid.cells.forEach((cell, wallCellIndex) => pushWallInteraction(cell, wallCellIndex, cell.enabled !== false, true));
+    }
     blockRef(g, 'PergoRise Ray Duvar Bağlantı Set', bagX, bagY, 120, 95, 'Blok - Yan Görünüş'); blockRef(g, 'PergoRise Ray Arka Mekanizma Yan Görünüş', arkaMekX, arkaMekY, 135, 90, 'Blok - Yan Görünüş', normDeg(aci * 180 / Math.PI));
     rotatedRect(g, startRayX, startRayY, rayLen, -K.sideRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş'); rotatedRect(g, startRayX, startRayY - K.sideInnerRayOffsetY, rayLen, -K.sideInnerRayH, arkaMekX, arkaMekY, aci, 'Ray - Yan Görünüş');
     const kafa = rotatePoint(startRayX + rayLen, startRayY, arkaMekX, arkaMekY, aci); const rotDeg = normDeg(aci * 180 / Math.PI); blockRef(g, 'PergoRise Ray Kafası Yan Görünüş', kafa[0], kafa[1], 130, 90, 'Blok - Yan Görünüş', rotDeg);
@@ -2612,27 +2889,27 @@
     }
     if (sideSegments.length) {
       const intermediatePosition = d.sidePositionCount >= 3 && p.index > 0 && p.index < d.sidePositionCount - 1;
-      // v8.9.29: Cam kayıt yalnız kenar yan görünüşlerde çizilir. Bu nedenle ara
-      // pozlarda net üst referans doğrudan oluk altıdır (yanUstY). Kenar pozlarda
-      // cam kayıt gerçekten çiziliyorsa profilin -Y dış kenarı kullanılır ve profil
-      // En değeri değiştiğinde ölçü otomatik revize olur.
-      const trackDrawnInThisPosition = sideFeatureEnabled(d, 'glassTrack', sideViewKey, p.index);
-      const clearTopY = trackDrawnInThisPosition ? sideGlassTrackBottomY(d, yanUstY, sideViewKey, p.index) : yanUstY;
-      sideSegments.forEach((segment, segmentIndex) => {
-        const height = Math.max(0, Number(segment.height) || 0);
-        const x = duvarX + Number(segment.start || 0);
-        const width = Math.max(1, Number(segment.end || 0) - Number(segment.start || 0));
+      // Parapet zincirinin üst referansı tüm yan görünüşlerde oluk altıdır.
+      // Cam kaydı alt kotu ayrıca kendi bilgi ölçüsünde gösterildiği için burada
+      // profil kalınlığı düşülmez.
+      const clearTopY = yanUstY;
+      parapetDimensionStations(sideSegments).forEach(station => {
+        const segment = station.segment;
+        const segmentIndex = station.segmentIndex;
+        const height = Math.max(0, Number(station.height) || 0);
+        const refXAtStation = duvarX + station.coordinate;
         const topY = duvarY + height;
         // Üç veya daha çok pozda, tek parçalı ara poz parapetinin zincir ölçüsü
         // ön dikmenin hemen solunda gösterilir. Çok parçalı parapetlerde segment
         // bazlı lokal dağılım korunur.
         const useFrontLocalPlacement = intermediatePosition && sideSegments.length === 1;
-        const refX = useFrontLocalPlacement ? yanX - K.postSize / 2 : x + width / 2;
-        const dimX = useFrontLocalPlacement ? yanX - K.postSize - 220 : parapetSegmentVerticalDimX(x, width);
-        addDimV(g, duvarY, topY, refX, dimX, formatMm(height), {
+        const refX = useFrontLocalPlacement && station.kind === 'center' ? yanX - K.postSize / 2 : refXAtStation;
+        const dimX = useFrontLocalPlacement && station.kind === 'center' ? yanX - K.postSize - 220 : duvarX + station.dimensionCoordinate;
+        const stationSuffix = station.kind === 'center' ? '' : `_${station.kind}`;
+        if (height > 0.001) addDimV(g, duvarY, topY, refX, dimX, formatMm(height), {
           scale: 0.66, layer: 'Ölçüler - Yan Görünüş', dimensionFilterType: 'detail', positionIndex: p.index,
           edit: {
-            dimId: `side_parapet_height_${sideViewKey}_${p.index}_${segment.id}`,
+            dimId: `side_parapet_height_${sideViewKey}_${p.index}_${segment.id}${stationSuffix}`,
             ruleKey: 'parapet_height_info', field: '__parapet__', index: segmentIndex,
             label: 'Parapet H', view: sideViewKey === 'right' ? 'Right' : 'Side',
             relatedZoneId: `side_parapet_zone_${sideViewKey}_${p.index}_${segment.id}`,
@@ -2643,13 +2920,13 @@
         if (clearTopY - topY > 0.5) addDimV(g, topY, clearTopY, refX, dimX, formatMm(clearTopY - topY), {
           scale: 0.66, layer: 'Ölçüler - Yan Görünüş', dimensionFilterType: 'detail', positionIndex: p.index,
           edit: {
-            dimId: `side_gutter_to_parapet_${sideViewKey}_${p.index}_${segment.id}`,
+            dimId: `side_gutter_to_parapet_${sideViewKey}_${p.index}_${segment.id}${stationSuffix}`,
             ruleKey: 'info_only', field: '__info__', index: segmentIndex,
-            label: 'Cam Kaydı - Parapet Arası', view: sideViewKey === 'right' ? 'Right' : 'Side',
+            label: 'Oluk - Parapet Arası', view: sideViewKey === 'right' ? 'Right' : 'Side',
             relatedZoneId: `side_parapet_zone_${sideViewKey}_${p.index}_${segment.id}`,
             parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
             editable: false, dimensionType: 'detail',
-            passiveReason: 'Cam kayıt profilinin -Y dış kenarı ile ilgili yan parapet parçasının üst kotu arasındaki bilgi ölçüsüdür.'
+            passiveReason: 'Oluk altı ile ilgili yan parapet parçasının üst kotu arasındaki bilgi ölçüsüdür.'
           }
         });
       });
@@ -2821,7 +3098,7 @@
     if (!e) return [0, 0, 0, 0];
     if (e.type === 'line') return [Math.min(e.x1, e.x2), Math.min(e.y1, e.y2), Math.max(e.x1, e.x2), Math.max(e.y1, e.y2)];
     if (e.type === 'text' || e.type === 'mtext') return [e.x, e.y - e.height, e.x + Math.max(1, String(e.value || '').length) * e.height * 0.65, e.y + e.height];
-    if (e.type === 'polyline') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
+    if (e.type === 'polyline' || e.type === 'hatch') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
     if (e.type === 'circle') return [e.x - e.r, e.y - e.r, e.x + e.r, e.y + e.r];
     if (e.type === 'insert') {
       const block = getBlocks()[e.name];
@@ -3278,7 +3555,7 @@
       const height = (Number(e.height) || 0) * Math.max(1, lines.length) * 1.2;
       return [e.x, e.y - height, e.x + width, e.y];
     }
-    if (e.type === 'polyline') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
+    if (e.type === 'polyline' || e.type === 'hatch') { const points = e.points || []; return [safeExtrema(points.map(p => p[0]), 'min', 0), safeExtrema(points.map(p => p[1]), 'min', 0), safeExtrema(points.map(p => p[0]), 'max', 0), safeExtrema(points.map(p => p[1]), 'max', 0)]; }
     if (e.type === 'circle') return [e.x - e.r, e.y - e.r, e.x + e.r, e.y + e.r];
     if (e.type === 'insert') { const block = blocks[e.name]; if (block) return transformBlockBounds(block, e); const w = Math.abs(e.previewW || 120), h = Math.abs(e.previewH || 80); return [e.x - w / 2, e.y - h / 2, e.x + w / 2, e.y + h / 2]; }
     if (e.type === 'dimension') { const gs = (e.graphics || []).map(ge => entityBounds(ge, blocks)); if (gs.length) return [safeExtrema(gs.map(b => b[0]), 'min', 0), safeExtrema(gs.map(b => b[1]), 'min', 0), safeExtrema(gs.map(b => b[2]), 'max', 0), safeExtrema(gs.map(b => b[3]), 'max', 0)]; }
@@ -3440,6 +3717,61 @@
     return segments;
   }
 
+  function polygonScanlineIntervals(points, axis, value) {
+    const clean = (Array.isArray(points) ? points : []).map(point => [Number(point && point[0]), Number(point && point[1])]).filter(point => point.every(Number.isFinite));
+    if (clean.length < 3 || !Number.isFinite(Number(value))) return [];
+    const intersections = [];
+    for (let index = 0; index < clean.length; index += 1) {
+      const first = clean[index], second = clean[(index + 1) % clean.length];
+      const a = axis === 'x' ? first[0] : first[1];
+      const b = axis === 'x' ? second[0] : second[1];
+      if (!((a <= value && value < b) || (b <= value && value < a))) continue;
+      const ratio = (value - a) / (b - a);
+      intersections.push(axis === 'x'
+        ? first[1] + (second[1] - first[1]) * ratio
+        : first[0] + (second[0] - first[0]) * ratio);
+    }
+    intersections.sort((left, right) => left - right);
+    const unique = intersections.filter((entry, index) => index === 0 || Math.abs(entry - intersections[index - 1]) > 1e-7);
+    const intervals = [];
+    for (let index = 0; index + 1 < unique.length; index += 2) if (unique[index + 1] - unique[index] > 1e-7) intervals.push([unique[index], unique[index + 1]]);
+    return intervals;
+  }
+
+  function hatchSegmentsForPolygon(entity) {
+    const points = (Array.isArray(entity && entity.points) ? entity.points : []).map(point => [Number(point && point[0]), Number(point && point[1])]).filter(point => point.every(Number.isFinite));
+    if (points.length < 3) return [];
+    const minX = safeExtrema(points.map(point => point[0]), 'min', 0), maxX = safeExtrema(points.map(point => point[0]), 'max', 0);
+    const minY = safeExtrema(points.map(point => point[1]), 'min', 0), maxY = safeExtrema(points.map(point => point[1]), 'max', 0);
+    const epsilon = 1e-7, segments = [];
+    if (entity.patternKind === 'fabric') {
+      const repeat = 150, offsets = [0, 42];
+      offsets.forEach(offset => {
+        let x = Math.ceil((minX - offset + epsilon) / repeat) * repeat + offset;
+        for (; x < maxX - epsilon; x += repeat) polygonScanlineIntervals(points, 'x', x).forEach(interval => segments.push({ x1: x, y1: interval[0], x2: x, y2: interval[1] }));
+      });
+      return segments;
+    }
+    if (entity.patternKind !== 'brick') return segments;
+    const scale = Math.max(0.01, Number(entity.patternScale) || 30);
+    const course = 6.35 * scale, brickWidth = 12.7 * scale;
+    let y = Math.ceil((minY + epsilon) / course) * course;
+    for (; y < maxY - epsilon; y += course) polygonScanlineIntervals(points, 'y', y).forEach(interval => segments.push({ x1: interval[0], y1: y, x2: interval[1], y2: y }));
+    const firstRow = Math.floor(minY / course), lastRow = Math.ceil(maxY / course) - 1;
+    for (let row = firstRow; row <= lastRow; row += 1) {
+      const rowMinY = Math.max(minY, row * course), rowMaxY = Math.min(maxY, (row + 1) * course);
+      const parity = ((row % 2) + 2) % 2, offset = parity ? course : 0;
+      let x = Math.ceil((minX - offset + epsilon) / brickWidth) * brickWidth + offset;
+      for (; x < maxX - epsilon; x += brickWidth) {
+        polygonScanlineIntervals(points, 'x', x).forEach(interval => {
+          const y1 = Math.max(rowMinY, interval[0]), y2 = Math.min(rowMaxY, interval[1]);
+          if (y2 - y1 > epsilon) segments.push({ x1: x, y1, x2: x, y2 });
+        });
+      }
+    }
+    return segments;
+  }
+
   function renderSvg(drawing) {
     const ents = drawing.entities;
     const blockLib = drawing.blocks || { ...getBlocks(), ...customHatchBlocks() };
@@ -3494,10 +3826,17 @@
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewW} ${viewH}" preserveAspectRatio="xMidYMid meet">`);
     parts.push('<rect x="0" y="0" width="100%" height="100%" fill="white"/>');
     for (const [entityIndex, e] of ents.entries()) {
+      if (e && e.previewOnly) continue;
       const st = drawing.layerStyle[e.layer] || drawing.layerStyle.OUTLINE;
       const stroke = entityStroke(e, st);
       const sw = previewStrokeWidth(st.width);
       const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : '';
+      if (e.type === 'hatch') {
+        const hatchSw = e.patternKind === 'brick' ? 0.52 : 0.58;
+        const hatchLines = hatchSegmentsForPolygon(e).map(seg => `<line x1="${sx(seg.x1)}" y1="${sy(seg.y1)}" x2="${sx(seg.x2)}" y2="${sy(seg.y2)}" vector-effect="non-scaling-stroke"/>`).join('');
+        parts.push(`<g stroke="${stroke}" stroke-width="${hatchSw}" fill="none">${hatchLines}</g>`);
+        continue;
+      }
       const hatchInfo = legacyHatchInfo(e);
       if (hatchInfo) {
         const clipId = `pulumur-hatch-${hatchSeq++}`;
@@ -3531,7 +3870,7 @@
       } else if (e.type === 'circle') parts.push(`<circle cx="${sx(e.x)}" cy="${sy(e.y)}" r="${Math.abs(e.r)}" stroke="${stroke}" stroke-width="${sw}"${dash} fill="none"/>`);
       else if (e.type === 'interaction') {
         const data = e.data || {};
-        const attrs = [
+        const attrPairs = [
           ['class', 'preview-interaction-hit'],
           ['data-interaction-type', e.kind || ''],
           ['data-post-index', data.postIndex ?? ''],
@@ -3565,12 +3904,27 @@
           ['data-side-enabled', data.sideEnabled ? 'true' : 'false'],
           ['data-triangle-division-count', data.triangleDivisionCount ?? ''],
           ['data-wall-x-offset', data.wallXOffset ?? ''],
+          ['data-wall-enabled', data.wallEnabled === false ? 'false' : 'true'],
+          ['data-wall-cell-enabled', data.wallCellEnabled === false ? 'false' : 'true'],
+          ['data-wall-cell-count', data.wallCellCount ?? ''],
           ['data-wall-depth', data.wallDepth ?? ''],
           ['data-wall-height', data.wallHeight ?? ''],
           ['data-wall-segment-id', data.wallSegmentId || ''],
           ['data-wall-segment-index', data.wallSegmentIndex ?? ''],
-          ['data-system-index', data.systemIndex ?? ''], ['data-bound-min-x', data.boundMinX ?? ''], ['data-bound-max-x', data.boundMaxX ?? ''], ['data-bound-min-y', data.boundMinY ?? ''], ['data-bound-max-y', data.boundMaxY ?? '']
-        ].map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
+          ['data-wall-cell-id', data.wallCellId || ''],
+          ['data-wall-cell-index', data.wallCellIndex ?? ''],
+          ['data-cell-min-x', data.cellMinX ?? ''], ['data-cell-max-x', data.cellMaxX ?? ''],
+          ['data-cell-min-y', data.cellMinY ?? ''], ['data-cell-max-y', data.cellMaxY ?? ''],
+          ['data-wall-min-x', data.wallMinX ?? ''], ['data-wall-max-x', data.wallMaxX ?? ''],
+          ['data-wall-min-y', data.wallMinY ?? ''], ['data-wall-max-y', data.wallMaxY ?? ''],
+          ['data-system-index', data.systemIndex ?? ''], ['data-bound-min-x', data.boundMinX ?? ''], ['data-bound-max-x', data.boundMaxX ?? ''], ['data-bound-min-y', data.boundMinY ?? ''], ['data-bound-max-y', data.boundMaxY ?? ''],
+          ['data-default-bound-min-x', data.defaultBoundMinX ?? ''], ['data-default-bound-max-x', data.defaultBoundMaxX ?? ''],
+          ['data-default-bound-min-y', data.defaultBoundMinY ?? ''], ['data-default-bound-max-y', data.defaultBoundMaxY ?? '']
+        ];
+        const attrs = attrPairs.map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
+        // Etiket de aynı etkileşime aittir. Veri özniteliklerini kapsayıcı gruba
+        // da koymak, özellikle DUVAR ve TS etiketine doğrudan tıklamayı çalıştırır.
+        const groupAttrs = attrPairs.filter(([key]) => key !== 'class').map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
         const rx = sx(e.x), ry = sy(e.y + e.h), rw = Math.abs(e.w), rh = Math.abs(e.h);
         const isGlass = (e.kind || '') === 'glassTrackEditor';
         const isProduct = (e.kind || '') === 'productEditor';
@@ -3583,9 +3937,11 @@
         const postTag = Number.isFinite(Number(data.postIndex)) ? `D${Number(data.postIndex) + 1}` : 'D';
         const parapetTag = `${(data.parapetView || '').toLowerCase() === 'side' ? 'YP' : 'PP'}${Number(data.parapetSegmentIndex || 0) + 1}`;
         const supportSuffix = (data.sideViewKey || data.scope || '').toLowerCase() === 'right' ? 'R' : ((data.sideViewKey || '') === '0' ? 'L' : `P${Number(data.sideIndex || 0) + 1}`);
-        const tag = isTrapezSheet ? `TS${Number(data.systemIndex||0)+1}` : (isSideEnable ? 'YÖN GÖRÜNÜŞ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? 'DUVAR' : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag))))));
+        const backWallTag = data.wallEnabled === false ? 'DUVAR EKLE' : (data.wallCellEnabled === false ? 'DUVAR PARÇASI EKLE' : (Number(data.wallCellCount || 1) > 1 ? `DP${Number(data.wallCellIndex || 0) + 1}` : 'DUVAR'));
+        const tag = isTrapezSheet ? `TS${Number(data.systemIndex||0)+1}` : (isSideEnable ? 'YÖN GÖRÜNÜŞ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? backWallTag : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag))))));
         const groupClass = isTrapezSheet ? 'preview-trapez-sheet-zone' : (isSideEnable ? 'preview-side-enable-zone' : (isTriangle ? 'preview-triangle-zone' : (isBackWall ? 'preview-wall-zone' : (isProduct ? 'preview-product-zone' : (isParapet ? 'preview-parapet-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone'))))));
-        const titleText = isTrapezSheet ? 'Trapez sac alanını düzenle' : (isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? 'Arka duvarı düzenle' : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`))))));
+        const backWallTitle = data.wallEnabled === false ? 'Arka duvarı yeniden ekle' : (data.wallCellEnabled === false ? 'Arka duvar parçasını yeniden ekle' : (Number(data.wallCellCount || 1) > 1 ? `Arka duvar parçasını düzenle ${Number(data.wallCellIndex || 0) + 1}` : 'Arka duvarı düzenle'));
+        const titleText = isTrapezSheet ? 'Trapez sac alanını düzenle' : (isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? backWallTitle : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`))))));
         const tagColor = isTrapezSheet ? '#d97706' : (isSideEnable ? (data.sideEnabled ? '#15803d' : '#b91c1c') : (isTriangle ? '#15803d' : (isBackWall ? '#6b4f2a' : (isProduct ? '#7b1fa2' : (isParapet ? '#c62828' : (isGlass ? '#0b8043' : '#1a73e8'))))));
         if (isSideEnable) {
           const fill = data.sideEnabled ? '#22c55e' : '#ef4444';
@@ -3597,9 +3953,13 @@
           const lineGap = Math.max(43, fontSize * 0.92);
           const centerX = rx + rw / 2;
           const centerY = ry + rh / 2;
-          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" y="${centerY - lineGap / 2}">YÖN GÖRÜNÜŞ</tspan><tspan x="${centerX}" y="${centerY + lineGap / 2}">DÜZENLE</tspan></text></g>`);
+          parts.push(`<g class="${groupClass}" ${groupAttrs}><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" y="${centerY - lineGap / 2}">YÖN GÖRÜNÜŞ</tspan><tspan x="${centerX}" y="${centerY + lineGap / 2}">DÜZENLE</tspan></text></g>`);
         } else {
-          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="transparent" stroke="transparent" stroke-width="1.2" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
+          const deletedWall = isBackWall && data.wallEnabled === false;
+          const zoneFill = deletedWall ? '#fff3c9' : 'transparent';
+          const zoneFillOpacity = deletedWall ? '0.35' : '1';
+          const zoneStroke = deletedWall ? '#b45309' : 'transparent';
+          parts.push(`<g class="${groupClass}" ${groupAttrs}><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${zoneFill}" fill-opacity="${zoneFillOpacity}" stroke="${zoneStroke}" stroke-width="${deletedWall ? 2 : 1.2}" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
         }
       }
       else if (e.type === 'dimension') {
@@ -3727,6 +4087,10 @@
         (e.graphics || []).forEach(ge => expand(ge, layer));
         return;
       }
+      if (e.type === 'hatch') {
+        hatchSegmentsForPolygon(e).forEach(seg => push({ type: 'line', layer, color: e.color, x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2 }));
+        return;
+      }
       if (e.type === 'insert') {
         const hatchInfo = legacyHatchInfo(e);
         if (hatchInfo) {
@@ -3767,7 +4131,7 @@
     return { entities: out, bounds: bounds(out), layerStyle: drawing.layerStyle || LAYER_STYLE };
   }
 
-  const api = { SAMPLE_INPUT, LAYER_STYLE, K, BUILD_LABEL, DIMENSION_EDIT_RULES, DIMENSION_ACTIONS, PROFILE_LIBRARY, PRODUCT_LIBRARY, normalizeInput, buildDrawing, renderSvg, flattenDrawingForExport, bounds, formatMm, formatDeg, rayLenFor, sideAngleRadFor, getBlocks, upperTableValueWrapInfo, wrapTextForUpperInput, aciColorToHex };
+  const api = { SAMPLE_INPUT, LAYER_STYLE, K, BUILD_LABEL, DIMENSION_EDIT_RULES, DIMENSION_ACTIONS, PROFILE_LIBRARY, PRODUCT_LIBRARY, normalizeInput, buildDrawing, renderSvg, flattenDrawingForExport, bounds, formatMm, formatDeg, parapetAngleDegrees, parapetDisplayAngleDegrees, parapetModelAngleDegrees, resolveParapetEndHeight, alignParapetNeighborEndpoints, parapetDimensionStations, sanitizeSignedDecimalInput, trapezSheetExtensions, trapezSheetBoundsFromExtensions, trapezSheetEditorAxisState, trapezSheetEditorState, trapezSheetBoundsFromEditor, rayLenFor, sideAngleRadFor, getBlocks, upperTableValueWrapInfo, wrapTextForUpperInput, aciColorToHex };
   root.PulumurGeometry = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

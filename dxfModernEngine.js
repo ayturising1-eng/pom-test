@@ -128,7 +128,7 @@
     return type === 'detail' ? 'Ölçüler - Detay' : 'Ölçüler - Ana';
   }
   function hatchFromLegacyInsert(entity) {
-    if (!entity || entity.type !== 'insert') return null;
+    if (!entity || entity.type !== 'insert' || entity.previewOnly) return null;
     const name = String(entity.name || '');
     const isWall = name === 'PULUMUR WALL BRICK SAFE HATCH';
     const isFabric = name === 'PULUMUR TRAPEZ SAFE HATCH';
@@ -194,7 +194,7 @@
   function collectUsedBlocks(drawing, sourceBlocks) {
     const used = new Map();
     for (const e of drawing.entities || []) {
-      if (e.type !== 'insert' || !sourceBlocks[e.name] || isHeavyDisabledBlockName(e.name)) continue;
+      if (e.type !== 'insert' || e.previewOnly || !sourceBlocks[e.name] || isHeavyDisabledBlockName(e.name)) continue;
       if (e.mirrorX) used.set(`${e.name}__MIRROR`, mirroredBlockFrom(sourceBlocks[e.name]));
       else used.set(e.name, sourceBlocks[e.name]);
     }

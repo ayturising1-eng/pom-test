@@ -44,7 +44,7 @@
     scopes.forEach(scope => {
       const supports = array(scope.supportPosts).length;
       if (supports > active.maxSideSupportsPerView) fail(`SIDE_SUPPORT_LIMIT_EXCEEDED:${scope.key}`, supports, active.maxSideSupportsPerView);
-      const segmentCount = Math.max(array(scope.parapetSegments).length, array(object(scope.backWall).segments).length);
+      const segmentCount = Math.max(array(scope.parapetSegments).length, array(object(scope.backWall).segments).length, array(object(object(scope.backWall).grid).cells).length);
       if (segmentCount > active.maxSegmentsPerView) fail(`SEGMENT_LIMIT_EXCEEDED:${scope.key}`, segmentCount, active.maxSegmentsPerView);
       if (scope.key === 'last_left_mirror' || scope.derivedFrom) fail('DERIVED_MIRROR_MUST_NOT_BE_PERSISTED', 1, 0);
     });

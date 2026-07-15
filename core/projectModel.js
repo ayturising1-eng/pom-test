@@ -39,6 +39,93 @@
     return String(Math.max(1, positiveInteger(name.replace(/^middle_?/, ''), 1)));
   }
 
+
+  function backWallGridCellsAreValid(cells, bounds) {
+    if (!Array.isArray(cells) || !cells.length) return false;
+    const epsilon = 1e-7;
+    const ids = new Set();
+    for (const cell of cells) {
+      if (!cell || ids.has(cell.id)) return false;
+      ids.add(cell.id);
+      if (!(cell.maxX > cell.minX && cell.maxY > cell.minY)) return false;
+      if (cell.minX < bounds.minX - epsilon || cell.maxX > bounds.maxX + epsilon || cell.minY < bounds.minY - epsilon || cell.maxY > bounds.maxY + epsilon) return false;
+    }
+    const enabledCells = cells.filter(cell => cell.enabled !== false);
+    for (let left = 0; left < enabledCells.length; left += 1) {
+      for (let right = left + 1; right < enabledCells.length; right += 1) {
+        const overlapX = Math.min(enabledCells[left].maxX, enabledCells[right].maxX) - Math.max(enabledCells[left].minX, enabledCells[right].minX);
+        const overlapY = Math.min(enabledCells[left].maxY, enabledCells[right].maxY) - Math.max(enabledCells[left].minY, enabledCells[right].minY);
+        if (overlapX > epsilon && overlapY > epsilon) return false;
+      }
+    }
+    return true;
+  }
+
+  function normalizeBackWallGrid(rawGrid, legacySegments, depth, height) {
+    const legacyList = array(legacySegments);
+    const legacyDepth = legacyList.reduce((value, item) => Math.max(value, finite(object(item).end, 0)), 0);
+    const legacyHeight = legacyList.reduce((value, item) => Math.max(value, finite(object(item).height, 0)), 0);
+    const safeDepth = Math.max(1, finite(depth, 600), legacyDepth);
+    const safeHeight = Math.max(0, finite(height, 0), legacyHeight);
+    const source = object(rawGrid);
+    const rawBounds = object(source.bounds);
+    const rawMaxY = Number(rawBounds.maxY);
+    // Yüksekliği 0 olan legacy/default duvar, gerçek yan görünüş arka
+    // yüksekliğini render sırasında kullanır. V12.3'ün 1 mm'lik pozitif grid
+    // yer tutucusu bu niyeti kaybetmemeli; aksi halde duvar görünmez ve hit-area
+    // yalnız 1 mm kalır. Alan additive'dir ve gerçek kullanıcı gridlerini bozmaz.
+    const autoHeight = (source.autoHeight === true && (!Number.isFinite(rawMaxY) || rawMaxY <= 1.000001)) || (source.autoHeight !== false
+      && !(finite(height, 0) > 0) && !(legacyHeight > 0)
+      && (!Number.isFinite(rawMaxY) || rawMaxY <= 1.000001));
+    let minX = finite(rawBounds.minX, 0);
+    let maxX = finite(rawBounds.maxX, safeDepth);
+    let minY = finite(rawBounds.minY, 0);
+    let maxY = finite(rawBounds.maxY, safeHeight);
+    if (!(maxX > minX)) { minX = 0; maxX = safeDepth; }
+    if (!(maxY > minY)) { minY = 0; maxY = Math.max(1, safeHeight); }
+
+    const rawCells = array(source.cells);
+    const candidateCells = rawCells.map((cell, index) => {
+      const item = object(cell);
+      const cellMinX = finite(item.minX, minX);
+      const cellMaxX = finite(item.maxX, maxX);
+      const cellMinY = finite(item.minY, minY);
+      const cellMaxY = finite(item.maxY, maxY);
+      if (!(cellMaxX > cellMinX && cellMaxY > cellMinY)) return null;
+      return {
+        id: text(item.id, `back_wall_cell_${index + 1}`), ...(item.enabled === false ? { enabled: false } : {}),
+        minX: cellMinX, maxX: cellMaxX, minY: cellMinY, maxY: cellMaxY
+      };
+    }).filter(Boolean);
+    const gridBounds = { minX, maxX, minY, maxY };
+    const normalizedCells = candidateCells.length === rawCells.length && backWallGridCellsAreValid(candidateCells, gridBounds)
+      ? candidateCells
+      : [];
+
+    const cells = normalizedCells.length ? normalizedCells : legacyList.map((segment, index) => {
+      const item = object(segment);
+      const start = Math.max(minX, finite(item.start, minX));
+      const end = Math.min(maxX, finite(item.end, maxX));
+      const segmentHeight = Math.min(maxY, Math.max(minY, finite(item.height, maxY)));
+      if (!(end > start && segmentHeight > minY)) return null;
+      return {
+        id: text(item.id, `back_wall_cell_${index + 1}`),
+        minX: start, maxX: end, minY, maxY: segmentHeight
+      };
+    }).filter(Boolean);
+
+    const coordinateCount = (items, first, second) => new Set(items.flatMap(item => [item[first], item[second]]).map(value => Number(value).toFixed(6))).size;
+    const finalCells = cells.length ? cells : [{ id: 'back_wall_cell_1', minX, maxX, minY, maxY }];
+    return {
+      version: 1,
+      autoHeight,
+      columns: Math.max(1, positiveInteger(source.columns, Math.max(1, coordinateCount(finalCells, 'minX', 'maxX') - 1))),
+      rows: Math.max(1, positiveInteger(source.rows, Math.max(1, coordinateCount(finalCells, 'minY', 'maxY') - 1))),
+      bounds: gridBounds,
+      cells: finalCells
+    };
+  }
+
   function emptyScope(name, enabled) {
     return {
       key: name,
@@ -49,8 +136,9 @@
       triangle: { enabled: null, divisionCount: null },
       supportCenters: null,
       supportPosts: [],
+      autoSupportSuppressed: false,
       parapetSegments: [],
-      backWall: { xOffset: 0, depth: 600, height: 0, segments: [] },
+      backWall: { enabled: true, xOffset: 0, depth: 600, height: 0, segments: [], grid: normalizeBackWallGrid(null, [], 600, 0) },
       products: { sliding: [], guillotine: [] },
       dimensionOffsets: {}
     };
@@ -103,12 +191,16 @@
       },
       supportCenters: source.supportCenters === null || source.supportCenters === undefined ? null : finite(source.supportCenters, 0),
       supportPosts: clone(array(source.supportPosts)),
+      autoSupportSuppressed: source.autoSupportSuppressed === true,
       parapetSegments: clone(array(source.parapetSegments)),
+      trapezSheetBounds: clone(object(source.trapezSheetBounds)),
       backWall: {
+        enabled: backWall.enabled !== false,
         xOffset: finite(backWall.xOffset, 0),
         depth: Math.max(1, finite(backWall.depth, 600)),
         height: Math.max(0, finite(backWall.height, 0)),
-        segments: clone(array(backWall.segments))
+        segments: clone(array(backWall.segments)),
+        grid: normalizeBackWallGrid(backWall.grid, backWall.segments, backWall.depth, backWall.height)
       },
       products: {
         sliding: clone(array(products.sliding)),
@@ -141,7 +233,8 @@
         rayPositions: null,
         postProfiles: [],
         postExtensions: [],
-        parapetSegments: []
+        parapetSegments: [],
+        trapezSheetBounds: {}
       },
       sideViews: { left: emptyScope('left', true), right: emptyScope('right', true), middle: {} },
       products: { front: { sliding: [], guillotine: [] } },
@@ -216,7 +309,7 @@
       const name = legacyKeyToScopeName(key);
       if (name.startsWith('middle_')) names.add(name);
     };
-    const keyedSources = [state.sidePosts, state.sideSupportCenters, object(state.parapetSegments).side, object(state.backWallSegments).side];
+    const keyedSources = [state.sidePosts, state.sideSupportCenters, state.sideAutoSupportSuppressed, object(state.parapetSegments).side, object(state.backWallSegments).side, object(state.backWallGridState).side];
     keyedSources.forEach(source => Object.keys(object(source)).forEach(addLegacyKey));
     ['middleEnabled'].forEach(key => Object.keys(object(object(state.sideFeatureState)[key])).forEach(addLegacyKey));
     ['glassTrack', 'triangle'].forEach(key => Object.keys(object(object(object(state.sideFeatureState)[key]).middle)).forEach(addLegacyKey));
@@ -247,11 +340,14 @@
     scope.triangle.divisionCount = sideMapValue(object(state.triangleDivisionState), scopeName, null);
     scope.supportCenters = keyedValue(state.sideSupportCenters, scopeName, null);
     scope.supportPosts = clone(keyedValue(state.sidePosts, scopeName, [])) || [];
+    scope.autoSupportSuppressed = keyedValue(state.sideAutoSupportSuppressed, scopeName, false) === true;
     scope.parapetSegments = clone(keyedValue(object(state.parapetSegments).side, scopeName, [])) || [];
     const wall = clone(sideMapValue(object(state.backWallState), scopeName, { xOffset: 0, depth: 600, height: 0 })) || {};
     scope.backWall = {
+      enabled: wall.enabled !== false,
       xOffset: finite(wall.xOffset, 0), depth: Math.max(1, finite(wall.depth, 600)), height: Math.max(0, finite(wall.height, 0)),
-      segments: clone(keyedValue(object(state.backWallSegments).side, scopeName, [])) || []
+      segments: clone(keyedValue(object(state.backWallSegments).side, scopeName, [])) || [],
+      grid: normalizeBackWallGrid(keyedValue(object(state.backWallGridState).side, scopeName, null), keyedValue(object(state.backWallSegments).side, scopeName, []), wall.depth, wall.height)
     };
     const matches = item => legacyKeyToScopeName(item && (item.sideViewKey === undefined ? item.sideIndex : item.sideViewKey)) === scopeName;
     scope.products.sliding = clone(array(state.sideSlidingPlacements).filter(matches)) || [];
@@ -287,7 +383,8 @@
       rayPositions: clone(state.customRayPositions) || null,
       postProfiles: clone(array(state.frontPostProfiles)) || [],
       postExtensions: array(state.frontPostExtensions).map(value => Math.max(0, finite(value, 0))),
-      parapetSegments: clone(array(object(state.parapetSegments).front)) || []
+      parapetSegments: clone(array(object(state.parapetSegments).front)) || [],
+      trapezSheetBounds: clone(object(state.trapezSheetBounds)) || {}
     };
     model.sideViews = { left: null, right: null, middle: {} };
     scopeNamesFromState(state).forEach(name => {
@@ -349,10 +446,12 @@
     const sideFeatureState = { glassTrack: { left: null, right: null, middle: {} }, triangle: { left: null, right: null, middle: {} }, middleEnabled: {} };
     const glassTrackLengthOffsets = { left: 0, right: 0, middle: {} };
     const triangleDivisionState = { left: null, right: null, middle: {} };
-    const backWallState = { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} };
+    const backWallState = { left: { enabled: true, xOffset: 0, depth: 600, height: 0 }, right: { enabled: true, xOffset: 0, depth: 600, height: 0 }, middle: {} };
     const backWallSegments = { side: {} };
+    const backWallGridState = { side: {} };
     const parapetSegments = { front: clone(model.frontView.parapetSegments) || [], side: {} };
     const sidePosts = {};
+    const sideAutoSupportSuppressed = {};
     const sideSupportCenters = {};
     const sideSlidingPlacements = [];
     const sideGuillotinePlacements = [];
@@ -366,11 +465,13 @@
       writeSideMap(sideFeatureState.triangle, name, scope.triangle.enabled);
       writeSideMap(glassTrackLengthOffsets, name, finite(scope.glassTrack.lengthOffset, 0));
       writeSideMap(triangleDivisionState, name, scope.triangle.divisionCount);
-      writeSideMap(backWallState, name, { xOffset: finite(scope.backWall.xOffset, 0), depth: Math.max(1, finite(scope.backWall.depth, 600)), height: Math.max(0, finite(scope.backWall.height, 0)) });
+      writeSideMap(backWallState, name, { enabled: scope.backWall.enabled !== false, xOffset: finite(scope.backWall.xOffset, 0), depth: Math.max(1, finite(scope.backWall.depth, 600)), height: Math.max(0, finite(scope.backWall.height, 0)) });
       sidePosts[key] = clone(scope.supportPosts) || [];
+      if (scope.autoSupportSuppressed === true) sideAutoSupportSuppressed[key] = true;
       if (scope.supportCenters !== null && scope.supportCenters !== undefined) sideSupportCenters[key] = finite(scope.supportCenters, 0);
       parapetSegments.side[key] = clone(scope.parapetSegments) || [];
       backWallSegments.side[key] = clone(scope.backWall.segments) || [];
+      backWallGridState.side[key] = clone(scope.backWall.grid) || normalizeBackWallGrid(null, scope.backWall.segments, scope.backWall.depth, scope.backWall.height);
       Object.assign(previewDimensionOffsets, clone(scope.dimensionOffsets) || {});
       array(scope.products.sliding).forEach(item => sideSlidingPlacements.push({ ...clone(item), sideViewKey: key, placementView: key === 'right' ? 'side-right' : 'side-left' }));
       array(scope.products.guillotine).forEach(item => sideGuillotinePlacements.push({ ...clone(item), sideViewKey: key, placementView: key === 'right' ? 'side-right' : 'side-left' }));
@@ -382,9 +483,9 @@
         glassTrackProfile: clone(model.frontView.glassTrackProfile),
         glassTrackSupportProfiles: { left: clone(model.sideViews.left.glassTrack.supportProfile), right: clone(model.sideViews.right.glassTrack.supportProfile) },
         frontPostCenters: clone(model.frontView.postCenters), customRayPositions: clone(model.frontView.rayPositions),
-        sideSupportCenters, sidePosts,
+        sideSupportCenters, sidePosts, sideAutoSupportSuppressed,
         frontPostProfiles: clone(model.frontView.postProfiles), frontPostExtensions: clone(model.frontView.postExtensions),
-        parapetSegments, sideFeatureState, glassTrackLengthOffsets, triangleDivisionState, backWallState, backWallSegments,
+        parapetSegments, trapezSheetBounds: clone(model.frontView.trapezSheetBounds) || {}, sideFeatureState, glassTrackLengthOffsets, triangleDivisionState, backWallState, backWallSegments, backWallGridState,
         previewDimensionOffsets,
         slidingPlacements: clone(model.products.front.sliding), sideSlidingPlacements,
         guillotinePlacements: clone(model.products.front.guillotine), sideGuillotinePlacements,
@@ -407,6 +508,7 @@
       __customRayPositions: clone(state.customRayPositions),
       __sideSupportCenters: clone(state.sideSupportCenters),
       __sidePosts: clone(state.sidePosts),
+      __sideAutoSupportSuppressed: clone(state.sideAutoSupportSuppressed),
       __frontPostProfiles: clone(state.frontPostProfiles),
       __frontPostExtensions: clone(state.frontPostExtensions),
       __parapetSegments: clone(state.parapetSegments),
@@ -415,6 +517,8 @@
       __triangleDivisionState: clone(state.triangleDivisionState),
       __backWallState: clone(state.backWallState),
       __backWallSegments: clone(state.backWallSegments),
+      __backWallGridState: clone(state.backWallGridState),
+      __trapezSheetBounds: clone(state.trapezSheetBounds),
       __previewDimensionOffsets: clone(state.previewDimensionOffsets),
       __slidingPlacements: clone(state.slidingPlacements),
       __sideSlidingPlacements: clone(state.sideSlidingPlacements),
@@ -489,6 +593,7 @@
     model.frontView.postProfiles = clone(array(model.frontView.postProfiles));
     model.frontView.postExtensions = clone(array(model.frontView.postExtensions));
     model.frontView.parapetSegments = clone(array(model.frontView.parapetSegments));
+    model.frontView.trapezSheetBounds = clone(object(model.frontView.trapezSheetBounds));
     const side = object(source.sideViews);
     model.sideViews.left = normalizeScope(side.left, 'left', true);
     model.sideViews.right = normalizeScope(side.right, 'right', true);
@@ -521,7 +626,7 @@
     defaultForm: { ...DEFAULT_FORM },
     createEmpty, normalize, clone, fromLegacy, toLegacy, formDataFromModel, geometryInputFromModel,
     setFormField, withNormalizedInput, legacyKeyToScopeName, scopeNameToLegacyKey,
-    deriveLastLeftMirror
+    deriveLastLeftMirror, normalizeBackWallGrid
   });
 
   global.PulumurProjectModel = api;

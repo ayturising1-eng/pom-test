@@ -43,8 +43,11 @@
     if (raw.format !== FORMAT) throw new Error('PROJECT_FORMAT_INVALID');
     if (Number(raw.schemaVersion) !== SCHEMA_VERSION) throw new Error(`PROJECT_SCHEMA_UNSUPPORTED:${raw.schemaVersion}`);
     if (!raw.projectModel || typeof raw.projectModel !== 'object' || Array.isArray(raw.projectModel)) throw new Error('PROJECT_MODEL_MISSING');
+    // The checksum protects the bytes/model that were actually stored. Additive
+    // normalization may introduce newer optional fields, so validating only the
+    // normalized model incorrectly rejects older, otherwise intact schema-v2 files.
+    if (raw.checksum && String(raw.checksum) !== checksumForModel(raw.projectModel)) throw new Error('PROJECT_CHECKSUM_INVALID');
     const projectModel = validation.validateProjectModel(model.clone(raw.projectModel), options);
-    if (raw.checksum && String(raw.checksum) !== checksumForModel(projectModel)) throw new Error('PROJECT_CHECKSUM_INVALID');
     return {
       format: FORMAT,
       schemaVersion: SCHEMA_VERSION,
