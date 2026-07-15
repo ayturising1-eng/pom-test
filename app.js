@@ -892,7 +892,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.7').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.9').catch(() => {}), { once: true });
     }
   }
 
@@ -1276,6 +1276,13 @@
       const drawing = pipeline.drawing;
       syncUpperInputWrap(pipeline.formData);
       lastDrawing = drawing;
+      if (drawing.input && drawing.input.frontPostCentersAutoReconciled && Array.isArray(customFrontPostCenters)) {
+        // V12.12.9: Tek poz standart bölmede eski otomatik ray düzeninden
+        // kalmış dikme aksı listesini kalıcı manuel veri olarak taşımayı bırak.
+        // Gerçek kullanıcı tarafından değiştirilmiş özel akslar geometri tarafında
+        // otomatik liste olarak işaretlenmez ve burada korunur.
+        customFrontPostCenters = null;
+      }
       renderPreview(drawing, resetZoom);
       applyPreviewDimensionOffsets();
       applyPreviewDimensionFilter();

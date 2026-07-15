@@ -1722,7 +1722,52 @@
   }
   function axisPick(list, idx, total) { const n = list.length; if (n <= 0) return null; if (total <= 1) return list[Math.floor(n / 2)]; if (n === 1) return list[0]; let k = Math.floor(0.5 + idx * ((n - 1) / (total - 1))); return list[clamp(k, 0, n - 1)]; }
   function dikmeXEski(d, i) { if (i === 0) return d.solX; if (i === d.postCount - 1) return d.sagX; if (d.postCount === d.rayCount && d.rayCount > 1) return K.systemStartX + ((d.width - K.rayW) / (d.rayCount - 1)) * i + 40; return d.postCount > 1 ? d.solX + ((d.width - K.postSize) / (d.postCount - 1)) * i : K.systemStartX + d.width / 2; }
+  function postAxisListsNear(a, b, tolerance = 0.01) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length
+      && a.every((value, index) => Number.isFinite(Number(value)) && Math.abs(Number(value) - Number(b[index])) <= tolerance);
+  }
+  function singleSystemAutomaticPostCentersForSides(d, leftEnabled, rightEnabled) {
+    if (!d || d.systemCount !== 1 || d.manualPostPlacementMode !== 'standard') return null;
+    if (d.postCount !== d.rayCount || d.postCount <= 2) return null;
+    const system = Array.isArray(d.systems) ? d.systems[0] : null;
+    if (!system) return null;
+    const areaStartX = Number(system.startX) + (leftEnabled ? K.glassOffsetEachSide : 0);
+    const areaEndX = Number(system.endX) - (rightEnabled ? K.glassOffsetEachSide : 0);
+    if (![areaStartX, areaEndX].every(Number.isFinite)) return null;
+    const areaW = Math.max(K.rayW, areaEndX - areaStartX);
+    const pitch = d.rayCount > 1 ? (areaW - K.rayW) / (d.rayCount - 1) : 0;
+    return Array.from({ length: d.postCount }, (_, index) => {
+      if (index === 0) return d.solX;
+      if (index === d.postCount - 1) return d.sagX;
+      return areaStartX + index * pitch + K.rayW / 2;
+    });
+  }
+  function isKnownSingleSystemAutomaticPostCenters(d, centers) {
+    if (!d || d.systemCount !== 1 || d.manualPostPlacementMode !== 'standard') return false;
+    if (d.postCount !== d.rayCount || d.postCount <= 2 || !Array.isArray(centers) || centers.length !== d.postCount) return false;
+    const candidates = [
+      Array.from({ length: d.postCount }, (_, index) => dikmeXEski(d, index)),
+      singleSystemAutomaticPostCentersForSides(d, false, false),
+      singleSystemAutomaticPostCentersForSides(d, true, false),
+      singleSystemAutomaticPostCentersForSides(d, false, true),
+      singleSystemAutomaticPostCentersForSides(d, true, true)
+    ].filter(Boolean);
+    return candidates.some(candidate => postAxisListsNear(centers, candidate));
+  }
+  function singleSystemStandardPostAxis(d, index) {
+    // V12.12.8: Tek poz standart bölmede ara dikmeler, cam kaydının
+    // sol/sağ 66 mm kararından sonra gerçekten çizilen ray merkezlerini izler.
+    // İlk ve son dikmenin dış sistem kenarı sözleşmesi değişmez.
+    if (!d || d.systemCount !== 1 || d.manualPostPlacementMode !== 'standard') return null;
+    if (d.postCount !== d.rayCount || d.postCount <= 2) return null;
+    if (index <= 0 || index >= d.postCount - 1) return null;
+    const system = Array.isArray(d.systems) ? d.systems[0] : null;
+    if (!system || !Array.isArray(system.rays) || system.rays.length !== d.postCount) return null;
+    const rayLeftX = Number(system.rays[index]);
+    return Number.isFinite(rayLeftX) ? rayLeftX + K.rayW / 2 : null;
+  }
   function postCenterXs(d) {
+    d.frontPostCentersAutoReconciled = false;
     if (d.postCount <= 0) return [];
     if (d.postCount === 1) return [K.systemStartX + d.width / 2];
     if (Array.isArray(d.customFrontPostCenters) && d.customFrontPostCenters.length === d.postCount) {
@@ -1731,7 +1776,14 @@
       if (valid) {
         custom[0] = d.solX;
         custom[custom.length - 1] = d.sagX;
-        if (custom.every((x, i) => i === 0 || x > custom[i - 1] + K.postSize)) return custom;
+        if (custom.every((x, i) => i === 0 || x > custom[i - 1] + K.postSize)) {
+          // V12.12.9: Önceki tek-poz standart ray düzenlerinden otomatik olarak
+          // kaydedilmiş dikme aksları manuel kullanıcı tercihi sayılmaz. Sol/sağ
+          // cam kaydı kararı değiştiğinde bu eski otomatik listeyi geçersiz kıl ve
+          // ara dikmeleri güncel gerçek ray merkezlerinden yeniden üret.
+          if (!isKnownSingleSystemAutomaticPostCenters(d, custom)) return custom;
+          d.frontPostCentersAutoReconciled = true;
+        }
       }
     }
     if (d.manualPostPlacementMode === 'equal') {
@@ -1740,7 +1792,7 @@
     const out = [];
     const ax = dikmeAraAxes(d);
     for (let i = 0; i < d.postCount; i += 1) {
-      let x = null;
+      let x = singleSystemStandardPostAxis(d, i);
       if (d.systemCount > 1) {
         if (i === 0) x = d.solX;
         else if (i === d.postCount - 1) x = d.sagX;
