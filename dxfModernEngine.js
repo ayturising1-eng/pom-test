@@ -489,7 +489,7 @@
     const customBlockRecords = blockInfos.map(blockRecord).join('\n');
     const customBlocks = blockInfos.map(info => blockSection(info, ctx, sourceBlocks)).join('\n');
     const entityLines = [];
-    for (const e of drawing.entities || []) append(entityLines, entityOut(e, ctx, sourceBlocks));
+    for (const e of drawing.entities || []) { if (!e || e.previewOnly || e.type === 'interaction') continue; append(entityLines, entityOut(e, ctx, sourceBlocks)); }
     const extents = drawingExtents(drawing, sourceBlocks);
     const modern = TEMPLATE
       .replace('__LAYER_COUNT__', String(2 + layerOriginals.filter(n => n !== '0' && n !== 'Defpoints').length))

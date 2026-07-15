@@ -65,6 +65,9 @@
   let triangleDivisionState = { left: null, right: null, middle: {} };
   let backWallState = { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} };
   let backWallSegments = { side: {} };
+  let backWallGridState = { side: {} };
+  let trapezSheetBounds = {};
+  let selectedBackWallCopySource = null;
   let syncingSideFeatureForm = false;
   let previewDimensionOffsets = {};
   let dimensionDragState = null;
@@ -293,6 +296,65 @@
     return { side };
   }
 
+
+  function normalizeBackWallGridStateForApp(raw = null) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const side = {};
+    if (source.side && typeof source.side === 'object') {
+      Object.entries(source.side).forEach(([rawKey, value]) => {
+        const key = normalizeSideViewKey(rawKey, Number(rawKey) || 0);
+        const item = value && typeof value === 'object' ? value : {};
+        const bounds = item.bounds && typeof item.bounds === 'object' ? item.bounds : {};
+        let minX = Number.isFinite(Number(bounds.minX)) ? Number(bounds.minX) : 0;
+        let maxX = Number.isFinite(Number(bounds.maxX)) ? Number(bounds.maxX) : 600;
+        let minY = Number.isFinite(Number(bounds.minY)) ? Number(bounds.minY) : 0;
+        let maxY = Number.isFinite(Number(bounds.maxY)) ? Number(bounds.maxY) : 1;
+        if (!(maxX > minX)) { minX = 0; maxX = 600; }
+        if (!(maxY > minY)) { minY = 0; maxY = 1; }
+        const cells = Array.isArray(item.cells) ? item.cells.map((cell, index) => {
+          const rawCell = cell && typeof cell === 'object' ? cell : {};
+          const cellMinX = Number(rawCell.minX);
+          const cellMaxX = Number(rawCell.maxX);
+          const cellMinY = Number(rawCell.minY);
+          const cellMaxY = Number(rawCell.maxY);
+          if (![cellMinX, cellMaxX, cellMinY, cellMaxY].every(Number.isFinite) || !(cellMaxX > cellMinX && cellMaxY > cellMinY)) return null;
+          return { id: String(rawCell.id || `back_wall_cell_${key}_${index + 1}`), minX: cellMinX, maxX: cellMaxX, minY: cellMinY, maxY: cellMaxY };
+        }).filter(Boolean) : [];
+        side[key] = { version: 1, bounds: { minX, maxX, minY, maxY }, cells };
+      });
+    }
+    return { side };
+  }
+
+
+  function backWallGridForKey(sideKey, rearHeight = 0) {
+    const key = normalizeSideViewKey(sideKey, 0);
+    const stored = backWallGridState && backWallGridState.side ? backWallGridState.side[key] : null;
+    if (stored && stored.bounds && Array.isArray(stored.cells) && stored.cells.length) return deepCloneJson(stored);
+    const wall = wallStateForKey(key, rearHeight);
+    const segments = backWallSegmentsForKey(key, rearHeight);
+    const maxX = segments.reduce((value, item) => Math.max(value, Number(item.end) || 0), wall.depth);
+    const maxY = segments.reduce((value, item) => Math.max(value, Number(item.height) || 0), wall.height);
+    return {
+      version: 1,
+      bounds: { minX: 0, maxX: Math.max(1, maxX), minY: 0, maxY: Math.max(1, maxY) },
+      cells: segments.map((item, index) => ({
+        id: String(item.id || `back_wall_cell_${key}_${index + 1}`),
+        minX: Math.max(0, Number(item.start) || 0), maxX: Math.max(0, Number(item.end) || 0),
+        minY: 0, maxY: Math.max(1, Number(item.height) || maxY)
+      })).filter(item => item.maxX > item.minX)
+    };
+  }
+
+  function storeBackWallGridForKey(sideKey, grid) {
+    const key = normalizeSideViewKey(sideKey, 0);
+    if (!backWallGridState || typeof backWallGridState !== 'object') backWallGridState = { side: {} };
+    if (!backWallGridState.side || typeof backWallGridState.side !== 'object') backWallGridState.side = {};
+    const normalized = normalizeBackWallGridStateForApp({ side: { [key]: grid } }).side[key];
+    if (normalized && normalized.cells.length) backWallGridState.side[key] = normalized;
+    else delete backWallGridState.side[key];
+  }
+
   function backWallSegmentsForKey(sideKey, rearHeight = 0) {
     const key = normalizeSideViewKey(sideKey, 0);
     const stored = backWallSegments && backWallSegments.side && Array.isArray(backWallSegments.side[key]) ? backWallSegments.side[key] : null;
@@ -428,7 +490,7 @@
       options_motor: 'Motor', options_remote: 'Kumanda', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Ekstralar / Notlar',
       extra_triangleJoinery: 'Üçgen Doğrama', extra_waterStandard: 'Su Çıkışı Standart mı?', quickTestsHead: 'Hızlı Testler',
       previewTitle: 'Çizim Ön İzleme', previewBtn: 'Önizlemeyi Yenile', expandPreviewBtn: 'Önizlemeyi Büyüt', undoPreviewBtn: 'Geri Al', redoPreviewBtn: 'İleri Al', historyGroupLabel: 'Çizim geçmişi', shrinkPreviewBtn: 'Önizlemeyi Küçült', showMainDimsLabel: 'Ana ölçüleri göster', showAllDimsLabel: 'Tüm ölçüleri göster',
-      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', previewProjectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç', checkDrawingBtn: 'Çizimi Kontrol Et', multiProductBtn: 'Çoklu Ürün Ekleme', multiDimensionBtn: 'Çoklu Ölçü Düzenleme', equalizeGapsBtn: 'Aralıkları Eşitle', postSettingsBtn: 'Dikme Ayarları', bulkExtendBtn: 'Çoklu Profil Uzat', bulkPostProfileBtn: 'Dikme Profilini Toplu Değiştir', convertProductBtn: 'Ürün Tipini Değiştir', fitProductsBtn: 'Ürünü Alana Uydur', multiDeleteBtn: 'Çoklu Ürün Silme', deleteAllProductsBtn: 'Tüm Ürünleri Sil',
+      pdfBtn: 'PDF İndir', generateBtn: 'DXF İndir', resetBtn: 'Değerleri Resetle', calcBtn: 'Pülümür Hesaplayıcı', projectExportBtn: 'Proje Dosyası İndir', previewProjectExportBtn: 'Proje Dosyası İndir', projectImportBtn: 'Proje Dosyası Aç', checkDrawingBtn: 'Çizimi Kontrol Et', multiProductBtn: 'Çoklu Ürün Ekleme', multiDimensionBtn: 'Çoklu Ölçü Düzenleme', equalizeGapsBtn: 'Aralıkları Eşitle', postSettingsBtn: 'Dikme Ayarları', bulkExtendBtn: 'Çoklu Profil Uzat', bulkPostProfileBtn: 'Dikme Profilini Toplu Değiştir', convertProductBtn: 'Ürün Tipini Değiştir', fitProductsBtn: 'Ürünü Alana Uydur', detailCopyBtn: 'Detay Kopyala', multiDeleteBtn: 'Çoklu Ürün Silme', deleteAllProductsBtn: 'Tüm Ürünleri Sil',
       calcTitle: 'Pülümür Hesaplayıcı', calcSub: '4 satırdan herhangi 3 tanesini doldur. Boş olan değer hesaplanır.',
       calcGuide: '<strong>TR</strong><ul><li>4 alandan 3 tanesini doldur.</li><li>Hesaplanacak alanı boş bırak.</li><li>Hesapla’ya bas.</li><li>Sonucu ana forma aktar.</li></ul>',
       calcWaiting: 'Sonuç bekleniyor.', calcReady: 'Sonuç', calcPoz: 'poz', calcOpenNote: 'Ana formdaki açılım / arka / ön değerleri aktarıldı. Açıyı hesaplamak için Hesapla’ya bas.',
@@ -453,7 +515,7 @@
       options_motor: 'Motor', options_remote: 'Remote', options_led: 'LED', options_dimmer: 'Dimmer', options_extras: 'Extras / Notes',
       extra_triangleJoinery: 'Triangle Joinery', extra_waterStandard: 'Standard Water Outlet?', quickTestsHead: 'Quick Tests',
       previewTitle: 'Drawing Preview', previewBtn: 'Refresh Preview', expandPreviewBtn: 'Expand Preview', undoPreviewBtn: 'Undo', redoPreviewBtn: 'Redo', historyGroupLabel: 'Drawing history', shrinkPreviewBtn: 'Collapse Preview', showMainDimsLabel: 'Show main dimensions', showAllDimsLabel: 'Show all dimensions',
-      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', previewProjectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File', checkDrawingBtn: 'Check Drawing', multiProductBtn: 'Multiple Product Placement', multiDimensionBtn: 'Multiple Dimension Editing', equalizeGapsBtn: 'Equalize Gaps', postSettingsBtn: 'Post Settings', bulkExtendBtn: 'Extend Multiple Profiles', bulkPostProfileBtn: 'Change Post Profiles in Bulk', convertProductBtn: 'Change Product Type', fitProductsBtn: 'Fit Product to Opening', multiDeleteBtn: 'Delete Multiple Products', deleteAllProductsBtn: 'Delete All Products',
+      pdfBtn: 'Download PDF', generateBtn: 'Download DXF', resetBtn: 'Reset Values', calcBtn: 'Pulumur Calculator', projectExportBtn: 'Download Project File', previewProjectExportBtn: 'Download Project File', projectImportBtn: 'Open Project File', checkDrawingBtn: 'Check Drawing', multiProductBtn: 'Multiple Product Placement', multiDimensionBtn: 'Multiple Dimension Editing', equalizeGapsBtn: 'Equalize Gaps', postSettingsBtn: 'Post Settings', bulkExtendBtn: 'Extend Multiple Profiles', bulkPostProfileBtn: 'Change Post Profiles in Bulk', convertProductBtn: 'Change Product Type', fitProductsBtn: 'Fit Product to Opening', detailCopyBtn: 'Copy Detail', multiDeleteBtn: 'Delete Multiple Products', deleteAllProductsBtn: 'Delete All Products',
       calcTitle: 'Pulumur Calculator', calcSub: 'Fill any 3 of the 4 rows. The empty value will be calculated.',
       calcGuide: '<strong>EN</strong><ul><li>Fill 3 of the 4 fields.</li><li>Leave one field empty.</li><li>Click Calculate.</li><li>Transfer the result to the main form.</li></ul>',
       calcWaiting: 'Waiting for result.', calcReady: 'Result', calcPoz: 'position', calcOpenNote: 'Projection / rear H / front H values were copied from the main form. Click Calculate to calculate the angle.',
@@ -661,6 +723,7 @@
     setText('bulkPostProfileBtn', txt.bulkPostProfileBtn);
     setText('convertProductBtn', txt.convertProductBtn);
     setText('fitProductsBtn', txt.fitProductsBtn);
+    setText('detailCopyBtn', txt.detailCopyBtn);
     setText('multiDeleteBtn', txt.multiDeleteBtn);
     setText('deleteAllProductsBtn', txt.deleteAllProductsBtn);
     if ($('bulkPostProfileBtn')) $('bulkPostProfileBtn').title = currentLanguage === 'en' ? 'This feature will be activated in a future revision.' : 'Bu özellik sonraki revizyonlardan birinde aktif edilecek.';
@@ -762,6 +825,8 @@
     triangleDivisionState = { left: null, right: null, middle: {} };
     backWallState = { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} };
     backWallSegments = { side: {} };
+    backWallGridState = { side: {} };
+    trapezSheetBounds = {};
     previewDimensionOffsets = {};
     customSideSupportCenters = {};
     customSidePosts = {};
@@ -832,6 +897,8 @@
       __triangleDivisionState: deepCloneJson(triangleDivisionState) || { left: null, right: null, middle: {} },
       __backWallState: deepCloneJson(backWallState) || { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} },
       __backWallSegments: deepCloneJson(backWallSegments) || { side: {} },
+      __backWallGridState: deepCloneJson(backWallGridState) || { side: {} },
+      __trapezSheetBounds: deepCloneJson(trapezSheetBounds) || {},
       __previewDimensionOffsets: deepCloneJson(previewDimensionOffsets) || {},
       __slidingPlacements: slidingPlacements.map(item => ({ ...item })),
       __sideSlidingPlacements: sideSlidingPlacements.map(item => ({ ...item })),
@@ -1844,7 +1911,13 @@
       const end = Number(item && item.end) || 0;
       return x >= start - 0.001 && (x < end - 0.001 || (index === items.length - 1 && x <= end + 0.001));
     });
-    return hit ? Math.max(0, Number(hit.height) || 0) : Math.max(0, Number(fallback) || 0);
+    if (!hit) return Math.max(0, Number(fallback) || 0);
+    const start = Number(hit.start) || 0;
+    const end = Number(hit.end) || start;
+    const h0 = Math.max(0, Number.isFinite(Number(hit.startHeight)) ? Number(hit.startHeight) : Number(hit.height) || 0);
+    const h1 = Math.max(0, Number.isFinite(Number(hit.endHeight)) ? Number(hit.endHeight) : Number(hit.height) || 0);
+    const ratio = end - start > 0.001 ? Math.max(0, Math.min(1, (x - start) / (end - start))) : 0;
+    return h0 + (h1 - h0) * ratio;
   }
 
   function currentFrontParapetHeightAt(absoluteX) {
@@ -2201,6 +2274,13 @@
     // Kutunun kendisi de seçim hedefidir. Kaynak hit öğesi, ürün ve ölçü
     // seçimlerinde aynı çözümleyici üzerinden kullanılabilsin diye saklanır.
     marker.__toolboxSelectionSource = hit;
+    // İşaretleyici doğrudan seçim hedefidir. SVG üst üste binme/çizim sırası
+    // nedeniyle alttaki profil hit alanına güvenmeden olayı burada tamamla.
+    marker.addEventListener('click', evt => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      toggleToolboxSelectionFromHit(marker);
+    });
     const rect = document.createElementNS(ns, 'rect');
     rect.setAttribute('x', String(markerX)); rect.setAttribute('y', String(markerY));
     rect.setAttribute('width', String(size)); rect.setAttribute('height', String(size));
@@ -2226,6 +2306,14 @@
 
   function clearToolboxElementFilter() {
     preview.querySelectorAll('.toolbox-filtered-out').forEach(node => node.classList.remove('toolbox-filtered-out'));
+  }
+
+  function toolboxProfileSelectionKey(meta) {
+    const item = meta || {};
+    if (['postEditor', 'frontPostProfileEditor'].includes(item.interactionType)) {
+      return `profile:frontPost:${Math.max(0, Number(item.postIndex) || 0)}`;
+    }
+    return `profile:${item.interactionType}:${item.sideViewKey}:${item.sidePostId || item.postIndex || item.profilePart}`;
   }
 
   function refreshToolboxSelectionDecorations() {
@@ -2254,7 +2342,7 @@
         const meta=previewInteractionMetaFromHit(hit);
         if(meta.interactionType==='glassTrackEditor' && meta.profilePart==='support' && !meta.sidePostId) return;
         const host=hit.closest('g')||hit;host.classList.remove('toolbox-filtered-out');
-        const key=`profile:${meta.interactionType}:${meta.sideViewKey}:${meta.sidePostId||meta.postIndex||meta.profilePart}`;
+        const key=toolboxProfileSelectionKey(meta);
         hit.dataset.toolboxProfileKey=key;hit.classList.add('toolbox-selectable');if(toolboxSelectionItems.has(key))hit.classList.add('toolbox-selected');createToolboxMarker(hit,toolboxSelectionItems.has(key));
       });
       return;
@@ -2285,7 +2373,7 @@
     if (isProfileSelectionMode(toolboxSelectionMode)) {
       const hit=target.closest('[data-interaction-type="glassTrackEditor"],[data-interaction-type="postEditor"],[data-interaction-type="frontPostProfileEditor"]');
       if(!hit)return null;
-      const meta=previewInteractionMetaFromHit(hit); const key=hit.dataset.toolboxProfileKey||`profile:${meta.interactionType}:${meta.sideViewKey}:${meta.sidePostId||meta.postIndex||meta.profilePart}`;
+      const meta=previewInteractionMetaFromHit(hit); const key=hit.dataset.toolboxProfileKey||toolboxProfileSelectionKey(meta);
       return { type:'profile', key, meta };
     }
     if (isProductSelectionMode(toolboxSelectionMode)) {
@@ -4438,6 +4526,11 @@
       sideEnabled: hit.dataset.sideEnabled === 'true',
       triangleDivisionCount: Math.max(1, Number(hit.dataset.triangleDivisionCount || 1) || 1),
       wallXOffset: Number(hit.dataset.wallXOffset || 0) || 0,
+      systemIndex: Math.max(0, Number(hit.dataset.systemIndex || 0) || 0),
+      boundMinX: Number(hit.dataset.boundMinX || 0) || 0,
+      boundMaxX: Number(hit.dataset.boundMaxX || 0) || 0,
+      boundMinY: Number(hit.dataset.boundMinY || 0) || 0,
+      boundMaxY: Number(hit.dataset.boundMaxY || 0) || 0,
       wallDepth: Math.max(1, Number(hit.dataset.wallDepth || 600) || 600),
       wallHeight: Math.max(1, Number(hit.dataset.wallHeight || 1) || 1),
       wallSegmentId: hit.dataset.wallSegmentId || '',
@@ -4471,6 +4564,7 @@
         <div id="glassTrackEditorError" class="dim-edit-error" aria-live="polite"></div>
         <div class="dim-edit-actions">
           <button id="glassTrackEditorDelete" type="button" class="dim-edit-delete" hidden>Dikmeyi Sil</button>
+          <button id="glassTrackEditorSeatOnParapet" type="button" class="dim-edit-delete" hidden>Parapete Oturt</button>
           <button id="glassTrackEditorExtend" type="button" class="dim-edit-cancel" hidden>Uzat / Kısalt</button>
           <button id="glassTrackEditorWallFit" type="button" class="dim-edit-cancel" hidden disabled>Duvara Oturt</button>
           <button id="glassTrackEditorCancel" type="button" class="dim-edit-cancel">İptal</button>
@@ -4514,6 +4608,25 @@
       statusText.textContent = isTrack
         ? (currentLanguage === 'en' ? 'Glass track deleted on this side.' : 'Cam kaydı bu tarafta silindi.')
         : (currentLanguage === 'en' ? 'Support post deleted.' : 'Destek dikmesi silindi.');
+    });
+    overlay.querySelector('#glassTrackEditorSeatOnParapet').addEventListener('click', () => {
+      if (overlay.dataset.profilePart !== 'support') return;
+      const postId = overlay.dataset.sidePostId || '';
+      const sideIndex = Number(overlay.dataset.sideIndex || 0) || 0;
+      const sideViewKey = normalizeSideViewKey(overlay.dataset.sideViewKey, sideIndex);
+      if (!postId) return;
+      const meta = { index: sideIndex, sideViewKey };
+      const posts = materializeSidePosts(meta);
+      const target = posts.find(item => String(item.id) === String(postId));
+      if (!target) {
+        overlay.querySelector('#glassTrackEditorError').textContent = currentLanguage === 'en' ? 'Support post not found.' : 'Destek dikmesi bulunamadı.';
+        return;
+      }
+      target.extension = 0;
+      storeSidePosts(meta, posts);
+      overlay.hidden = true;
+      updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Support post seated on the local parapet.' : 'Destek dikmesi yerel parapete oturtuldu.';
     });
     overlay.querySelector('#glassTrackEditorExtend').addEventListener('click', () => {
       const postId = overlay.dataset.sidePostId || '';
@@ -4615,6 +4728,9 @@
     const deleteBtn = overlay.querySelector('#glassTrackEditorDelete');
     deleteBtn.hidden = isSupport ? !meta.sidePostId : false;
     deleteBtn.textContent = isSupport ? (isEn ? 'Delete Post' : 'Dikmeyi Sil') : (isEn ? 'Delete Glass Track' : 'Cam Kaydını Sil');
+    const seatOnParapetBtn = overlay.querySelector('#glassTrackEditorSeatOnParapet');
+    seatOnParapetBtn.hidden = !isSupport || !meta.sidePostId;
+    seatOnParapetBtn.textContent = isEn ? 'Seat on Parapet' : 'Parapete Oturt';
     const extendBtn = overlay.querySelector('#glassTrackEditorExtend');
     extendBtn.hidden = isSupport ? !meta.sidePostId : false;
     extendBtn.textContent = isSupport ? (isEn ? 'Extend / Shorten Post' : 'Dikmeyi Uzat / Kısalt') : (isEn ? 'Extend / Shorten Profile' : 'Profili Uzat / Kısalt');
@@ -4668,7 +4784,7 @@
         <label><span>Et</span><input id="frontPostProfileEt" type="text" inputmode="numeric"></label>
       </div>
       <div class="post-editor-note" id="frontPostProfileNote"></div><div id="frontPostProfileError" class="dim-edit-error"></div>
-      <div class="dim-edit-actions"><button id="frontPostProfileDelete" type="button" class="dim-edit-delete">Dikmeyi Sil</button><button id="frontPostProfileExtend" type="button" class="dim-edit-cancel">Dikmeyi Uzat / Kısalt</button><button id="frontPostProfileCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div></form>`;
+      <div class="dim-edit-actions"><button id="frontPostProfileDelete" type="button" class="dim-edit-delete">Dikmeyi Sil</button><button id="frontPostProfileSeatOnParapet" type="button" class="dim-edit-delete">Parapete Oturt</button><button id="frontPostProfileExtend" type="button" class="dim-edit-cancel">Dikmeyi Uzat / Kısalt</button><button id="frontPostProfileCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div></form>`;
     previewPanel.appendChild(overlay);
     const sync = () => { overlay.querySelector('#frontPostProfileFields').hidden = (overlay.querySelector('input[name="frontPostProfileMode"]:checked') || {}).value !== 'other'; };
     overlay.querySelectorAll('input[name="frontPostProfileMode"]').forEach(r => r.addEventListener('change', sync));
@@ -4681,6 +4797,13 @@
       if(!window.confirm(currentLanguage==='en'?'Delete this front post?':'Bu ön dikme silinsin mi?'))return;
       try{deleteFrontPost(idx);}catch(err){overlay.querySelector('#frontPostProfileError').textContent=err.message;return;}
       close();updatePreview(false);
+    });
+    overlay.querySelector('#frontPostProfileSeatOnParapet').addEventListener('click',()=>{
+      const idx=Math.max(0,Number(overlay.dataset.postIndex)||0);
+      while(frontPostExtensions.length<=idx)frontPostExtensions.push(0);
+      frontPostExtensions[idx]=0;
+      close();updatePreview(false);
+      statusText.textContent=currentLanguage==='en'?'Front post seated on its local parapet.':'Ön dikme yerel parapete oturtuldu.';
     });
     overlay.querySelector('#frontPostProfileExtend').addEventListener('click',()=>{const idx=Math.max(0,Number(overlay.dataset.postIndex)||0);overlay.hidden=true;showFrontPostExtensionOverlay(idx);});
     overlay.querySelector('form').addEventListener('submit', evt=>{
@@ -4708,8 +4831,9 @@
     overlay.querySelector('#frontPostProfileMeta').innerHTML=`<b>${isEn?'Front post':'Ön dikme'}:</b> ${idx+1}<br><b>${isEn?'Current':'Mevcut'}:</b> ${Math.round(current.en)} × ${Math.round(current.boy)} × ${Math.round(current.et)} mm<br><b>${isEn?'Lower-end offset':'Alt uç ofseti'}:</b> ${Math.round(Number(frontPostExtensions[idx])||0)} mm`;
     overlay.querySelector('#frontPostProfileStandard').textContent=isEn?'Standard 100×100×2':'Standart 100×100×2';
     overlay.querySelector('#frontPostProfileOther').textContent=isEn?'Other':'Diğer';
-    overlay.querySelector('#frontPostProfileNote').textContent=isEn?'The front view uses En; the top view uses En × Boy × Et and keeps the gutter-side -Y edge aligned.':'Ön görünüşte En, üst görünüşte En × Boy × Et kullanılır; kesitin oluk tarafındaki -Y dış kenarı sabit kalır.';
+    overlay.querySelector('#frontPostProfileNote').textContent=isEn?'The front view uses En; the top view uses En × Boy × Et and keeps the gutter-side -Y edge aligned.':'Ön görünüşte En, yan görünüşte Boy kullanılır. Profil ve uzatma aynı fiziksel dikmenin eş görünüşlerine uygulanır.';
     overlay.querySelector('#frontPostProfileDelete').textContent=isEn?'Delete Post':'Dikmeyi Sil';
+    overlay.querySelector('#frontPostProfileSeatOnParapet').textContent=isEn?'Seat on Parapet':'Parapete Oturt';
     overlay.querySelector('#frontPostProfileExtend').textContent=isEn?'Extend / Shorten Post':'Dikmeyi Uzat / Kısalt';
     overlay.querySelector('#frontPostProfileCancel').textContent=isEn?'Cancel':'İptal';
     const mode=current.mode==='40x130x2'?'40x130x2':(frontPostProfiles[idx]?'other':'standard');
@@ -4742,7 +4866,7 @@
       <label class="dim-edit-label"><span id="sidePostExtensionLabel">Alt uç ofseti *(mm)</span><input id="sidePostExtensionInput" type="text" inputmode="decimal" autocomplete="off"></label>
       <div class="post-editor-note" id="sidePostExtensionNote"></div>
       <div id="sidePostExtensionError" class="dim-edit-error"></div>
-      <div class="dim-edit-actions"><button id="sidePostExtensionReset" type="button" class="dim-edit-delete">Parapete Oturt</button><button id="sidePostExtensionCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div>
+      <div class="dim-edit-actions"><button id="sidePostExtensionCancel" type="button" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Tamam</button></div>
     </form>`;
     previewPanel.appendChild(overlay);
     const input = overlay.querySelector('#sidePostExtensionInput');
@@ -4778,7 +4902,6 @@
         ? `Support-post lower-end offset set to ${Math.round(numeric)} mm.`
         : `Destek dikmesi alt uç ofseti ${Math.round(numeric)} mm olarak ayarlandı.`;
     };
-    overlay.querySelector('#sidePostExtensionReset').addEventListener('click', () => applyValue(0));
     overlay.querySelector('form').addEventListener('submit', evt => { evt.preventDefault(); applyValue(input.value); });
     return overlay;
   }
@@ -4802,7 +4925,6 @@
     overlay.querySelector('#sidePostExtensionNote').textContent = isEn
       ? 'The +Y upper end stays fixed. 0 seats the lower end on the local parapet; a positive value extends it in -Y, and a negative value shortens it upward.'
       : '+Y yönündeki üst uç sabit kalır. 0 değeri alt ucu yerel parapete oturtur; pozitif değer -Y yönüne uzatır, negatif değer alttan kısaltır.';
-    overlay.querySelector('#sidePostExtensionReset').textContent = isEn ? 'Seat on Parapet' : 'Parapete Oturt';
     overlay.querySelector('#sidePostExtensionCancel').textContent = isEn ? 'Cancel' : 'İptal';
     overlay.querySelector('#sidePostExtensionInput').value = String(Math.round(current));
     overlay.querySelector('#sidePostExtensionError').textContent = '';
@@ -4966,7 +5088,9 @@
       id: String(item.id || `parapet_${Date.now()}_${index}`),
       start: Number(item.start) || 0,
       end: Number(item.end) || 0,
-      height: Math.max(0, Number(item.height) || 0)
+      height: Math.max(0, Number(item.height) || Number(item.startHeight) || Number(item.endHeight) || 0),
+      startHeight: Math.max(0, Number.isFinite(Number(item.startHeight)) ? Number(item.startHeight) : Number(item.height) || 0),
+      endHeight: Math.max(0, Number.isFinite(Number(item.endHeight)) ? Number(item.endHeight) : Number(item.height) || 0)
     })).sort((a, b) => a.start - b.start || a.end - b.end);
     if (String(meta && meta.parapetView || '').toLowerCase() === 'side') {
       const key = sideViewKeyFromMeta(meta);
@@ -4977,7 +5101,7 @@
       ...(Array.isArray(parapetSegments.front) ? parapetSegments.front : []),
       ...Object.values(parapetSegments.side || {}).flatMap(items => Array.isArray(items) ? items : [])
     ];
-    const maxHeight = all.reduce((max, item) => Math.max(max, Number(item.height) || 0), 0);
+    const maxHeight = all.reduce((max, item) => Math.max(max, Number(item.height) || 0, Number(item.startHeight) || 0, Number(item.endHeight) || 0), 0);
     if ($('parapet')) $('parapet').value = maxHeight > 0 ? 'EVET' : 'HAYIR';
     const currentBase = Number($('parapetHeight') && $('parapetHeight').value) || 0;
     if ($('parapetHeight') && !(currentBase > 0) && maxHeight > 0) $('parapetHeight').value = String(Math.round(maxHeight));
@@ -4998,7 +5122,9 @@
       <div class="parapet-editor-grid">
         <label><span id="parapetStartLabel">Başlangıç X *(mm)</span><input id="parapetStartInput" type="text" inputmode="numeric"></label>
         <label><span id="parapetEndLabel">Bitiş X *(mm)</span><input id="parapetEndInput" type="text" inputmode="numeric"></label>
-        <label><span id="parapetHeightLabel">Yükseklik *(mm)</span><input id="parapetSegmentHeightInput" type="text" inputmode="numeric"></label>
+        <label><span id="parapetHeightLabel">Başlangıç Yüksekliği *(mm)</span><input id="parapetSegmentHeightInput" type="text" inputmode="numeric"></label>
+        <label><span id="parapetEndHeightLabel">Bitiş Yüksekliği *(mm)</span><input id="parapetSegmentEndHeightInput" type="text" inputmode="numeric"></label>
+        <label><span id="parapetAngleLabel">Eğim *(°)</span><input id="parapetAngleInput" type="text" inputmode="decimal" placeholder="0"></label>
         <label><span id="parapetDivideLabel">Eşit parçaya böl</span><input id="parapetDivideInput" type="text" inputmode="numeric" placeholder="1"></label>
       </div>
       <div id="parapetEditorNote" class="post-editor-note"></div>
@@ -5010,10 +5136,11 @@
       </div>
     </form>`;
     previewPanel.appendChild(overlay);
-    overlay.querySelectorAll('#parapetStartInput,#parapetEndInput,#parapetSegmentHeightInput,#parapetDivideInput').forEach(input => input.addEventListener('input', () => {
+    overlay.querySelectorAll('#parapetStartInput,#parapetEndInput,#parapetSegmentHeightInput,#parapetSegmentEndHeightInput,#parapetDivideInput').forEach(input => input.addEventListener('input', () => {
       input.value = String(input.value || '').replace(/[^0-9]/g, '');
       overlay.querySelector('#parapetEditorError').textContent = '';
     }));
+    overlay.querySelector('#parapetAngleInput').addEventListener('input', input => { input.target.value = String(input.target.value || '').replace(/[^0-9+\-.,]/g, ''); overlay.querySelector('#parapetEditorError').textContent = ''; });
     const close = () => { overlay.hidden = true; focusPreviewCanvas(); };
     overlay.querySelector('#parapetEditorCancel').addEventListener('click', close);
     overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) close(); });
@@ -5022,8 +5149,9 @@
       const meta = overlay._meta || {};
       const length = parapetLengthForMeta(meta);
       const height = Math.max(0, Number(overlay.querySelector('#parapetSegmentHeightInput').value) || Number(meta.segmentHeight) || Number($('parapetHeight') && $('parapetHeight').value) || 0);
-      if (!(length > 0 && height > 0)) return;
-      storeParapetSegments(meta, [{ id: `${meta.parapetView || 'front'}_${Number(meta.sideIndex) || 0}_parapet_1`, start: 0, end: length, height }]);
+      const endHeight = Math.max(0, Number(overlay.querySelector('#parapetSegmentEndHeightInput').value) || height);
+      if (!(length > 0 && Math.max(height, endHeight) > 0)) return;
+      storeParapetSegments(meta, [{ id: `${meta.parapetView || 'front'}_${Number(meta.sideIndex) || 0}_parapet_1`, start: 0, end: length, height: Math.max(height, endHeight), startHeight: height, endHeight }]);
       close();
       updatePreview(false);
       statusText.textContent = currentLanguage === 'en' ? 'The parapet was returned to one piece.' : 'Parapet tek parçaya döndürüldü.';
@@ -5035,9 +5163,14 @@
       const length = parapetLengthForMeta(meta);
       const start = Number(overlay.querySelector('#parapetStartInput').value);
       const end = Number(overlay.querySelector('#parapetEndInput').value);
-      const height = Number(overlay.querySelector('#parapetSegmentHeightInput').value);
+      const startHeight = Number(overlay.querySelector('#parapetSegmentHeightInput').value);
+      const angleText = String(overlay.querySelector('#parapetAngleInput').value || '').replace(',', '.');
+      const angle = angleText.trim() === '' ? null : Number(angleText);
+      let endHeight = Number(overlay.querySelector('#parapetSegmentEndHeightInput').value);
+      if (Number.isFinite(angle)) endHeight = startHeight + Math.tan(angle * Math.PI / 180) * (end - start);
+      const height = Math.max(startHeight, endHeight);
       const divide = Math.max(1, Math.floor(Number(overlay.querySelector('#parapetDivideInput').value) || 1));
-      if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(height) || start < 0 || end <= start || end > length + 0.001 || height < 0) {
+      if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(startHeight) || !Number.isFinite(endHeight) || start < 0 || end <= start || end > length + 0.001 || startHeight < 0 || endHeight < 0) {
         error.textContent = currentLanguage === 'en' ? `Enter a valid range between 0 and ${Math.round(length)} mm and a non-negative height.` : `0–${Math.round(length)} mm arasında geçerli bir aralık ve sıfır veya pozitif yükseklik gir.`;
         return;
       }
@@ -5059,12 +5192,20 @@
         return;
       }
       const piece = (end - start) / divide;
-      for (let i = 0; i < divide; i += 1) replacement.push({
-        id: divide === 1 ? originalId : `${originalId}_${Date.now()}_${i + 1}`,
-        start: start + piece * i,
-        end: i === divide - 1 ? end : start + piece * (i + 1),
-        height
-      });
+      for (let i = 0; i < divide; i += 1) {
+        const ratio0 = i / divide;
+        const ratio1 = (i + 1) / divide;
+        const pieceStartHeight = startHeight + (endHeight - startHeight) * ratio0;
+        const pieceEndHeight = startHeight + (endHeight - startHeight) * ratio1;
+        replacement.push({
+          id: divide === 1 ? originalId : `${originalId}_${Date.now()}_${i + 1}`,
+          start: start + piece * i,
+          end: i === divide - 1 ? end : start + piece * (i + 1),
+          height: Math.max(pieceStartHeight, pieceEndHeight),
+          startHeight: pieceStartHeight,
+          endHeight: pieceEndHeight
+        });
+      }
       list.splice(index, 1);
       replacement.forEach((item, replacementIndex) => list.splice(index + replacementIndex, 0, item));
       storeParapetSegments(meta, list);
@@ -5083,20 +5224,28 @@
     const list = materializeParapetSegments(meta);
     let index = list.findIndex(item => String(item.id) === String(meta.parapetSegmentId));
     if (index < 0) index = Math.max(0, Math.min(list.length - 1, Number(meta.parapetSegmentIndex) || 0));
-    const segment = list[index] || { start: meta.segmentStart, end: meta.segmentEnd, height: meta.segmentHeight };
+    const segment = list[index] || { start: meta.segmentStart, end: meta.segmentEnd, height: meta.segmentHeight, startHeight: meta.segmentStartHeight, endHeight: meta.segmentEndHeight };
     overlay._meta = { ...meta, parapetSegmentId: segment.id || meta.parapetSegmentId, parapetSegmentIndex: index };
     overlay.querySelector('#parapetEditorTitle').textContent = isEn ? 'Edit Parapet Segment' : 'Parapet Parçasını Düzenle';
     overlay.querySelector('#parapetEditorMeta').textContent = `${isEn ? 'View' : 'Görünüş'}: ${String(meta.parapetView).toLowerCase() === 'side' ? (sideViewKeyFromMeta(meta) === 'right' ? (isEn ? 'Right Side' : 'Sağ Yan') : (sideViewKeyFromMeta(meta) === '0' ? (isEn ? 'Left Side' : 'Sol Yan') : `${isEn ? 'Intermediate Position' : 'Ara Poz'} ${Number(meta.sideIndex || 0) + 1}`)) : (isEn ? 'Front View' : 'Ön Görünüş')} · ${index + 1}/${Math.max(1, list.length)}`;
     overlay.querySelector('#parapetStartLabel').textContent = isEn ? 'Start X *(mm)' : 'Başlangıç X *(mm)';
     overlay.querySelector('#parapetEndLabel').textContent = isEn ? 'End X *(mm)' : 'Bitiş X *(mm)';
-    overlay.querySelector('#parapetHeightLabel').textContent = isEn ? 'Height *(mm)' : 'Yükseklik *(mm)';
+    overlay.querySelector('#parapetHeightLabel').textContent = isEn ? 'Start Height *(mm)' : 'Başlangıç Yüksekliği *(mm)';
+    overlay.querySelector('#parapetEndHeightLabel').textContent = isEn ? 'End Height *(mm)' : 'Bitiş Yüksekliği *(mm)';
+    overlay.querySelector('#parapetAngleLabel').textContent = isEn ? 'Slope *(°)' : 'Eğim *(°)';
     overlay.querySelector('#parapetDivideLabel').textContent = isEn ? 'Divide into equal parts' : 'Eşit parçaya böl';
     overlay.querySelector('#parapetEditorNote').textContent = isEn ? 'Changing a shared boundary also moves the adjacent segment boundary. Enter a number greater than 1 to split this segment.' : 'Ortak sınır değiştirildiğinde komşu parapet parçasının sınırı da birlikte hareket eder. Bu parçayı bölmek için 1’den büyük sayı gir.';
     overlay.querySelector('#parapetMergeAll').textContent = isEn ? 'Return to One Piece' : 'Tek Parçaya Döndür';
     overlay.querySelector('#parapetEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
     overlay.querySelector('#parapetStartInput').value = String(Math.round(Number(segment.start) || 0));
     overlay.querySelector('#parapetEndInput').value = String(Math.round(Number(segment.end) || 0));
-    overlay.querySelector('#parapetSegmentHeightInput').value = String(Math.round(Number(segment.height) || 0));
+    const startHeight = Math.max(0, Number.isFinite(Number(segment.startHeight)) ? Number(segment.startHeight) : Number(segment.height) || 0);
+    const endHeight = Math.max(0, Number.isFinite(Number(segment.endHeight)) ? Number(segment.endHeight) : Number(segment.height) || 0);
+    const width = Math.max(0.001, Number(segment.end) - Number(segment.start));
+    const angle = Math.atan2(endHeight - startHeight, width) * 180 / Math.PI;
+    overlay.querySelector('#parapetSegmentHeightInput').value = String(Math.round(startHeight));
+    overlay.querySelector('#parapetSegmentEndHeightInput').value = String(Math.round(endHeight));
+    overlay.querySelector('#parapetAngleInput').value = Math.abs(angle) < 0.0001 ? '0' : String(Number(angle.toFixed(3)));
     overlay.querySelector('#parapetDivideInput').value = '1';
     overlay.querySelector('#parapetEditorError').textContent = '';
     overlay.hidden = false;
@@ -5280,18 +5429,19 @@
     if (overlay) return overlay;
     overlay = document.createElement('div');
     overlay.id = 'backWallEditorOverlay';
-    overlay.className = 'dim-edit-overlay back-wall-editor-overlay';
-    overlay.hidden = true;
+    overlay.className = 'dim-edit-overlay';
     overlay.innerHTML = `
       <form id="backWallEditorForm" class="dim-edit-card">
         <div class="dim-edit-title" id="backWallEditorTitle">Arka Duvarı Düzenle</div>
         <div class="dim-edit-meta" id="backWallEditorMeta"></div>
-        <div class="parapet-editor-grid">
+        <div class="dim-edit-grid">
           <label><span id="backWallOffsetLabel">X Ofset</span><input id="backWallOffsetInput" type="text" inputmode="decimal" autocomplete="off" /></label>
-          <label><span id="backWallStartLabel">Başlangıç</span><input id="backWallStartInput" type="text" inputmode="decimal" autocomplete="off" /></label>
-          <label><span id="backWallEndLabel">Bitiş</span><input id="backWallEndInput" type="text" inputmode="decimal" autocomplete="off" /></label>
-          <label><span id="backWallHeightLabel">Yükseklik</span><input id="backWallHeightInput" type="text" inputmode="decimal" autocomplete="off" /></label>
-          <label><span id="backWallDivideLabel">Eşit parçaya böl</span><input id="backWallDivideInput" type="text" inputmode="numeric" autocomplete="off" value="1" /></label>
+          <label><span id="backWallMinXLabel">+X Ucu</span><input id="backWallMinXInput" type="text" inputmode="decimal" autocomplete="off" /></label>
+          <label><span id="backWallMaxXLabel">-X Ucu</span><input id="backWallMaxXInput" type="text" inputmode="decimal" autocomplete="off" /></label>
+          <label><span id="backWallMinYLabel">-Y Ucu</span><input id="backWallMinYInput" type="text" inputmode="decimal" autocomplete="off" /></label>
+          <label><span id="backWallMaxYLabel">+Y Ucu</span><input id="backWallMaxYInput" type="text" inputmode="decimal" autocomplete="off" /></label>
+          <label><span id="backWallColumnsLabel">Dikey Bölme</span><input id="backWallColumnsInput" type="text" inputmode="numeric" autocomplete="off" value="1" /></label>
+          <label><span id="backWallRowsLabel">Yatay Bölme</span><input id="backWallRowsInput" type="text" inputmode="numeric" autocomplete="off" value="1" /></label>
         </div>
         <div class="post-editor-note" id="backWallEditorNote"></div>
         <div id="backWallEditorError" class="dim-edit-error" aria-live="polite"></div>
@@ -5301,12 +5451,12 @@
           <button id="backWallEditorApply" type="submit" class="dim-edit-apply">Tamam</button>
         </div>
       </form>`;
-    previewPanel.appendChild(overlay);
-    const close = () => { overlay.hidden = true; focusPreviewCanvas(); };
-    overlay.addEventListener('click', evt => { if (evt.target === overlay) close(); });
+    document.body.appendChild(overlay);
+    const close = () => { overlay.hidden = true; };
+    overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) close(); });
     overlay.querySelector('#backWallEditorCancel').addEventListener('click', close);
     overlay.querySelectorAll('input').forEach(input => input.addEventListener('input', () => {
-      if (input.id === 'backWallDivideInput') input.value = String(input.value || '').replace(/[^0-9]/g, '');
+      if (input.id === 'backWallColumnsInput' || input.id === 'backWallRowsInput') input.value = String(input.value || '').replace(/[^0-9]/g, '');
       else input.value = String(input.value || '').replace(/[^0-9,.-]/g, '');
       overlay.querySelector('#backWallEditorError').textContent = '';
     }));
@@ -5314,66 +5464,44 @@
       const key = normalizeSideViewKey(overlay.dataset.sideViewKey, Number(overlay.dataset.sideIndex || 0));
       setSideScopedStateValue(backWallState, key, { xOffset: 0, depth: 600, height: 0 });
       if (backWallSegments && backWallSegments.side) delete backWallSegments.side[key];
-      close();
-      updatePreview(false);
+      if (backWallGridState && backWallGridState.side) delete backWallGridState.side[key];
+      close(); updatePreview(false);
       statusText.textContent = currentLanguage === 'en' ? 'Back wall restored to default.' : 'Arka duvar varsayılan ölçülerine döndürüldü.';
     });
     overlay.querySelector('#backWallEditorForm').addEventListener('submit', evt => {
       evt.preventDefault();
       const read = id => Number(String(overlay.querySelector(id).value || '').replace(',', '.'));
       const xOffset = read('#backWallOffsetInput');
-      const startValue = read('#backWallStartInput');
-      const endValue = read('#backWallEndInput');
-      const height = read('#backWallHeightInput');
-      const divide = Math.max(1, Math.floor(read('#backWallDivideInput') || 1));
+      const minX = read('#backWallMinXInput'), maxX = read('#backWallMaxXInput');
+      const minY = read('#backWallMinYInput'), maxY = read('#backWallMaxYInput');
+      const columns = Math.max(1, Math.floor(read('#backWallColumnsInput') || 1));
+      const rows = Math.max(1, Math.floor(read('#backWallRowsInput') || 1));
       const error = overlay.querySelector('#backWallEditorError');
-      if (![xOffset, startValue, endValue, height].every(Number.isFinite) || startValue < 0 || endValue <= startValue || height <= 0 || divide > applicationLimits().maxSegmentsPerView) {
-        error.textContent = currentLanguage === 'en' ? `Enter a valid wall segment and division count (1–${applicationLimits().maxSegmentsPerView}).` : `Geçerli duvar parçası ve 1–${applicationLimits().maxSegmentsPerView} arasında bölme sayısı gir.`;
+      const limit = applicationLimits().maxSegmentsPerView;
+      if (![xOffset, minX, maxX, minY, maxY].every(Number.isFinite) || !(maxX > minX) || !(maxY > minY) || columns * rows > limit) {
+        error.textContent = currentLanguage === 'en' ? `Enter valid wall edges. Total cells may not exceed ${limit}.` : `Geçerli duvar uçları gir. Toplam hücre sayısı ${limit} değerini aşamaz.`;
         return;
       }
       const key = normalizeSideViewKey(overlay.dataset.sideViewKey, Number(overlay.dataset.sideIndex || 0));
-      const rearHeight = Number(overlay.dataset.rearHeight || 0) || height;
-      const list = backWallSegmentsForKey(key, rearHeight);
-      let index = list.findIndex(item => String(item.id) === String(overlay.dataset.wallSegmentId || ''));
-      if (index < 0) index = Math.max(0, Math.min(list.length - 1, Number(overlay.dataset.wallSegmentIndex) || 0));
-      let start = startValue;
-      let end = endValue;
-      if (index === 0) start = 0; // tüm duvar X konumu X Ofset ile değiştirilir.
-      const previous = index > 0 ? list[index - 1] : null;
-      const next = index < list.length - 1 ? list[index + 1] : null;
-      if (previous && start <= Number(previous.start || 0)) {
-        error.textContent = currentLanguage === 'en' ? 'The previous wall segment would become zero or negative.' : 'Önceki duvar parçası sıfır veya negatif kalır.';
-        return;
-      }
-      if (next && end >= Number(next.end || 0)) {
-        error.textContent = currentLanguage === 'en' ? 'The next wall segment would become zero or negative.' : 'Sonraki duvar parçası sıfır veya negatif kalır.';
-        return;
-      }
-      if (previous) previous.end = start;
-      if (next) next.start = end;
-      const original = list[index] || {};
-      const baseId = String(original.id || `back_wall_${key}_${Date.now()}`);
-      const segmentLimit = applicationLimits().maxSegmentsPerView;
-      if (list.length - 1 + divide > segmentLimit) {
-        error.textContent = currentLanguage === 'en' ? `The segment limit per view is ${segmentLimit}.` : `Görünüş başına parça sınırı ${segmentLimit}.`;
-        return;
-      }
-      const piece = (end - start) / divide;
-      const replacement = Array.from({ length: divide }, (_, i) => ({
-        id: divide === 1 ? baseId : `${baseId}_${Date.now()}_${i + 1}`,
-        start: start + piece * i,
-        end: i === divide - 1 ? end : start + piece * (i + 1),
-        height
-      }));
-      list.splice(index, 1);
-      replacement.forEach((item, replacementIndex) => list.splice(index + replacementIndex, 0, item));
-      storeBackWallSegmentsForKey(key, list);
-      const depth = list.reduce((value, item) => Math.max(value, Number(item.end) || 0), 1);
-      setSideScopedStateValue(backWallState, key, { xOffset, depth, height: 0 });
-      close();
-      updatePreview(false);
-      statusText.textContent = currentLanguage === 'en' ? 'Back wall segment updated.' : 'Arka duvar parçası güncellendi.';
+      const dx = (maxX - minX) / columns, dy = (maxY - minY) / rows;
+      const stamp = Date.now();
+      const cells = [];
+      for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) cells.push({
+        id: `back_wall_cell_${key}_${stamp}_${row + 1}_${column + 1}`,
+        minX: minX + dx * column, maxX: column === columns - 1 ? maxX : minX + dx * (column + 1),
+        minY: minY + dy * row, maxY: row === rows - 1 ? maxY : minY + dy * (row + 1)
+      });
+      storeBackWallGridForKey(key, { version: 1, bounds: { minX, maxX, minY, maxY }, cells });
+      const compatibilitySegments = Array.from({ length: columns }, (_, column) => ({
+        id: `back_wall_${key}_${stamp}_${column + 1}`,
+        start: Math.max(0, minX + dx * column), end: Math.max(0, column === columns - 1 ? maxX : minX + dx * (column + 1)), height: Math.max(1, maxY)
+      })).filter(item => item.end > item.start);
+      storeBackWallSegmentsForKey(key, compatibilitySegments);
+      setSideScopedStateValue(backWallState, key, { xOffset, depth: Math.max(1, maxX), height: Math.max(0, maxY) });
+      close(); updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Back wall grid updated.' : 'Arka duvar ızgarası güncellendi.';
     });
+    overlay.hidden = true;
     return overlay;
   }
 
@@ -5381,44 +5509,95 @@
     const overlay = ensureBackWallEditorOverlay();
     const isEn = currentLanguage === 'en';
     const key = normalizeSideViewKey(meta.sideViewKey, meta.sideIndex);
-    const positionIndex = key === 'right'
-      ? Math.max(0, Number(lastDrawing && lastDrawing.input && lastDrawing.input.sidePositionCount || 1) - 1)
-      : Math.max(0, Number(meta.sideIndex) || Number(key) || 0);
-    const rearHeight = lastDrawing && lastDrawing.input && lastDrawing.input.positions && lastDrawing.input.positions[positionIndex]
-      ? Number(lastDrawing.input.positions[positionIndex].rearHeight)
-      : Number(meta.wallHeight || 1);
+    const positionIndex = key === 'right' ? Math.max(0, Number(lastDrawing && lastDrawing.input && lastDrawing.input.sidePositionCount || 1) - 1) : Math.max(0, Number(meta.sideIndex) || Number(key) || 0);
+    const rearHeight = lastDrawing && lastDrawing.input && lastDrawing.input.positions && lastDrawing.input.positions[positionIndex] ? Number(lastDrawing.input.positions[positionIndex].rearHeight) : Number(meta.wallHeight || 1);
     const state = wallStateForKey(key, rearHeight);
-    const list = backWallSegmentsForKey(key, rearHeight);
-    let index = list.findIndex(item => String(item.id) === String(meta.wallSegmentId || ''));
-    if (index < 0) index = Math.max(0, Math.min(list.length - 1, Number(meta.wallSegmentIndex) || 0));
-    const segment = list[index] || { id: `back_wall_${key}_1`, start: 0, end: state.depth, height: state.height };
-    overlay.dataset.sideViewKey = key;
-    overlay.dataset.sideIndex = String(positionIndex);
-    overlay.dataset.rearHeight = String(rearHeight || 1);
-    overlay.dataset.wallSegmentId = String(segment.id || '');
-    overlay.dataset.wallSegmentIndex = String(index);
-    overlay.querySelector('#backWallEditorTitle').textContent = isEn ? 'Edit Back Wall' : 'Arka Duvarı Düzenle';
-    const sideLabel = key === 'right' ? (isEn ? 'Right' : 'Sağ') : (key === '0' ? (isEn ? 'Left' : 'Sol') : `${positionIndex + 1}. ${isEn ? 'position' : 'poz'}`);
-    overlay.querySelector('#backWallEditorMeta').innerHTML = `<b>${isEn ? 'Side view' : 'Yan görünüş'}:</b> ${sideLabel}<br><b>${isEn ? 'Segment' : 'Parça'}:</b> ${index + 1} / ${list.length}`;
+    const grid = backWallGridForKey(key, rearHeight);
+    selectedBackWallCopySource = { key, sideIndex: positionIndex };
+    const sideLabel = key === 'right' ? (isEn ? 'Right' : 'Sağ') : key === '0' ? (isEn ? 'Left' : 'Sol') : `${isEn ? 'Middle' : 'Ara'} ${Number(key) + 1}`;
+    overlay.dataset.sideViewKey = key; overlay.dataset.sideIndex = String(positionIndex);
+    overlay.querySelector('#backWallEditorTitle').textContent = isEn ? 'Edit Back Wall Grid' : 'Arka Duvar Izgarasını Düzenle';
+    overlay.querySelector('#backWallEditorMeta').innerHTML = `<b>${isEn ? 'Side view' : 'Yan görünüş'}:</b> ${sideLabel}<br><b>${isEn ? 'Current cells' : 'Mevcut hücre'}:</b> ${grid.cells.length}`;
     overlay.querySelector('#backWallOffsetLabel').textContent = isEn ? 'Wall X Offset' : 'Duvar X Ofset';
-    overlay.querySelector('#backWallStartLabel').textContent = isEn ? 'Segment Start' : 'Parça Başlangıcı';
-    overlay.querySelector('#backWallEndLabel').textContent = isEn ? 'Segment End' : 'Parça Bitişi';
-    overlay.querySelector('#backWallHeightLabel').textContent = isEn ? 'Segment Height' : 'Parça Yüksekliği';
-    overlay.querySelector('#backWallDivideLabel').textContent = isEn ? 'Divide Equally' : 'Eşit Parçaya Böl';
-    overlay.querySelector('#backWallEditorNote').textContent = isEn
-      ? 'The first segment starts at zero. Adjacent boundaries move together; wall offset changes the whole wall. Wall edits update support limits and glass-track wall fit.'
-      : 'İlk parça sıfırdan başlar. Komşu sınırlar birlikte hareket eder; X ofset tüm duvarı taşır. Duvar değişikliği destek sınırlarını ve cam kaydı duvara oturtma referansını günceller.';
+    overlay.querySelector('#backWallMinXLabel').textContent = isEn ? '+X Edge' : '+X Ucu';
+    overlay.querySelector('#backWallMaxXLabel').textContent = isEn ? '-X Edge' : '-X Ucu';
+    overlay.querySelector('#backWallMinYLabel').textContent = isEn ? '-Y Edge' : '-Y Ucu';
+    overlay.querySelector('#backWallMaxYLabel').textContent = isEn ? '+Y Edge' : '+Y Ucu';
+    overlay.querySelector('#backWallColumnsLabel').textContent = isEn ? 'Vertical Divisions' : 'Dikey Bölme';
+    overlay.querySelector('#backWallRowsLabel').textContent = isEn ? 'Horizontal Divisions' : 'Yatay Bölme';
+    overlay.querySelector('#backWallEditorNote').textContent = isEn ? 'Each edge is independent. Division counts rebuild the wall as a rectangular grid.' : 'Her uç bağımsızdır. Bölme sayıları duvarı dikdörtgen ızgara olarak yeniden oluşturur.';
     overlay.querySelector('#backWallEditorReset').textContent = isEn ? 'Reset Wall' : 'Duvarı Sıfırla';
     overlay.querySelector('#backWallEditorCancel').textContent = isEn ? 'Cancel' : 'İptal';
     overlay.querySelector('#backWallEditorApply').textContent = isEn ? 'OK' : 'Tamam';
     overlay.querySelector('#backWallOffsetInput').value = String(Math.round(state.xOffset));
-    overlay.querySelector('#backWallStartInput').value = String(Math.round(Number(segment.start) || 0));
-    overlay.querySelector('#backWallEndInput').value = String(Math.round(Number(segment.end) || state.depth));
-    overlay.querySelector('#backWallHeightInput').value = String(Math.round(Number(segment.height) || state.height));
-    overlay.querySelector('#backWallDivideInput').value = '1';
+    overlay.querySelector('#backWallMinXInput').value = String(Math.round(grid.bounds.minX));
+    overlay.querySelector('#backWallMaxXInput').value = String(Math.round(grid.bounds.maxX));
+    overlay.querySelector('#backWallMinYInput').value = String(Math.round(grid.bounds.minY));
+    overlay.querySelector('#backWallMaxYInput').value = String(Math.round(grid.bounds.maxY));
+    const xs = new Set(grid.cells.flatMap(cell => [cell.minX, cell.maxX]).map(value => Number(value).toFixed(6)));
+    const ys = new Set(grid.cells.flatMap(cell => [cell.minY, cell.maxY]).map(value => Number(value).toFixed(6)));
+    overlay.querySelector('#backWallColumnsInput').value = String(Math.max(1, xs.size - 1));
+    overlay.querySelector('#backWallRowsInput').value = String(Math.max(1, ys.size - 1));
     overlay.querySelector('#backWallEditorError').textContent = '';
     overlay.hidden = false;
-    window.setTimeout(() => { const input = overlay.querySelector('#backWallHeightInput'); input.focus({ preventScroll: true }); input.select(); }, 20);
+    window.setTimeout(() => { const input = overlay.querySelector('#backWallMinXInput'); input.focus({ preventScroll: true }); input.select(); }, 20);
+  }
+
+
+  function mirrorBackWallGrid(grid) {
+    const source = deepCloneJson(grid) || { version: 1, bounds: { minX: 0, maxX: 600, minY: 0, maxY: 1 }, cells: [] };
+    const minX = Number(source.bounds.minX) || 0, maxX = Number(source.bounds.maxX) || 0;
+    source.bounds.minX = -maxX; source.bounds.maxX = -minX;
+    source.cells = (source.cells || []).map(cell => ({ ...cell, minX: -Number(cell.maxX || 0), maxX: -Number(cell.minX || 0) })).sort((a, b) => a.minX - b.minX || a.minY - b.minY);
+    return source;
+  }
+
+  function ensureDetailCopyOverlay() {
+    let overlay = $('detailCopyOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div'); overlay.id = 'detailCopyOverlay'; overlay.className = 'dim-edit-overlay'; overlay.hidden = true;
+    overlay.innerHTML = `<form class="dim-edit-card"><div class="dim-edit-title" id="detailCopyTitle">Detay Kopyala</div><div class="dim-edit-meta" id="detailCopyMeta"></div><div id="detailCopyTargets" class="dimension-filter-positions"></div><div class="dim-edit-grid"><label><span>Uygulama</span><select id="detailCopyMode"><option value="direct">Doğrudan Uygula</option><option value="mirror">Aynalayarak Uygula</option></select></label></div><div class="post-editor-note" id="detailCopyNote">Bu sürümde yalnız arka duvar detayı kopyalanır.</div><div id="detailCopyError" class="dim-edit-error"></div><div class="dim-edit-actions"><button type="button" id="detailCopyCancel" class="dim-edit-cancel">İptal</button><button type="submit" class="dim-edit-apply">Uygula</button></div></form>`;
+    previewPanel.appendChild(overlay);
+    const close = () => { overlay.hidden = true; focusPreviewCanvas(); };
+    overlay.querySelector('#detailCopyCancel').addEventListener('click', close);
+    overlay.addEventListener('mousedown', evt => { if (evt.target === overlay) close(); });
+    overlay.querySelector('form').addEventListener('submit', evt => {
+      evt.preventDefault();
+      const source = selectedBackWallCopySource;
+      const targets = Array.from(overlay.querySelectorAll('input[data-detail-target]:checked')).map(input => input.dataset.detailTarget);
+      const error = overlay.querySelector('#detailCopyError');
+      if (!source || !targets.length) { error.textContent = currentLanguage === 'en' ? 'Select at least one target.' : 'En az bir hedef seç.'; return; }
+      const sourceGrid = backWallGridForKey(source.key, Number(overlay.dataset.rearHeight || 1));
+      const sourceWall = sideScopedStateValue(backWallState, source.key, { xOffset: 0, depth: 600, height: 0 });
+      const mode = overlay.querySelector('#detailCopyMode').value;
+      targets.forEach(targetKey => {
+        const nextGrid = mode === 'mirror' ? mirrorBackWallGrid(sourceGrid) : deepCloneJson(sourceGrid);
+        storeBackWallGridForKey(targetKey, nextGrid);
+        const nextWall = { ...deepCloneJson(sourceWall), xOffset: mode === 'mirror' ? -Number(sourceWall.xOffset || 0) : Number(sourceWall.xOffset || 0) };
+        setSideScopedStateValue(backWallState, targetKey, nextWall);
+        const segments = (nextGrid.cells || []).filter(cell => Number(cell.minY) <= Number(nextGrid.bounds.minY) + 0.001).map((cell, index) => ({ id: `back_wall_${targetKey}_${Date.now()}_${index + 1}`, start: Math.max(0, Number(cell.minX) || 0), end: Math.max(0, Number(cell.maxX) || 0), height: Math.max(1, Number(nextGrid.bounds.maxY) || 1) })).filter(item => item.end > item.start);
+        storeBackWallSegmentsForKey(targetKey, segments);
+      });
+      close(); updatePreview(false);
+      statusText.textContent = currentLanguage === 'en' ? 'Back-wall detail copied.' : 'Arka duvar detayı kopyalandı.';
+    });
+    return overlay;
+  }
+
+  function showDetailCopyOverlay() {
+    if (!selectedBackWallCopySource) { statusText.textContent = currentLanguage === 'en' ? 'Select a back wall first.' : 'Önce bir arka duvar seç.'; return; }
+    const overlay = ensureDetailCopyOverlay();
+    const d = lastDrawing && lastDrawing.input; const count = Math.max(1, Number(d && d.sidePositionCount || 1));
+    const keys = ['0', ...Array.from({ length: Math.max(0, count - 2) }, (_, index) => String(index + 1)), 'right'];
+    const targetBox = overlay.querySelector('#detailCopyTargets'); targetBox.innerHTML = '';
+    keys.filter(key => key !== selectedBackWallCopySource.key).forEach(key => {
+      const label = document.createElement('label'); const name = key === '0' ? (currentLanguage === 'en' ? 'Left' : 'Sol') : key === 'right' ? (currentLanguage === 'en' ? 'Right' : 'Sağ') : `${Number(key) + 1}. ${currentLanguage === 'en' ? 'position' : 'poz'}`;
+      label.innerHTML = `<input type="checkbox" data-detail-target="${key}"><span>${name}</span>`; targetBox.appendChild(label);
+    });
+    overlay.querySelector('#detailCopyTitle').textContent = currentLanguage === 'en' ? 'Copy Detail' : 'Detay Kopyala';
+    overlay.querySelector('#detailCopyMeta').textContent = currentLanguage === 'en' ? 'Back wall only' : 'Yalnız arka duvar';
+    overlay.querySelector('#detailCopyNote').textContent = currentLanguage === 'en' ? 'Choose direct or mirrored application.' : 'Doğrudan veya aynalı uygulama seç.';
+    overlay.querySelector('#detailCopyError').textContent = ''; overlay.dataset.rearHeight = String(d && d.rearHeight || 1); overlay.hidden = false;
   }
 
   function toggleMiddleSideView(sideIndex) {
@@ -5444,6 +5623,33 @@
     statusText.textContent = currentLanguage === 'en' ? `Intermediate side view ${index + 1} disabled. Its settings were preserved.` : `${index + 1}. ara poz yan görünüşü kapatıldı; özel ayarları korundu.`;
   }
 
+  function ensureTrapezSheetEditorOverlay() {
+    let overlay = $('trapezSheetEditorOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'trapezSheetEditorOverlay';
+    overlay.className = 'v66-modal-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML = `<div class="v66-modal-card"><h3>Trapez Sac Alanını Düzenle</h3><form><div class="v66-field-grid">
+      <label>-X Kenarı<input id="trapMinX" type="number" step="1"></label><label>+X Kenarı<input id="trapMaxX" type="number" step="1"></label>
+      <label>-Y Kenarı<input id="trapMinY" type="number" step="1"></label><label>+Y Kenarı<input id="trapMaxY" type="number" step="1"></label>
+      </div><div id="trapEditError" class="v66-error"></div><div class="v66-modal-actions"><button type="button" id="trapReset">Varsayılana Dön</button><button type="button" id="trapCancel">Kapat</button><button type="submit">Uygula</button></div></form></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#trapCancel').addEventListener('click',()=>{overlay.hidden=true;});
+    overlay.querySelector('#trapReset').addEventListener('click',()=>{delete trapezSheetBounds[String(overlay.dataset.systemIndex||0)];overlay.hidden=true;updatePreview(false);});
+    overlay.querySelector('form').addEventListener('submit',evt=>{
+      evt.preventDefault(); const vals=['trapMinX','trapMaxX','trapMinY','trapMaxY'].map(id=>Number(overlay.querySelector('#'+id).value));
+      if(!vals.every(Number.isFinite)||vals[1]-vals[0]<50||vals[3]-vals[2]<50){overlay.querySelector('#trapEditError').textContent='Alan genişliği ve derinliği en az 50 mm olmalıdır.';return;}
+      beginHistoryTransaction(); try{trapezSheetBounds[String(overlay.dataset.systemIndex||0)]={minX:vals[0],maxX:vals[1],minY:vals[2],maxY:vals[3]};overlay.hidden=true;updatePreview(false);}finally{endHistoryTransaction(true);}
+    });
+    return overlay;
+  }
+  function showTrapezSheetEditorOverlay(meta){
+    const o=ensureTrapezSheetEditorOverlay(); o.dataset.systemIndex=String(meta.systemIndex||0); o.querySelector('#trapEditError').textContent='';
+    o.querySelector('#trapMinX').value=String(Math.round(meta.boundMinX)); o.querySelector('#trapMaxX').value=String(Math.round(meta.boundMaxX));
+    o.querySelector('#trapMinY').value=String(Math.round(meta.boundMinY)); o.querySelector('#trapMaxY').value=String(Math.round(meta.boundMaxY)); o.hidden=false;
+  }
+
   function handlePreviewDimensionEdit(evt) {
     if (toolboxSelectionMode) {
       evt.preventDefault();
@@ -5452,7 +5658,7 @@
       return;
     }
     const dimHit = evt.target && evt.target.closest ? evt.target.closest('[data-dim-id],[data-edit-field]') : null;
-    const interactionHit = !dimHit && evt.target && evt.target.closest ? evt.target.closest('[data-interaction-type="postEditor"],[data-interaction-type="frontPostProfileEditor"],[data-interaction-type="glassTrackEditor"],[data-interaction-type="productEditor"],[data-interaction-type="parapetEditor"],[data-interaction-type="sideViewEnable"],[data-interaction-type="triangleEditor"],[data-interaction-type="backWallEditor"]') : null;
+    const interactionHit = !dimHit && evt.target && evt.target.closest ? evt.target.closest('[data-interaction-type="postEditor"],[data-interaction-type="frontPostProfileEditor"],[data-interaction-type="glassTrackEditor"],[data-interaction-type="productEditor"],[data-interaction-type="parapetEditor"],[data-interaction-type="sideViewEnable"],[data-interaction-type="triangleEditor"],[data-interaction-type="backWallEditor"],[data-interaction-type="trapezSheetEditor"]') : null;
     if (!dimHit && !interactionHit) return;
     evt.preventDefault();
     evt.stopPropagation();
@@ -5468,6 +5674,7 @@
       else if (interactionMeta.interactionType === 'parapetEditor') showParapetEditorOverlay(interactionMeta);
       else if (interactionMeta.interactionType === 'triangleEditor') showTriangleEditorOverlay(interactionMeta);
       else if (interactionMeta.interactionType === 'backWallEditor') showBackWallEditorOverlay(interactionMeta);
+      else if (interactionMeta.interactionType === 'trapezSheetEditor') showTrapezSheetEditorOverlay(interactionMeta);
       else if (interactionMeta.interactionType === 'productEditor') {
         const record = findProductByInteraction(interactionMeta);
         if (!record) return;
@@ -5637,6 +5844,8 @@
       triangleDivisionState: deepCloneJson(triangleDivisionState) || { left: null, right: null, middle: {} },
       backWallState: deepCloneJson(backWallState) || { left: { xOffset: 0, depth: 600, height: 0 }, right: { xOffset: 0, depth: 600, height: 0 }, middle: {} },
       backWallSegments: deepCloneJson(backWallSegments) || { side: {} },
+      backWallGridState: deepCloneJson(backWallGridState) || { side: {} },
+      trapezSheetBounds: deepCloneJson(trapezSheetBounds) || {},
       previewDimensionOffsets: deepCloneJson(previewDimensionOffsets) || {},
       slidingPlacements: deepCloneJson(slidingPlacements) || [],
       sideSlidingPlacements: deepCloneJson(sideSlidingPlacements) || [],
@@ -5695,6 +5904,8 @@
     triangleDivisionState = normalizeTriangleDivisionStateForApp(state.triangleDivisionState);
     backWallState = normalizeBackWallStateForApp(state.backWallState);
     backWallSegments = normalizeBackWallSegmentsForApp(state.backWallSegments);
+    backWallGridState = normalizeBackWallGridStateForApp(state.backWallGridState);
+    trapezSheetBounds = state.trapezSheetBounds && typeof state.trapezSheetBounds === 'object' ? deepCloneJson(state.trapezSheetBounds) || {} : {};
     previewDimensionOffsets = normalizePreviewDimensionOffsets(state.previewDimensionOffsets);
     slidingPlacements = Array.isArray(state.slidingPlacements) ? deepCloneJson(state.slidingPlacements) || [] : [];
     sideSlidingPlacements = Array.isArray(state.sideSlidingPlacements) ? deepCloneJson(state.sideSlidingPlacements) || [] : [];
@@ -5782,6 +5993,8 @@
       triangleDivisionState = normalizeTriangleDivisionStateForApp(drawingState.triangleDivisionState);
       backWallState = normalizeBackWallStateForApp(drawingState.backWallState);
       backWallSegments = normalizeBackWallSegmentsForApp(drawingState.backWallSegments);
+      backWallGridState = normalizeBackWallGridStateForApp(drawingState.backWallGridState);
+      trapezSheetBounds = drawingState.trapezSheetBounds && typeof drawingState.trapezSheetBounds === 'object' ? deepCloneJson(drawingState.trapezSheetBounds) || {} : {};
       previewDimensionOffsets = drawingState.previewDimensionOffsets && typeof drawingState.previewDimensionOffsets === 'object'
         ? normalizePreviewDimensionOffsets(drawingState.previewDimensionOffsets)
         : {};
@@ -6807,6 +7020,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
     if ($('equalizeGapsBtn')) $('equalizeGapsBtn').addEventListener('click', () => startToolboxSelection('equalize-gaps'));
     if ($('convertProductBtn')) $('convertProductBtn').addEventListener('click', () => startToolboxSelection('convert-product'));
     if ($('fitProductsBtn')) $('fitProductsBtn').addEventListener('click', () => startToolboxSelection('fit-products'));
+    if ($('detailCopyBtn')) $('detailCopyBtn').addEventListener('click', showDetailCopyOverlay);
     if ($('multiDeleteBtn')) $('multiDeleteBtn').addEventListener('click', () => startToolboxSelection('multi-delete'));
     if ($('deleteAllProductsBtn')) $('deleteAllProductsBtn').addEventListener('click', deleteAllProducts);
     if ($('postSettingsBtn')) $('postSettingsBtn').addEventListener('click', openPostSettingsFromToolbox);

@@ -535,6 +535,47 @@
     return { side };
   }
 
+
+  function normalizeBackWallGridState(rawState) {
+    const raw = rawState && typeof rawState === 'object' ? rawState : {};
+    const sourceMap = raw.side && typeof raw.side === 'object' ? raw.side : {};
+    const side = {};
+    Object.entries(sourceMap).forEach(([rawKey, value]) => {
+      const key = normalizeSideViewKey(rawKey, Number(rawKey) || 0);
+      const item = value && typeof value === 'object' ? value : {};
+      const bounds = item.bounds && typeof item.bounds === 'object' ? item.bounds : {};
+      const minX = Number(bounds.minX), maxX = Number(bounds.maxX), minY = Number(bounds.minY), maxY = Number(bounds.maxY);
+      if (![minX, maxX, minY, maxY].every(Number.isFinite) || !(maxX > minX && maxY > minY)) return;
+      const cells = Array.isArray(item.cells) ? item.cells.map((cell, index) => {
+        const c = cell && typeof cell === 'object' ? cell : {};
+        const x1 = Number(c.minX), x2 = Number(c.maxX), y1 = Number(c.minY), y2 = Number(c.maxY);
+        if (![x1, x2, y1, y2].every(Number.isFinite) || !(x2 > x1 && y2 > y1)) return null;
+        return { id: String(c.id || `back_wall_cell_${key}_${index + 1}`), minX: x1, maxX: x2, minY: y1, maxY: y2 };
+      }).filter(Boolean) : [];
+      side[key] = { version: 1, bounds: { minX, maxX, minY, maxY }, cells };
+    });
+    return { side };
+  }
+
+  function explicitBackWallGridFor(d, key) {
+    const normalized = normalizeSideViewKey(key, 0);
+    const grid = d && d.backWallGridState && d.backWallGridState.side ? d.backWallGridState.side[normalized] : null;
+    return grid && Array.isArray(grid.cells) && grid.cells.length ? grid : null;
+  }
+
+  function backWallCellsFor(d, key, rearHeight) {
+    const grid = explicitBackWallGridFor(d, key);
+    if (grid) return grid;
+    const segments = backWallSegmentsFor(d, key, rearHeight);
+    const maxX = segments.reduce((value, item) => Math.max(value, Number(item.end) || 0), 1);
+    const maxY = segments.reduce((value, item) => Math.max(value, Number(item.height) || 0), Math.max(1, Number(rearHeight) || 1));
+    return {
+      version: 1,
+      bounds: { minX: 0, maxX, minY: 0, maxY },
+      cells: segments.map((item, index) => ({ id: String(item.id || `back_wall_cell_${index + 1}`), minX: Number(item.start) || 0, maxX: Number(item.end) || 0, minY: 0, maxY: Number(item.height) || maxY }))
+    };
+  }
+
   function explicitBackWallSegmentsFor(d, key) {
     const normalized = normalizeSideViewKey(key, 0);
     const list = d && d.backWallSegments && d.backWallSegments.side ? d.backWallSegments.side[normalized] : null;
@@ -574,9 +615,15 @@
     return [{ id: `back_wall_${normalizeSideViewKey(key, 0)}_1`, start: 0, end: wall.depth, height: wall.height }];
   }
 
-  function sideBackWallFaceX(d, p, key) {
+  function sideBackWallAnchorX(d, p, key) {
     const base = K.systemStartX - (1750 + Number(p && p.opening || 0));
     return base + sideBackWallSettings(d, key, p && p.rearHeight).xOffset;
+  }
+
+  function sideBackWallFaceX(d, p, key) {
+    const grid = explicitBackWallGridFor(d, key);
+    const localPositiveXEdge = grid && grid.bounds ? Number(grid.bounds.minX) || 0 : 0;
+    return sideBackWallAnchorX(d, p, key) - localPositiveXEdge;
   }
 
   function sideViewKeyForPosition(p) {
@@ -641,7 +688,9 @@
     const explicitMap = d.sidePosts && typeof d.sidePosts === 'object' ? d.sidePosts : {};
     const hasExplicit = Object.prototype.hasOwnProperty.call(explicitMap, sideViewKey);
     let rawPosts = hasExplicit && Array.isArray(explicitMap[sideViewKey]) ? explicitMap[sideViewKey] : null;
-    if (!rawPosts) {
+    // 5000 mm üzerindeki cam kaydı açıklığında en az bir destek dikmesi zorunludur.
+    // Dolu manuel liste korunur; eski/boş state otomatik desteği bastıramaz.
+    if (!rawPosts || (camW > 5000 && rawPosts.length === 0)) {
       rawPosts = camW > 5000 ? [{
         id: `auto_side_${sideViewKey}_0`,
         centerX: Number(d.sideSupportCenters && d.sideSupportCenters[sideViewKey]) || defaultCenterX,
@@ -779,6 +828,8 @@
     d.triangleDivisionState = normalizeTriangleDivisionState(raw && raw.__triangleDivisionState);
     d.backWallState = normalizeBackWallState(raw && raw.__backWallState);
     d.backWallSegmentsRaw = raw && raw.__backWallSegments && typeof raw.__backWallSegments === 'object' ? raw.__backWallSegments : null;
+    d.backWallGridStateRaw = raw && raw.__backWallGridState && typeof raw.__backWallGridState === 'object' ? raw.__backWallGridState : null;
+    d.trapezSheetBounds = raw && raw.__trapezSheetBounds && typeof raw.__trapezSheetBounds === 'object' ? raw.__trapezSheetBounds : {};
     d.frontPostProfiles = Array.isArray(raw && raw.__frontPostProfiles)
       ? raw.__frontPostProfiles.map(item => item ? normalizeGlassTrackProfile(item) : null)
       : [];
@@ -836,6 +887,7 @@
     }
     d.parapetSegments = normalizeParapetSegmentsState(d.parapetSegmentsRaw, d);
     d.backWallSegments = normalizeBackWallSegmentsState(d.backWallSegmentsRaw, d);
+    d.backWallGridState = normalizeBackWallGridState(d.backWallGridStateRaw);
     d.frontPostExtensions = Array.from({ length: d.postCount }, (_, i) => Math.max(0, Number(d.frontPostExtensions[i]) || 0));
     d.maxOpening = safeExtrema(d.positions.map(p => p.opening), 'max', d.opening);
     d.lastOpening = d.positions[d.positions.length - 1].opening;
@@ -1218,15 +1270,22 @@
     const clean = input.map((raw, index) => {
       const start = clamp(Number(raw && raw.start) || 0, 0, maxLength);
       const end = clamp(Number(raw && raw.end), 0, maxLength);
-      const height = Math.max(0, Number(raw && raw.height));
+      const legacyHeight = Math.max(0, Number(raw && raw.height));
+      const startHeightRaw = Number(raw && raw.startHeight);
+      const endHeightRaw = Number(raw && raw.endHeight);
+      const height = Number.isFinite(legacyHeight) ? legacyHeight : baseHeight;
+      const startHeight = Math.max(0, Number.isFinite(startHeightRaw) ? startHeightRaw : height);
+      const endHeight = Math.max(0, Number.isFinite(endHeightRaw) ? endHeightRaw : height);
       return {
         id: String((raw && raw.id) || `${prefix}_${index + 1}`),
         start: Math.min(start, Number.isFinite(end) ? end : maxLength),
         end: Math.max(start, Number.isFinite(end) ? end : maxLength),
-        height: Number.isFinite(height) ? height : baseHeight
+        height: Math.max(startHeight, endHeight),
+        startHeight,
+        endHeight
       };
     }).filter(item => item.end - item.start > 0.001).sort((a, b) => a.start - b.start || a.end - b.end);
-    if (!clean.length && maxLength > 0 && baseHeight > 0) return [{ id: `${prefix}_1`, start: 0, end: maxLength, height: baseHeight }];
+    if (!clean.length && maxLength > 0 && baseHeight > 0) return [{ id: `${prefix}_1`, start: 0, end: maxLength, height: baseHeight, startHeight: baseHeight, endHeight: baseHeight }];
     return clean;
   }
 
@@ -1256,7 +1315,13 @@
     const list = Array.isArray(segments) ? segments : [];
     const x = Number(coordinate) || 0;
     const hit = list.find((item, index) => x >= Number(item.start) - 0.001 && (x < Number(item.end) - 0.001 || index === list.length - 1 && x <= Number(item.end) + 0.001));
-    return hit ? Math.max(0, Number(hit.height) || 0) : Math.max(0, Number(fallback) || 0);
+    if (!hit) return Math.max(0, Number(fallback) || 0);
+    const start = Number(hit.start) || 0;
+    const end = Number(hit.end) || start;
+    const h0 = Math.max(0, Number.isFinite(Number(hit.startHeight)) ? Number(hit.startHeight) : Number(hit.height) || 0);
+    const h1 = Math.max(0, Number.isFinite(Number(hit.endHeight)) ? Number(hit.endHeight) : Number(hit.height) || 0);
+    const ratio = end - start > 0.001 ? clamp((x - start) / (end - start), 0, 1) : 0;
+    return h0 + (h1 - h0) * ratio;
   }
 
   function parapetSegmentVerticalDimX(segmentStartX, segmentWidth) {
@@ -1415,10 +1480,22 @@
 
   function frontPostWidthAt(d, index) { return Math.max(1, Number(frontPostProfileAt(d, index).en) || K.postSize); }
 
+  // V12.6: İlk ve son ön dikmelerin dış uçları kanonik sabit kenardır.
+  // İlk dikme -X ucunu, son dikme +X ucunu korur; ara dikmeler aks merkezinde kalır.
+  function frontPostBoundsAt(d, postXs, index) {
+    const xs = Array.isArray(postXs) ? postXs : postCenterXs(d);
+    const i = Math.max(0, Math.min(Math.max(0, xs.length - 1), Number(index) || 0));
+    const axis = Number(xs[i]) || 0;
+    const width = frontPostWidthAt(d, i);
+    if (i === 0) return { left: axis - K.postSize / 2, right: axis - K.postSize / 2 + width, width, center: axis - K.postSize / 2 + width / 2 };
+    if (i === xs.length - 1) return { left: axis + K.postSize / 2 - width, right: axis + K.postSize / 2, width, center: axis + K.postSize / 2 - width / 2 };
+    return { left: axis - width / 2, right: axis + width / 2, width, center: axis };
+  }
+
   function frontGapBounds(d, postXs, gapIndex) {
     const i = Math.max(0, Math.min(postXs.length - 2, Number(gapIndex) || 0));
-    const left = postXs[i] + frontPostWidthAt(d, i) / 2;
-    const right = postXs[i + 1] - frontPostWidthAt(d, i + 1) / 2;
+    const left = frontPostBoundsAt(d, postXs, i).right;
+    const right = frontPostBoundsAt(d, postXs, i + 1).left;
     return { left, right, width: Math.max(0, right - left) };
   }
 
@@ -1462,7 +1539,7 @@
     const insX = ww >= 0 ? x : x + ww;
     const scaleX = Math.abs(ww) / 1000;
     const scaleY = hh / 1000;
-    g.insert(name, insX, y, { layer, rotation: 0, scaleX, scaleY, previewW: Math.abs(ww), previewH: Math.abs(hh) });
+    return g.insert(name, insX, y, { layer, rotation: 0, scaleX, scaleY, previewW: Math.abs(ww), previewH: Math.abs(hh) });
   }
 
   function topWallYAt(d, idx) { return -(d.openingList[0] - (nthOrLast(d.openingList, idx) || d.opening)); }
@@ -1542,18 +1619,30 @@
     });
   }
 
+  function defaultTopTrapezBounds(d, sys) {
+    const p = d.positions[sys.index] || d.positions[0];
+    const firstRayX = sys.rays && sys.rays.length ? sys.rays[0] : sys.rayAreaStartX;
+    const lastRayX = sys.rays && sys.rays.length ? sys.rays[sys.rays.length - 1] : sys.rayAreaEndX;
+    const rayEndY = -(d.opening + K.topRayEndExtra);
+    const rayStartY = rayEndY + (p.opening - K.rayLengthFrontDeduct);
+    const roofY = topCatiProfilYAt(d, sys.index);
+    const shift = (p.rayLength / K.catiProfilRayRatioBase) * K.catiProfilRayRatioMove + K.catiProfilExtraOffset;
+    return { minX:firstRayX + 40, maxX:lastRayX + 40 + 95, minY:roofY - shift, maxY:rayStartY + 72 };
+  }
+  function topTrapezBoundsForSystem(d, sys) {
+    const base=defaultTopTrapezBounds(d,sys), raw=d.trapezSheetBounds && d.trapezSheetBounds[String(sys.index)];
+    if(!raw||typeof raw!=='object') return base;
+    const out={minX:Number(raw.minX),maxX:Number(raw.maxX),minY:Number(raw.minY),maxY:Number(raw.maxY)};
+    return Object.values(out).every(Number.isFinite)&&out.maxX-out.minX>=50&&out.maxY-out.minY>=50?out:base;
+  }
   function drawTopTrapezSafeHatch(g, d) {
     d.systems.forEach(sys => {
-      const p = d.positions[sys.index] || d.positions[0];
-      const firstRayX = sys.rays && sys.rays.length ? sys.rays[0] : sys.rayAreaStartX;
-      const lastRayX = sys.rays && sys.rays.length ? sys.rays[sys.rays.length - 1] : sys.rayAreaEndX;
-      const x = firstRayX;
-      const w = Math.max(1, lastRayX - firstRayX); // V8.2.26: son raydan +X yönünde K.rayW/76-80 mm taşma yok
-      const wallY = topWallYAt(d, sys.index);
-      const roofY = topCatiProfilYAt(d, sys.index);
-      const shift = (p.rayLength / K.catiProfilRayRatioBase) * K.catiProfilRayRatioMove + K.catiProfilExtraOffset;
-      const bottomY = roofY - shift;
-      safeHatchBlock(g, 'PULUMUR TRAPEZ SAFE HATCH', x, wallY, w, bottomY - wallY, 'HATCH_FABRIC');
+      const b=topTrapezBoundsForSystem(d,sys); const w=b.maxX-b.minX, h=b.maxY-b.minY;
+      const boundary=g.rect(b.minX,b.minY,w,h,'HATCH_FABRIC');
+      g.entities.push({type:'hatch',layer:'HATCH_FABRIC',points:[[b.minX,b.minY],[b.maxX,b.minY],[b.maxX,b.maxY],[b.minX,b.maxY]],patternKind:'fabric'});
+      const preview=safeHatchBlock(g, 'PULUMUR TRAPEZ SAFE HATCH', b.minX, b.minY, w, h, 'HATCH_FABRIC');
+      if(preview) preview.previewOnly=true;
+      g.entities.push({type:'interaction',kind:'trapezSheetEditor',x:b.minX,y:b.minY,w,h,data:{systemIndex:sys.index,boundMinX:b.minX,boundMaxX:b.maxX,boundMinY:b.minY,boundMaxY:b.maxY}});
     });
   }
 
@@ -2016,14 +2105,17 @@
     frontSegments.forEach((segment, segmentIndex) => {
       const x = K.systemStartX + Number(segment.start || 0);
       const width = Math.max(0, Number(segment.end || 0) - Number(segment.start || 0));
-      const height = Math.max(0, Number(segment.height) || 0);
+      const startHeight = Math.max(0, Number.isFinite(Number(segment.startHeight)) ? Number(segment.startHeight) : Number(segment.height) || 0);
+      const endHeight = Math.max(0, Number.isFinite(Number(segment.endHeight)) ? Number(segment.endHeight) : Number(segment.height) || 0);
+      const height = Math.max(startHeight, endHeight);
       if (!(width > 0 && height > 0)) return;
-      const topY = frontBaseY + height;
-      g.rect(x, topY, width, -height, 'WALL');
-      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, topY, width, -height, 'HATCH_WALL');
+      const points = [[x, frontBaseY], [x + width, frontBaseY], [x + width, frontBaseY + endHeight], [x, frontBaseY + startHeight]];
+      g.poly(points, true, 'WALL');
+      if (Math.abs(startHeight - endHeight) < 0.001) safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, frontBaseY + height, width, -height, 'HATCH_WALL');
+      else g.entities.push({ type: 'hatch', layer: 'HATCH_WALL', points, patternKind: 'brick' });
       g.entities.push({ type: 'interaction', kind: 'parapetEditor', x, y: frontBaseY, w: width, h: height, data: {
         parapetView: 'front', parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
-        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height
+        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height, segmentStartHeight: startHeight, segmentEndHeight: endHeight
       }});
       addDimH(g, x, x + width, frontBaseY, frontBaseY + 50, formatMm(width), {
         scale: 0.58,
@@ -2056,26 +2148,28 @@
 
     postXs.forEach((x, idx) => {
       const postProfile = frontPostProfileAt(d, idx);
+      const postBounds = frontPostBoundsAt(d, postXs, idx);
+      const renderX = postBounds.center;
       const parapetH = frontParapetHeightAt(d, x);
       const extension = frontPostExtensionAt(d, idx);
       const parapetTopY = frontBaseY + parapetH;
       let hitBottomY;
       if (!postProfile.custom) {
-        blockRef(g, 'PergoRise Dikme Oluk Bağlantı Karşı Görünüş', x, rectStartY, 135, 85);
+        blockRef(g, 'PergoRise Dikme Oluk Bağlantı Karşı Görünüş', renderX, rectStartY, 135, 85);
         const normalBodyBottom = parapetTopY + K.altBlockCorrection;
         const bodyTop = rectStartY - K.onPostTopDrop;
         const bodyBottom = normalBodyBottom - extension;
-        g.rect(x - K.postSize / 2, bodyTop, K.postSize, -(bodyTop - bodyBottom), 'POST');
-        blockRef(g, 'PergoRise Dikme Alt Bağlantı Karşı Görünüş', x, parapetTopY + K.altBlockCorrection - extension, 125, 70);
+        g.rect(postBounds.left, bodyTop, postBounds.width, -(bodyTop - bodyBottom), 'POST');
+        blockRef(g, 'PergoRise Dikme Alt Bağlantı Karşı Görünüş', renderX, parapetTopY + K.altBlockCorrection - extension, 125, 70);
         hitBottomY = bodyBottom - 24;
       } else {
         const bodyBottom = parapetTopY - extension;
-        g.rect(x - postProfile.en / 2, rectStartY, postProfile.en, -(rectStartY - bodyBottom), 'POST');
+        drawHollowRect(g, postBounds.left, rectStartY, postBounds.width, -(rectStartY - bodyBottom), 'POST', postProfile.et);
         hitBottomY = bodyBottom - 24;
       }
       const hitTopY = rectStartY + 24;
       const hitW = Math.max(124, postProfile.en + 24);
-      g.entities.push({ type: 'interaction', kind: 'postEditor', x: x - hitW / 2, y: hitBottomY, w: hitW, h: hitTopY - hitBottomY, data: {
+      g.entities.push({ type: 'interaction', kind: 'postEditor', x: renderX - hitW / 2, y: hitBottomY, w: hitW, h: hitTopY - hitBottomY, data: {
         postIndex: idx, postCount: d.postCount, totalRayCount: d.totalRayCount,
         placementMode: d.manualPostPlacementMode || 'standard', profileMode: postProfile.mode,
         en: postProfile.en, boy: postProfile.boy, et: postProfile.et, postExtension: extension
@@ -2142,7 +2236,9 @@
   }
 
   function triangleDogramaAraDikmeSay(AB) {
-    return Math.max(0, Math.floor((AB - 0.000001) / 2000));
+    // Kullanıcı kuralı: üçgen doğramada her 2500 mm tamamlandıktan sonra
+    // bir ek ara dikme oluşur. Eşik değerinin kendisi önceki aralıkta kalır.
+    return Math.max(0, Math.floor((AB - 0.000001) / 2500));
   }
 
   function triangleDogramaKapaliCiz(g, pA, pB, pC, pD, layer = 'TRIANGLE') {
@@ -2289,12 +2385,20 @@
     const yanX = K.sideBaseX;
     const sideViewKey = sideViewKeyForPosition(p);
     const wallSettings = sideBackWallSettings(d, sideViewKey, p.rearHeight);
-    const duvarX = sideBackWallFaceX(d, p, sideViewKey);
+    const duvarX = sideBackWallAnchorX(d, p, sideViewKey);
     const duvarY = rectStartY - d.frontHeight;
     const isMiddlePosition = p.index > 0 && p.index < d.sidePositionCount - 1;
     const middleEnabled = !isMiddlePosition || sideViewEnabled(d, sideViewKey, p.index);
-    const sideFrontParapetH = sideParapetHeightAt(d, p.index, yanX - K.postSize / 2, duvarX, sideViewKey);
-    const yanAltY = duvarY + sideFrontParapetH + K.altBlockCorrection;
+    const frontPostIndex = sideViewKey === 'right' ? Math.max(0, d.postCount - 1) : 0;
+    const sideFrontProfile = frontPostProfileAt(d, frontPostIndex);
+    const sideFrontWidth = Math.max(1, Number(sideFrontProfile.boy) || K.postSize);
+    const sideFrontExtension = frontPostExtensionAt(d, frontPostIndex);
+    // Sol kaynak görünüşte +X uç sabittir; sağ görünüş bu geometrinin semantik aynasıdır
+    // ve aynalama sonrasında -X uç sabit kalır.
+    const sideFrontLeftX = yanX - sideFrontWidth;
+    const sideFrontCenterX = yanX - sideFrontWidth / 2;
+    const sideFrontParapetH = sideParapetHeightAt(d, p.index, sideFrontCenterX, duvarX, sideViewKey);
+    const yanAltY = duvarY + sideFrontParapetH + K.altBlockCorrection - sideFrontExtension;
     const dikH = Math.max(1, yanPostUstY - yanAltY);
     const bagX = duvarX;
     const bagY = duvarY + p.rearHeight;
@@ -2308,11 +2412,14 @@
     let camBottomY = null;
     const sideSupportGeometry = sideViewKey === 'right' ? d.rightSideSupportGeometry : (d.sideSupportGeometry && d.sideSupportGeometry[sideViewKey]);
     if (d.postCount > 0) {
-      g.rect(yanX, yanPostUstY, -K.postSize, -dikH, 'Dikme - Yan Görünüş');
-      blockRef(g, 'PergoRise Dikme Oluk Bağlantı Yan Görünüş', yanX, yanPostUstY, 130, 80, 'Blok - Yan Görünüş', 270);
-      blockRef(g, 'PergoRise Dikme Alt Bağlantı Yan Görünüş', yanX - 50, yanAltY, 120, 70, 'Blok - Yan Görünüş');
-      const postIndex = sideViewKey === 'right' ? Math.max(0, d.postCount - 1) : 0;
-      g.entities.push({ type: 'interaction', kind: 'frontPostProfileEditor', x: yanX - K.postSize, y: yanAltY, w: K.postSize, h: Math.max(1, yanPostUstY - yanAltY), data: { postIndex, sideIndex: p.index, sideViewKey } });
+      if (sideFrontProfile.custom) {
+        drawHollowRect(g, sideFrontLeftX, yanPostUstY, sideFrontWidth, -dikH, 'Dikme - Yan Görünüş', sideFrontProfile.et);
+      } else {
+        g.rect(sideFrontLeftX, yanPostUstY, sideFrontWidth, -dikH, 'Dikme - Yan Görünüş');
+        blockRef(g, 'PergoRise Dikme Oluk Bağlantı Yan Görünüş', yanX, yanPostUstY, 130, 80, 'Blok - Yan Görünüş', 270);
+        blockRef(g, 'PergoRise Dikme Alt Bağlantı Yan Görünüş', sideFrontCenterX, yanAltY, 120, 70, 'Blok - Yan Görünüş');
+      }
+      g.entities.push({ type: 'interaction', kind: 'frontPostProfileEditor', x: sideFrontLeftX, y: yanAltY, w: sideFrontWidth, h: Math.max(1, yanPostUstY - yanAltY), data: { postIndex: frontPostIndex, sideIndex: p.index, sideViewKey, profileMode: sideFrontProfile.mode, en: sideFrontProfile.en, boy: sideFrontProfile.boy, et: sideFrontProfile.et, postExtension: sideFrontExtension } });
     }
     blockRef(g, 'PergoRise Oluk Yan Görünüş Birleştirilmiş', yanX, yanUstY, 220, 135, 'Blok - Yan Görünüş');
     if (isMiddlePosition) {
@@ -2362,14 +2469,17 @@
     sideSegments.forEach((segment, segmentIndex) => {
       const x = duvarX + Number(segment.start || 0);
       const width = Math.max(0, Number(segment.end || 0) - Number(segment.start || 0));
-      const height = Math.max(0, Number(segment.height) || 0);
+      const startHeight = Math.max(0, Number.isFinite(Number(segment.startHeight)) ? Number(segment.startHeight) : Number(segment.height) || 0);
+      const endHeight = Math.max(0, Number.isFinite(Number(segment.endHeight)) ? Number(segment.endHeight) : Number(segment.height) || 0);
+      const height = Math.max(startHeight, endHeight);
       if (!(width > 0 && height > 0)) return;
-      const topY = duvarY + height;
-      g.rect(x, topY, width, -height, 'Duvar - Yan Görünüş');
-      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, topY, width, -height, 'HATCH_WALL');
+      const points = [[x, duvarY], [x + width, duvarY], [x + width, duvarY + endHeight], [x, duvarY + startHeight]];
+      g.poly(points, true, 'Duvar - Yan Görünüş');
+      if (Math.abs(startHeight - endHeight) < 0.001) safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', x, duvarY + height, width, -height, 'HATCH_WALL');
+      else g.entities.push({ type: 'hatch', layer: 'HATCH_WALL', points, patternKind: 'brick' });
       const interaction = { type: 'interaction', kind: 'parapetEditor', x, y: duvarY, w: width, h: height, data: {
         parapetView: 'side', sideIndex: p.index, sideViewKey, parapetSegmentId: segment.id, parapetSegmentIndex: segmentIndex,
-        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height
+        segmentStart: segment.start, segmentEnd: segment.end, segmentHeight: height, segmentStartHeight: startHeight, segmentEndHeight: endHeight
       }};
       g.entities.push(interaction);
       const sideParapetWidthDim = addDimH(g, x, x + width, duvarY, duvarY + 50, formatMm(width), {
@@ -2391,22 +2501,24 @@
       });
       void sideParapetWidthDim;
     });
-    const wallSegments = backWallSegmentsFor(d, sideViewKey, p.rearHeight);
-    wallSegments.forEach((segment, wallSegmentIndex) => {
-      const start = Math.max(0, Number(segment.start) || 0);
-      const end = Math.max(start, Number(segment.end) || 0);
-      const height = Math.max(0, Number(segment.height) || 0);
-      const wallW = end - start;
-      if (!(wallW > 0 && height > 0)) return;
-      // Keep the legacy right-to-left wall vertex order so unchanged projects
-      // retain byte-stable DXF geometry while segmented walls remain editable.
-      const wallRightX = duvarX - start;
-      const wallLeftX = duvarX - end;
-      g.rect(wallRightX, duvarY, -wallW, height, 'Duvar - Yan Görünüş');
-      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, duvarY, -wallW, height, 'HATCH_WALL');
-      g.entities.push({ type: 'interaction', kind: 'backWallEditor', x: wallLeftX, y: duvarY, w: wallW, h: height, data: {
+    const wallGrid = backWallCellsFor(d, sideViewKey, p.rearHeight);
+    wallGrid.cells.forEach((cell, wallCellIndex) => {
+      const minX = Number(cell.minX) || 0;
+      const maxX = Number(cell.maxX) || 0;
+      const minY = Number(cell.minY) || 0;
+      const maxY = Number(cell.maxY) || 0;
+      const wallW = maxX - minX;
+      const wallH = maxY - minY;
+      if (!(wallW > 0 && wallH > 0)) return;
+      const wallRightX = duvarX - minX;
+      const wallLeftX = duvarX - maxX;
+      const wallBottomY = duvarY + minY;
+      g.rect(wallRightX, wallBottomY, -wallW, wallH, 'Duvar - Yan Görünüş');
+      safeHatchBlock(g, 'PULUMUR WALL BRICK SAFE HATCH', wallRightX, wallBottomY, -wallW, wallH, 'HATCH_WALL');
+      g.entities.push({ type: 'interaction', kind: 'backWallEditor', x: wallLeftX, y: wallBottomY, w: wallW, h: wallH, data: {
         sideIndex: p.index, sideViewKey, wallXOffset: wallSettings.xOffset, wallDepth: wallSettings.depth, wallHeight: wallSettings.height,
-        wallSegmentId: segment.id, wallSegmentIndex, segmentStart: start, segmentEnd: end, segmentHeight: height
+        wallCellId: cell.id, wallCellIndex, cellMinX: minX, cellMaxX: maxX, cellMinY: minY, cellMaxY: maxY,
+        wallMinX: wallGrid.bounds.minX, wallMaxX: wallGrid.bounds.maxX, wallMinY: wallGrid.bounds.minY, wallMaxY: wallGrid.bounds.maxY
       } });
     });
     blockRef(g, 'PergoRise Ray Duvar Bağlantı Set', bagX, bagY, 120, 95, 'Blok - Yan Görünüş'); blockRef(g, 'PergoRise Ray Arka Mekanizma Yan Görünüş', arkaMekX, arkaMekY, 135, 90, 'Blok - Yan Görünüş', normDeg(aci * 180 / Math.PI));
@@ -3456,7 +3568,8 @@
           ['data-wall-depth', data.wallDepth ?? ''],
           ['data-wall-height', data.wallHeight ?? ''],
           ['data-wall-segment-id', data.wallSegmentId || ''],
-          ['data-wall-segment-index', data.wallSegmentIndex ?? '']
+          ['data-wall-segment-index', data.wallSegmentIndex ?? ''],
+          ['data-system-index', data.systemIndex ?? ''], ['data-bound-min-x', data.boundMinX ?? ''], ['data-bound-max-x', data.boundMaxX ?? ''], ['data-bound-min-y', data.boundMinY ?? ''], ['data-bound-max-y', data.boundMaxY ?? '']
         ].map(([k,v]) => `${k}="${escXml(v)}"`).join(' ');
         const rx = sx(e.x), ry = sy(e.y + e.h), rw = Math.abs(e.w), rh = Math.abs(e.h);
         const isGlass = (e.kind || '') === 'glassTrackEditor';
@@ -3465,25 +3578,26 @@
         const isSideEnable = (e.kind || '') === 'sideViewEnable';
         const isTriangle = (e.kind || '') === 'triangleEditor';
         const isBackWall = (e.kind || '') === 'backWallEditor';
+        const isTrapezSheet = (e.kind || '') === 'trapezSheetEditor';
         const isSupport = isGlass && (data.part || '') === 'support';
         const postTag = Number.isFinite(Number(data.postIndex)) ? `D${Number(data.postIndex) + 1}` : 'D';
         const parapetTag = `${(data.parapetView || '').toLowerCase() === 'side' ? 'YP' : 'PP'}${Number(data.parapetSegmentIndex || 0) + 1}`;
         const supportSuffix = (data.sideViewKey || data.scope || '').toLowerCase() === 'right' ? 'R' : ((data.sideViewKey || '') === '0' ? 'L' : `P${Number(data.sideIndex || 0) + 1}`);
-        const tag = isSideEnable ? 'YAN GÖRÜNÜŞÜ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? 'DUVAR' : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag)))));
-        const groupClass = isSideEnable ? 'preview-side-enable-zone' : (isTriangle ? 'preview-triangle-zone' : (isBackWall ? 'preview-wall-zone' : (isProduct ? 'preview-product-zone' : (isParapet ? 'preview-parapet-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone')))));
-        const titleText = isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? 'Arka duvarı düzenle' : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`)))));
-        const tagColor = isSideEnable ? (data.sideEnabled ? '#15803d' : '#b91c1c') : (isTriangle ? '#15803d' : (isBackWall ? '#6b4f2a' : (isProduct ? '#7b1fa2' : (isParapet ? '#c62828' : (isGlass ? '#0b8043' : '#1a73e8')))));
+        const tag = isTrapezSheet ? `TS${Number(data.systemIndex||0)+1}` : (isSideEnable ? 'YÖN GÖRÜNÜŞ DÜZENLE' : (isTriangle ? 'ÜÇGEN' : (isBackWall ? 'DUVAR' : (isProduct ? String(data.pozNo || 'ÜRÜN') : (isParapet ? parapetTag : (isGlass ? (isSupport ? `SD-${supportSuffix}` : 'CK') : postTag))))));
+        const groupClass = isTrapezSheet ? 'preview-trapez-sheet-zone' : (isSideEnable ? 'preview-side-enable-zone' : (isTriangle ? 'preview-triangle-zone' : (isBackWall ? 'preview-wall-zone' : (isProduct ? 'preview-product-zone' : (isParapet ? 'preview-parapet-zone' : (isGlass ? 'preview-glass-zone' : 'preview-post-zone'))))));
+        const titleText = isTrapezSheet ? 'Trapez sac alanını düzenle' : (isSideEnable ? 'Ara poz yan görünüşünü aç / kapat' : (isTriangle ? 'Üçgen doğramayı düzenle' : (isBackWall ? 'Arka duvarı düzenle' : (isProduct ? `Mevcut ürünü düzenle ${tag}` : (isParapet ? `Parapet parçasını düzenle ${parapetTag}` : (isGlass ? (isSupport ? `Destek dikmesi profili düzenle (${supportSuffix})` : 'Cam kaydı profili düzenle') : `Dikme düzenle ${postTag}`))))));
+        const tagColor = isTrapezSheet ? '#d97706' : (isSideEnable ? (data.sideEnabled ? '#15803d' : '#b91c1c') : (isTriangle ? '#15803d' : (isBackWall ? '#6b4f2a' : (isProduct ? '#7b1fa2' : (isParapet ? '#c62828' : (isGlass ? '#0b8043' : '#1a73e8'))))));
         if (isSideEnable) {
           const fill = data.sideEnabled ? '#22c55e' : '#ef4444';
           const strokeColor = data.sideEnabled ? '#166534' : '#991b1b';
           const textColor = '#ffffff';
           // Model-uzayında buton 600 mm civarında olduğu için ekran üzerinde
           // okunabilir metin yüksekliği 50–72 birim aralığında tutulur.
-          const fontSize = Math.max(42, Math.min(72, Math.min(rw / 7.6, rh / 2.45)));
-          const lineGap = Math.max(44, fontSize * 0.92);
+          const fontSize = Math.max(41, Math.min(71, Math.min(rw / 7.6, rh / 2.45) - 1));
+          const lineGap = Math.max(43, fontSize * 0.92);
           const centerX = rx + rw / 2;
           const centerY = ry + rh / 2;
-          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" y="${centerY - lineGap * 0.15}" text-anchor="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" dy="-${lineGap * 0.35}">YAN GÖRÜNÜŞÜ</tspan><tspan x="${centerX}" dy="${lineGap}">DÜZENLE</tspan></text></g>`);
+          parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${fill}" stroke="${strokeColor}" stroke-width="3" pointer-events="all" rx="12" ry="12"><title>${escXml(titleText)}</title></rect><text x="${centerX}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="900" fill="${textColor}" pointer-events="none"><tspan x="${centerX}" y="${centerY - lineGap / 2}">YÖN GÖRÜNÜŞ</tspan><tspan x="${centerX}" y="${centerY + lineGap / 2}">DÜZENLE</tspan></text></g>`);
         } else {
           parts.push(`<g class="${groupClass}"><rect ${attrs} x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="transparent" stroke="transparent" stroke-width="1.2" stroke-dasharray="6 4" pointer-events="all" rx="6" ry="6"><title>${escXml(titleText)}</title></rect><text x="${rx + rw / 2}" y="${Math.max(14, ry - 6)}" text-anchor="middle" font-size="12" font-weight="700" fill="${tagColor}">${escXml(tag)}</text></g>`);
         }
