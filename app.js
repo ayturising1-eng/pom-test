@@ -892,7 +892,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.6').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.7').catch(() => {}), { once: true });
     }
   }
 
@@ -4766,10 +4766,14 @@
       const geom = d ? (sideViewKey === 'right' ? d.rightSideSupportGeometry : (d.sideSupportGeometry && d.sideSupportGeometry[sideViewKey])) : null;
       const position = d && Array.isArray(d.positions) ? (d.positions[sideIndex] || d.positions[0]) : null;
       if (!geom || !geom.exists || !position) {
-        overlay.querySelector('#glassTrackEditorError').textContent = currentLanguage === 'en' ? 'Wall reference could not be found.' : 'Duvar referansı bulunamadı.';
+        overlay.querySelector('#glassTrackEditorError').textContent = currentLanguage === 'en' ? 'Wall/track geometry could not be found.' : 'Duvar/cam kaydı geometrisi bulunamadı.';
         return;
       }
-      const desiredLength = Math.max(1, Number(geom.frontPostRearFace) - Number(geom.wallX));
+      if (!geom.hasWallContact || !Number.isFinite(Number(geom.wallContactX))) {
+        overlay.querySelector('#glassTrackEditorError').textContent = currentLanguage === 'en' ? 'No visible wall face was found at the glass-track height.' : 'Cam kaydı yüksekliğinde görünür duvar yüzü bulunamadı.';
+        return;
+      }
+      const desiredLength = Math.max(1, Number(geom.frontPostRearFace) - Number(geom.wallContactX));
       const baseLength = Math.max(1, Number(position.opening) - 100);
       setGlassTrackLengthOffsetForKey(sideViewKey, desiredLength - baseLength);
       overlay.hidden = true;
@@ -5083,7 +5087,11 @@
         overlay.querySelector('#glassTrackLengthError').textContent = currentLanguage === 'en' ? 'Wall/track geometry could not be found.' : 'Duvar/cam kaydı geometrisi bulunamadı.';
         return;
       }
-      const offset = Number(geom.frontPostRearFace) - Number(geom.wallX) - (Number(p.opening) - 100);
+      if (!geom.hasWallContact || !Number.isFinite(Number(geom.wallContactX))) {
+        overlay.querySelector('#glassTrackLengthError').textContent = currentLanguage === 'en' ? 'No visible wall face was found at the glass-track height.' : 'Cam kaydı yüksekliğinde görünür duvar yüzü bulunamadı.';
+        return;
+      }
+      const offset = Number(geom.frontPostRearFace) - Number(geom.wallContactX) - (Number(p.opening) - 100);
       setGlassTrackLengthOffsetForKey(key, Math.round(offset));
       input.value = String(Math.round(offset));
       close();

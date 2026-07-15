@@ -480,9 +480,14 @@
       totalNominal -= systems[systems.length - 1].gapAfter;
     }
 
+    const leftGlassTrackEnabled = sideFeatureEnabled(d, 'glassTrack', '0', 0);
+    const rightGlassTrackEnabled = sideFeatureEnabled(d, 'glassTrack', 'right', Math.max(0, systems.length - 1));
     systems.forEach((sys, s) => {
-      const areaStartX = sys.startX + (yes(d.glassTrack) && s === 0 ? K.glassOffsetEachSide : 0);
-      const areaEndX = sys.endX - (yes(d.glassTrack) && s === systems.length - 1 ? K.glassOffsetEachSide : 0);
+      // Dış ray sınırları ana formdaki global EVET/HAYIR değerine değil,
+      // doğrudan ilgili dış yan görünüşün cam kaydı durumuna bağlıdır.
+      // Tek sistemde sol başlangıç ve sağ bitiş aynı sistem üzerinde bağımsız uygulanır.
+      const areaStartX = sys.startX + (leftGlassTrackEnabled && s === 0 ? K.glassOffsetEachSide : 0);
+      const areaEndX = sys.endX - (rightGlassTrackEnabled && s === systems.length - 1 ? K.glassOffsetEachSide : 0);
       const areaW = Math.max(K.rayW, areaEndX - areaStartX);
       const pitch = sys.rayCount > 1 ? (areaW - K.rayW) / (sys.rayCount - 1) : 0;
       sys.rayAreaStartX = areaStartX;
@@ -831,6 +836,35 @@
     return sideBackWallAnchorX(d, p, key) - localPositiveXEdge;
   }
 
+  function glassTrackLocalVerticalBand(d) {
+    const profile = d && d.glassTrackProfile ? d.glassTrackProfile : normalizeGlassTrackProfile();
+    // Arka duvar hücrelerinin Y değerleri duvar tabanına göre lokaldir.
+    // Mevcut yan görünüş sabitleri sadeleştiğinde cam kaydı üst kotu
+    // frontHeight - 3, alt kotu ise profil yüksekliği kadar aşağıdadır.
+    const maxY = Math.max(0, Number(d && d.frontHeight) - 3);
+    const minY = maxY - Math.max(1, Number(profile.en) || 100);
+    return { minY, maxY };
+  }
+
+  function sideBackWallContactFaceX(d, p, key) {
+    const normalized = normalizeSideViewKey(key, p && p.index);
+    const wall = sideBackWallSettings(d, normalized, p && p.rearHeight);
+    if (wall.enabled === false) return null;
+    const grid = backWallCellsFor(d, normalized, p && p.rearHeight);
+    const band = glassTrackLocalVerticalBand(d);
+    const epsilon = 0.001;
+    const candidates = (grid && Array.isArray(grid.cells) ? grid.cells : []).filter(cell => {
+      if (!cell || cell.enabled === false) return false;
+      const minY = Number(cell.minY), maxY = Number(cell.maxY);
+      if (![minY, maxY].every(Number.isFinite) || !(maxY > minY)) return false;
+      return Math.min(maxY, band.maxY) - Math.max(minY, band.minY) > epsilon;
+    });
+    if (!candidates.length) return null;
+    const localPositiveXEdge = candidates.reduce((value, cell) => Math.min(value, Number(cell.minX)), Infinity);
+    if (!Number.isFinite(localPositiveXEdge)) return null;
+    return sideBackWallAnchorX(d, p, normalized) - localPositiveXEdge;
+  }
+
   function sideViewKeyForPosition(p) {
     return normalizeSideViewKey(p && p.sideViewKey != null ? p.sideViewKey : (p && p.index), p && p.index);
   }
@@ -887,7 +921,11 @@
     const camW = Math.max(1, Number(p.opening) - 100 + sideTrackLengthOffset(d, sideViewKey));
     if (!trackVisible) return { exists: false, index: p.index, sideViewKey };
     const scope = sideViewScopeForKey(sideViewKey);
-    const wallX = sideBackWallFaceX(d, p, sideViewKey);
+    const wallContactX = sideBackWallContactFaceX(d, p, sideViewKey);
+    // Görünür temas yüzü yoksa mevcut çizimi ve manuel ofsetleri kararlı tutmak
+    // için legacy grid sınırı yalnız yerleşim fallback'i olarak kullanılır.
+    // Duvara Oturt işlemi wallContactX yokken güvenli biçimde durur.
+    const wallX = Number.isFinite(wallContactX) ? wallContactX : sideBackWallFaceX(d, p, sideViewKey);
     const frontPostRearFace = K.sideBaseX - K.postSize;
     const defaultCenterX = (wallX + frontPostRearFace) / 2;
     const explicitMap = d.sidePosts && typeof d.sidePosts === 'object' ? d.sidePosts : {};
@@ -948,7 +986,10 @@
     const profile = d.glassTrackProfile || normalizeGlassTrackProfile();
     const camBottomY = rectStartY - 3 - profile.en;
     return {
-      exists: true, index: p.index, sideViewKey, scope, posts: normalizedPosts, gaps, wallX, frontPostRearFace, defaultCenterX,
+      exists: true, index: p.index, sideViewKey, scope, posts: normalizedPosts, gaps, wallX,
+      wallContactX: Number.isFinite(wallContactX) ? wallContactX : null,
+      hasWallContact: Number.isFinite(wallContactX),
+      frontPostRearFace, defaultCenterX,
       productClearHeight: Math.max(1, camBottomY - duvarY),
       wallToSupportGap: gaps[0] ? gaps[0].width : 0,
       supportToPostGap: gaps[gaps.length - 1] ? gaps[gaps.length - 1].width : 0,
