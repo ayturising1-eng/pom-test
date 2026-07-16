@@ -4403,3 +4403,75 @@ body:not(.auth-ready) .backend-warning-banner { display: none !important; }
   }
   .trapez-sheet-editor-overlay .dim-edit-actions > button { width: 100%; }
 }
+
+/* V13.2 AŞAMA-2 — proje başlangıç akışı ve salt okunur proje bilgileri */
+.project-start-screen {
+  max-width: 1180px;
+  margin: 30px auto;
+  padding: 0 22px;
+}
+.project-start-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: center;
+  min-height: 250px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffffff, #eef5f8);
+  box-shadow: var(--shadow);
+}
+.project-start-copy h2 { margin: 8px 0 10px; font-size: clamp(24px, 3vw, 38px); }
+.project-start-copy p { margin: 0; max-width: 720px; color: var(--muted); font-weight: 700; line-height: 1.55; }
+.project-start-kicker { display: inline-flex; padding: 6px 10px; border-radius: 999px; background: var(--yellow); color: var(--navy); font-weight: 950; letter-spacing: .08em; }
+.project-start-actions { display: grid; gap: 12px; min-width: 230px; }
+.project-start-actions button { min-height: 52px; }
+body.auth-ready.project-workspace-inactive .layout { display: none !important; }
+body.auth-ready.project-workspace-inactive #projectStartScreen { display: block; }
+body.auth-ready:not(.project-workspace-inactive) #projectStartScreen { display: none !important; }
+body.auth-pending #projectStartScreen,
+body.auth-locked #projectStartScreen { display: none !important; }
+
+#customer[readonly], #project[readonly], #version[readonly], #drawnBy[readonly], #date[readonly] {
+  background: #f5f8fb;
+  color: var(--navy);
+  cursor: default;
+}
+.project-info-edit-row { padding: 8px 10px 2px; }
+.project-info-edit-row button { width: 100%; min-height: 38px; padding: 9px 12px; }
+
+.new-project-modal { width: min(620px, calc(100vw - 28px)); }
+.new-project-body { padding: 20px 22px 4px; }
+.new-project-identity { display: grid; gap: 10px; margin-bottom: 16px; }
+.new-project-identity > div {
+  display: grid;
+  grid-template-columns: minmax(130px, .45fr) minmax(0, 1fr);
+  align-items: center;
+  min-height: 50px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbfd;
+}
+.new-project-identity span { padding: 12px 14px; color: var(--muted); font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.new-project-identity strong { min-width: 0; padding: 12px 14px; border-left: 1px solid var(--line); color: var(--navy); overflow-wrap: anywhere; }
+.new-project-field { grid-template-columns: 1fr; margin-bottom: 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--ice); }
+.new-project-field span { padding-bottom: 6px; }
+.new-project-field input { border: 0; border-top: 1px solid rgba(8,32,51,.08); text-transform: uppercase; }
+.new-project-body .modal-sub { margin: 8px 0 14px; }
+
+@media (max-width: 760px) {
+  .project-start-screen { margin: 18px auto; padding: 0 12px; }
+  .project-start-card { grid-template-columns: 1fr; padding: 24px 18px; }
+  .project-start-actions { min-width: 0; }
+  .new-project-identity > div { grid-template-columns: 1fr; }
+  .new-project-identity strong { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+body.auth-ready.project-workspace-inactive #saveCloudProjectBtn,
+body.auth-ready.project-workspace-inactive #newRevisionBtn,
+body.auth-ready.project-workspace-inactive #revisionHistoryBtn {
+  display: none !important;
+}
+.new-project-body .modal-sub.is-error { color: var(--danger); font-weight: 850; }

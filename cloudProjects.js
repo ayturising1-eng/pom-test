@@ -25,7 +25,14 @@
     conflictDialog: $('projectConflictDialog'), conflictMessage: $('projectConflictMessage'),
     conflictReloadBtn: $('projectConflictReloadBtn'), conflictRevisionBtn: $('projectConflictRevisionBtn'),
     conflictCopyBtn: $('projectConflictCopyBtn'), conflictCancelBtn: $('projectConflictCancelBtn'),
-    backendWarningBanner: $('backendWarningBanner')
+    backendWarningBanner: $('backendWarningBanner'),
+    projectStartScreen: $('projectStartScreen'), startNewProjectBtn: $('startNewProjectBtn'),
+    startOpenProjectsBtn: $('startOpenProjectsBtn'), startImportProjectBtn: $('startImportProjectBtn'),
+    editProjectInfoBtn: $('editProjectInfoBtn'), newProjectDialog: $('newProjectDialog'), newProjectForm: $('newProjectForm'),
+    newProjectTitle: $('newProjectTitle'), newProjectCloseBtn: $('newProjectCloseBtn'), newProjectCancelBtn: $('newProjectCancelBtn'),
+    newProjectConfirmBtn: $('newProjectConfirmBtn'), newProjectCodeValue: $('newProjectCodeValue'),
+    newProjectRevisionValue: $('newProjectRevisionValue'), newProjectCustomer: $('newProjectCustomer'),
+    newProjectName: $('newProjectName'), newProjectMessage: $('newProjectMessage')
   };
 
   const TEXT = {
@@ -36,6 +43,10 @@
       profileMissing: 'Kullanıcı profili bulunamadı. Yönetici profil kaydını kontrol etmeli.',
       setupMissing: 'Altyapı hazır değil. Supabase kurulumunu kontrol et.',
       newProject: 'Yeni proje', unsaved: 'Kaydedilmedi', saving: 'Kaydediliyor…', saved: 'Kaydedildi',
+      startTitle: 'Çalışmaya başlamak için bir proje seçin', startText: 'Yeni bir proje oluşturun, kayıtlı projelerinizi açın veya bir PLMR proje dosyası yükleyin.',
+      newProjectDialogTitle: 'Yeni Proje', editProjectDialogTitle: 'Proje Bilgilerini Düzenle', projectInfoUpdated: 'Proje bilgileri güncellendi.',
+      projectCodeUnavailable: 'Proje kodu oluşturulamadı. Firma ve kullanıcı kodlarını kontrol edin.', projectFieldsRequired: 'Müşteri adı ve proje adı zorunludur.',
+      projectTextRule: 'Müşteri ve proje adı büyük harfli İngilizce karakterlere otomatik dönüştürülür.', complete: 'Tamam', update: 'Güncelle', cancel: 'İptal',
       saveFailed: 'Proje kaydedilemedi.', projectNameRequired: 'Projeyi kaydetmek için Proje alanını doldur.',
       openFailed: 'Proje açılamadı.', loadingProjects: 'Projeler yükleniyor…', noProjects: 'Kayıtlı proje bulunamadı.',
       confirmDiscard: 'Kaydedilmemiş değişiklikler var. Devam edilsin mi?', projectOpened: 'Proje açıldı:',
@@ -67,6 +78,10 @@
       profileMissing: 'User profile was not found. The administrator must check the profile record.',
       setupMissing: 'Infrastructure is not ready. Check the Supabase setup.',
       newProject: 'New project', unsaved: 'Not saved', saving: 'Saving…', saved: 'Saved',
+      startTitle: 'Choose a project to begin', startText: 'Create a new project, open a saved project, or load a PLMR project file.',
+      newProjectDialogTitle: 'New Project', editProjectDialogTitle: 'Edit Project Information', projectInfoUpdated: 'Project information updated.',
+      projectCodeUnavailable: 'The project code could not be created. Check the company and user codes.', projectFieldsRequired: 'Customer name and project name are required.',
+      projectTextRule: 'Customer and project names are automatically converted to uppercase English characters.', complete: 'OK', update: 'Update', cancel: 'Cancel',
       saveFailed: 'The project could not be saved.', projectNameRequired: 'Fill the Project field before saving.',
       openFailed: 'The project could not be opened.', loadingProjects: 'Loading projects…', noProjects: 'No saved projects found.',
       confirmDiscard: 'There are unsaved changes. Continue?', projectOpened: 'Project opened:',
@@ -111,6 +126,8 @@
   let conflictResolver = null;
   let recoveryPromptedForUser = null;
   let backendWarningCode = '';
+  let projectDialogMode = 'new';
+  let provisionalProjectCode = null;
 
   // Shared auth bridge for admin operations. It exposes only the active session
   // token in memory; nothing is written to localStorage by this bridge.
@@ -214,6 +231,7 @@
     suppressDirty = true;
     try {
       ProjectState.restoreSnapshot(record.snapshot, { resetZoom: false, resetHistory: true });
+      setWorkspaceActive(true);
       dirty = true;
       dirtyGeneration += 1;
       refreshProjectHeader();
@@ -229,6 +247,12 @@
     if (ui.rememberMeLabel) ui.rememberMeLabel.textContent = t('rememberMe');
     if (ui.savePasswordLabel) ui.savePasswordLabel.textContent = t('savePassword');
     if (ui.authNote) ui.authNote.textContent = t('authNote');
+    if ($('projectStartTitle')) $('projectStartTitle').textContent = t('startTitle');
+    if ($('projectStartText')) $('projectStartText').textContent = t('startText');
+    if (ui.startNewProjectBtn) ui.startNewProjectBtn.textContent = t('newProjectDialogTitle');
+    if (ui.startOpenProjectsBtn) ui.startOpenProjectsBtn.textContent = language() === 'en' ? 'My Projects' : 'Projelerim';
+    if (ui.startImportProjectBtn) ui.startImportProjectBtn.textContent = language() === 'en' ? 'Open Project File' : 'Proje Dosyası Aç';
+    if (ui.editProjectInfoBtn) ui.editProjectInfoBtn.textContent = language() === 'en' ? 'Edit Project Information' : 'Proje Bilgilerini Düzenle';
   }
 
   function normalizeUsername(value) {
@@ -283,6 +307,64 @@
     return ProjectState && typeof ProjectState.getRecord === 'function'
       ? ProjectState.getRecord()
       : { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
+  }
+
+  function projectUi() {
+    return window.PulumurProjectUi || null;
+  }
+
+  function normalizeProjectText(value, options = {}) {
+    const api = projectUi();
+    if (api && typeof api.normalizeText === 'function') return api.normalizeText(value, options);
+    const preserveTrailingSpace = options.preserveTrailingSpace === true;
+    let text = String(value || '').toUpperCase()
+      .replace(/[Ç]/g, 'C').replace(/[Ğ]/g, 'G').replace(/[İI]/g, 'I')
+      .replace(/[Ö]/g, 'O').replace(/[Ş]/g, 'S').replace(/[Ü]/g, 'U')
+      .replace(/[^\x20-\x7E]/g, '').replace(/[ ]+/g, ' ').replace(/^ +/g, '');
+    return preserveTrailingSpace ? text : text.replace(/ +$/g, '');
+  }
+
+  function localIsoDate() {
+    const date = new Date();
+    const offset = date.getTimezoneOffset();
+    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+  }
+
+  function setWorkspaceActive(active) {
+    const api = projectUi();
+    if (api && typeof api.setWorkspaceActive === 'function') api.setWorkspaceActive(active === true);
+    else document.body.classList.toggle('project-workspace-inactive', active !== true);
+    if (ui.projectStartScreen) ui.projectStartScreen.hidden = false;
+  }
+
+  function previewProjectCode() {
+    const companyCode = String(currentOrganization && currentOrganization.company_code || '').trim();
+    const userCode = String(currentProfile && currentProfile.user_code || '').trim();
+    const number = Math.max(1, Math.round(Number(currentProfile && currentProfile.next_project_number) || 1));
+    if (!/^\d{4}$/.test(companyCode) || !/^\d{4}$/.test(userCode) || number > 99999999) return '';
+    return `${companyCode}.${userCode}.${String(number).padStart(8, '0')}`;
+  }
+
+  function updateLocalProjectCounter(projectCode) {
+    if (!currentProfile) return;
+    const match = String(projectCode || '').match(/\.(\d{8})$/);
+    const used = match ? Number(match[1]) : NaN;
+    const current = Math.max(1, Math.round(Number(currentProfile.next_project_number) || 1));
+    currentProfile.next_project_number = Number.isFinite(used) ? Math.max(current, used + 1) : current + 1;
+  }
+
+  function currentAuthorName() {
+    return normalizeProjectText(currentProfile && (currentProfile.full_name || currentProfile.username) || t('unknownUser'));
+  }
+
+  function applyMetadata(metadata, options = {}) {
+    const api = projectUi();
+    if (api && typeof api.applyMetadata === 'function') return api.applyMetadata(metadata, options);
+    Object.entries(metadata || {}).forEach(([key, value]) => {
+      const el = $(key);
+      if (el) el.value = value;
+    });
+    return metadata;
   }
 
   function canWriteProjects() {
@@ -485,12 +567,16 @@
   }
 
   async function handleAuthenticated(session) {
+    const previousUserId = String(currentSession && currentSession.user && currentSession.user.id || '');
+    const nextUserId = String(session && session.user && session.user.id || '');
+    const sameAuthenticatedUser = Boolean(previousUserId && previousUserId === nextUserId);
     currentSession = session;
     setAuthMessage(t('authLoading'), false);
     try {
       await loadProfile();
       await loadEffectiveLimits();
       setAppAccess(true);
+      if (!sameAuthenticatedUser) setWorkspaceActive(false);
       setAuthMessage('', false);
       refreshProjectHeader();
       if (window.PulumurActivity) await window.PulumurActivity.identify();
@@ -516,6 +602,7 @@
     revisionContext = null;
     revisionRows = [];
     if (ProjectState && typeof ProjectState.setRecord === 'function') ProjectState.setRecord({});
+    setWorkspaceActive(false);
     setAppAccess(false);
     setAuthMessage('', false);
     if (ui.loginPassword) ui.loginPassword.value = '';
@@ -778,6 +865,8 @@
           revisionNo: synced.current_revision || row.current_revision || 1,
           serverVersion: Number(synced.server_version) || Number(row.server_version) || 1
         });
+        updateLocalProjectCounter(synced.project_code || row.project_code);
+        setWorkspaceActive(true);
         historicalMode = false;
         historicalCurrentRevision = synced.current_revision || 1;
         const clean = markClean(saveGeneration);
@@ -849,9 +938,59 @@
     if (status) status.textContent = message;
   }
 
+  function setNewProjectDialogMessage(message, isError = false) {
+    if (!ui.newProjectMessage) return;
+    ui.newProjectMessage.textContent = message || '';
+    ui.newProjectMessage.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function closeNewProjectDialog() {
+    provisionalProjectCode = null;
+    if (ui.newProjectDialog && ui.newProjectDialog.open) ui.newProjectDialog.close();
+  }
+
+  function openProjectDialog(mode) {
+    projectDialogMode = mode === 'edit' ? 'edit' : 'new';
+    const record = getRecord();
+    if (projectDialogMode === 'new') {
+      provisionalProjectCode = previewProjectCode();
+      if (!provisionalProjectCode) {
+        window.alert(t('projectCodeUnavailable'));
+        return;
+      }
+      if (ui.newProjectTitle) ui.newProjectTitle.textContent = t('newProjectDialogTitle');
+      if (ui.newProjectConfirmBtn) ui.newProjectConfirmBtn.textContent = t('complete');
+      if (ui.newProjectCodeValue) ui.newProjectCodeValue.textContent = provisionalProjectCode;
+      if (ui.newProjectRevisionValue) ui.newProjectRevisionValue.textContent = 'R01';
+      if (ui.newProjectCustomer) ui.newProjectCustomer.value = '';
+      if (ui.newProjectName) ui.newProjectName.value = '';
+    } else {
+      provisionalProjectCode = record.projectCode || 'LOCAL';
+      if (ui.newProjectTitle) ui.newProjectTitle.textContent = t('editProjectDialogTitle');
+      if (ui.newProjectConfirmBtn) ui.newProjectConfirmBtn.textContent = t('update');
+      if (ui.newProjectCodeValue) ui.newProjectCodeValue.textContent = record.projectCode || 'LOCAL';
+      if (ui.newProjectRevisionValue) ui.newProjectRevisionValue.textContent = `R${String(record.revisionNo || 1).padStart(2, '0')}`;
+      if (ui.newProjectCustomer) ui.newProjectCustomer.value = normalizeProjectText($('customer') && $('customer').value);
+      if (ui.newProjectName) ui.newProjectName.value = normalizeProjectText($('project') && $('project').value);
+    }
+    if (ui.newProjectCancelBtn) ui.newProjectCancelBtn.textContent = t('cancel');
+    setNewProjectDialogMessage(t('projectTextRule'), false);
+    if (ui.newProjectDialog && !ui.newProjectDialog.open) ui.newProjectDialog.showModal();
+    window.setTimeout(() => ui.newProjectCustomer && ui.newProjectCustomer.focus(), 20);
+  }
+
   function startNewProject() {
     if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
     if (dirty && !window.confirm(t('confirmDiscard'))) return;
+    openProjectDialog('new');
+  }
+
+  function editProjectInfo() {
+    if (!canWriteProjects()) { window.alert(t('noWritePermission')); return; }
+    openProjectDialog('edit');
+  }
+
+  function resetToProjectStart() {
     suppressDirty = true;
     const reset = $('resetBtn');
     if (reset) reset.click();
@@ -861,13 +1000,64 @@
     historicalCurrentRevision = 1;
     revisionContext = null;
     revisionRows = [];
+    setWorkspaceActive(false);
+    refreshProjectHeader();
+    window.setTimeout(() => { suppressDirty = false; }, 0);
+  }
+
+  function submitProjectDialog(event) {
+    event.preventDefault();
+    const customer = normalizeProjectText(ui.newProjectCustomer && ui.newProjectCustomer.value);
+    const project = normalizeProjectText(ui.newProjectName && ui.newProjectName.value);
+    if (ui.newProjectCustomer) ui.newProjectCustomer.value = customer;
+    if (ui.newProjectName) ui.newProjectName.value = project;
+    if (!customer || !project) {
+      setNewProjectDialogMessage(t('projectFieldsRequired'), true);
+      return;
+    }
+
+    if (projectDialogMode === 'edit') {
+      const record = getRecord();
+      applyMetadata({ customer, project, revisionNo: record.revisionNo }, { source: 'project-info-edit' });
+      closeNewProjectDialog();
+      setWorkspaceActive(true);
+      markDirty();
+      setStatus(t('projectInfoUpdated'));
+      return;
+    }
+
+    if (!provisionalProjectCode) {
+      setNewProjectDialogMessage(t('projectCodeUnavailable'), true);
+      return;
+    }
+
+    suppressDirty = true;
+    const reset = $('resetBtn');
+    if (reset) reset.click();
+    ProjectState.setRecord({
+      projectId: null,
+      projectCode: provisionalProjectCode,
+      revisionNo: 1,
+      serverVersion: null
+    });
+    applyMetadata({
+      customer,
+      project,
+      revisionNo: 1,
+      drawnBy: currentAuthorName(),
+      date: localIsoDate()
+    }, { source: 'new-project' });
+    historicalMode = false;
+    historicalCurrentRevision = 1;
+    revisionContext = null;
+    revisionRows = [];
+    dirty = false;
+    closeNewProjectDialog();
+    setWorkspaceActive(true);
+    suppressDirty = false;
+    markDirty();
     refreshProjectHeader();
     setStatus(t('newProject'));
-    window.setTimeout(() => {
-      suppressDirty = false;
-      dirty = false;
-      refreshProjectHeader();
-    }, 80);
   }
 
   function formatDate(value) {
@@ -959,7 +1149,7 @@
       const currentRecord = getRecord();
       if (String(currentRecord.projectId || '') === String(projectId)) {
         dirty = false;
-        startNewProject();
+        resetToProjectStart();
       }
 
       projectRows = projectRows.filter(item => String(item.id) !== String(projectId));
@@ -1019,6 +1209,7 @@
       const snapshot = snapshotWithRecord(JSON.parse(JSON.stringify(row.project_data)), record);
       ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
       ProjectState.setRecord(record);
+      setWorkspaceActive(true);
       historicalMode = false;
       historicalCurrentRevision = row.current_revision || 1;
       dirty = false;
@@ -1067,6 +1258,13 @@
     if (ui.newRevisionConfirmBtn) ui.newRevisionConfirmBtn.disabled = true;
     if (ui.newRevisionMessage) ui.newRevisionMessage.textContent = t('revisionCreating');
     const saveGeneration = dirtyGeneration;
+    const targetRevision = (historicalMode ? historicalCurrentRevision : Number(record.revisionNo) || 1) + 1;
+    const previousRevisionMetadata = {
+      revisionNo: record.revisionNo,
+      drawnBy: $('drawnBy') ? $('drawnBy').value : '',
+      date: $('date') ? $('date').value : ''
+    };
+    applyMetadata({ revisionNo: targetRevision, drawnBy: currentAuthorName(), date: localIsoDate() }, { source: 'new-revision', updatePreview: false });
     try {
       const snapshot = ProjectState.createSnapshot();
       const payload = projectPayload(snapshot);
@@ -1081,7 +1279,7 @@
         p_project_data: payload.project_data,
         p_app_version: payload.app_version,
         p_schema_version: payload.schema_version,
-        p_change_note: String(ui.revisionChangeNote && ui.revisionChangeNote.value || '').trim() || null
+        p_change_note: normalizeProjectText(ui.revisionChangeNote && ui.revisionChangeNote.value) || null
       };
       if (historicalMode) args.p_source_revision = Math.max(1, Number(record.revisionNo) || 1);
       const result = await client.rpc(rpcName, args);
@@ -1107,10 +1305,11 @@
       if (window.PulumurActivity) {
         void window.PulumurActivity.log('revision_create', {
           projectId: row.id, projectCode: row.project_code, revisionNo: row.current_revision,
-          detail: { change_note: String(ui.revisionChangeNote && ui.revisionChangeNote.value || '').trim() || null }
+          detail: { change_note: normalizeProjectText(ui.revisionChangeNote && ui.revisionChangeNote.value) || null }
         });
       }
     } catch (error) {
+      applyMetadata(previousRevisionMetadata, { source: 'new-revision-rollback', updatePreview: false });
       if (/PROJECT_VERSION_CONFLICT/i.test(String(error && error.message || ''))) {
         if (ui.newRevisionDialog && ui.newRevisionDialog.open) ui.newRevisionDialog.close();
         try {
@@ -1224,6 +1423,7 @@
       const snapshot = snapshotWithRecord(JSON.parse(JSON.stringify(row.project_data)), record);
       ProjectState.restoreSnapshot(snapshot, { resetZoom: true, resetHistory: true });
       ProjectState.setRecord(record);
+      setWorkspaceActive(true);
       historicalMode = true;
       historicalCurrentRevision = currentRevision;
       dirty = false;
@@ -1287,6 +1487,28 @@
       await client.auth.signOut({ scope: 'local' });
     });
     if (ui.newCloudProjectBtn) ui.newCloudProjectBtn.addEventListener('click', startNewProject);
+    if (ui.startNewProjectBtn) ui.startNewProjectBtn.addEventListener('click', startNewProject);
+    if (ui.startOpenProjectsBtn) ui.startOpenProjectsBtn.addEventListener('click', showProjects);
+    if (ui.startImportProjectBtn) ui.startImportProjectBtn.addEventListener('click', () => {
+      const importButton = $('projectImportBtn');
+      if (importButton) importButton.click();
+    });
+    if (ui.editProjectInfoBtn) ui.editProjectInfoBtn.addEventListener('click', editProjectInfo);
+    if (ui.newProjectForm) ui.newProjectForm.addEventListener('submit', submitProjectDialog);
+    if (ui.newProjectCloseBtn) ui.newProjectCloseBtn.addEventListener('click', closeNewProjectDialog);
+    if (ui.newProjectCancelBtn) ui.newProjectCancelBtn.addEventListener('click', closeNewProjectDialog);
+    [ui.newProjectCustomer, ui.newProjectName].forEach(input => {
+      if (!input) return;
+      input.addEventListener('input', () => {
+        const normalized = normalizeProjectText(input.value, { preserveTrailingSpace: true });
+        if (input.value !== normalized) input.value = normalized;
+        setNewProjectDialogMessage(t('projectTextRule'), false);
+      });
+    });
+    if (ui.newProjectDialog) ui.newProjectDialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeNewProjectDialog();
+    });
     if (ui.saveCloudProjectBtn) ui.saveCloudProjectBtn.addEventListener('click', () => saveCurrentProject());
     if (ui.newRevisionBtn) ui.newRevisionBtn.addEventListener('click', openNewRevisionDialog);
     if (ui.openCloudProjectsBtn) ui.openCloudProjectsBtn.addEventListener('click', showProjects);
@@ -1295,6 +1517,10 @@
     if (ui.projectsCloseBtn) ui.projectsCloseBtn.addEventListener('click', () => ui.projectsDialog && ui.projectsDialog.close());
     if (ui.projectsSearch) ui.projectsSearch.addEventListener('input', renderProjects);
     if (ui.newRevisionForm) ui.newRevisionForm.addEventListener('submit', createNewRevision);
+    if (ui.revisionChangeNote) ui.revisionChangeNote.addEventListener('input', () => {
+      const normalized = normalizeProjectText(ui.revisionChangeNote.value, { preserveTrailingSpace: true });
+      if (ui.revisionChangeNote.value !== normalized) ui.revisionChangeNote.value = normalized;
+    });
     if (ui.newRevisionCloseBtn) ui.newRevisionCloseBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.newRevisionCancelBtn) ui.newRevisionCancelBtn.addEventListener('click', () => ui.newRevisionDialog && ui.newRevisionDialog.close());
     if (ui.revisionsCloseBtn) ui.revisionsCloseBtn.addEventListener('click', () => ui.revisionsDialog && ui.revisionsDialog.close());

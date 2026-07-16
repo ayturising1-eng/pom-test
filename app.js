@@ -19,6 +19,7 @@
   let lastDrawing = null;
   let lastCalc = null;
   const upperTableFieldIds = ['structureColor', 'fabric', 'fabricProfiles', 'motor', 'remote', 'led', 'dimmer', 'extras'];
+  const PROJECT_TEXT_FIELD_IDS = new Set(['customer', 'project', 'drawnBy', 'structureColor', 'fabric', 'fabricProfiles', 'motor', 'remote', 'led', 'dimmer', 'extras']);
 
   const BOOLEAN_FIELD_IDS = ['parapet', 'glassTrack', 'triangleJoinery', 'waterStandard'];
   const BOOLEAN_CANONICAL = {
@@ -747,6 +748,66 @@
     return String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').slice(0, 5).map(line => line.slice(0, 82)).join('\n');
   }
 
+  function normalizeProjectText(value, options = {}) {
+    const multiline = options.multiline === true;
+    const preserveTrailingSpace = options.preserveTrailingSpace === true;
+    let text = String(value ?? '')
+      .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      .replace(/[çÇ]/g, 'C').replace(/[ğĞ]/g, 'G')
+      .replace(/[ıİi]/g, 'I').replace(/[öÖ]/g, 'O')
+      .replace(/[şŞ]/g, 'S').replace(/[üÜ]/g, 'U')
+      .replace(/[–—−]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/\u00a0/g, ' ');
+    if (typeof text.normalize === 'function') text = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    text = text.toUpperCase().replace(/[^\x09\x0A\x20-\x7E]/g, '');
+    if (multiline) return text.replace(/\t/g, ' ');
+    text = text.replace(/\n/g, ' ').replace(/[\t ]+/g, ' ').replace(/^ +/g, '');
+    return preserveTrailingSpace ? text : text.replace(/ +$/g, '');
+  }
+
+  function normalizeProjectFieldValue(id, value, preserveTrailingSpace = true) {
+    if (BOOLEAN_FIELD_IDS.includes(id)) return normalizeYesNo(value);
+    if (id === 'extras') return normalizeExtrasFormValue(normalizeProjectText(value, { multiline: true }), preserveTrailingSpace);
+    if (PROJECT_TEXT_FIELD_IDS.has(id)) return normalizeProjectText(value, { preserveTrailingSpace });
+    if (upperTableFieldIds.includes(id)) return String(value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    return value;
+  }
+
+  function revisionVersionValue(revisionNo) {
+    const value = Math.max(1, Math.round(Number(revisionNo) || 1));
+    return String(value).padStart(2, '0');
+  }
+
+  function setProjectWorkspaceActive(active) {
+    document.body.classList.toggle('project-workspace-inactive', active !== true);
+    const startScreen = $('projectStartScreen');
+    if (startScreen) startScreen.hidden = false;
+  }
+
+  function applyProjectMetadataFields(metadata = {}, options = {}) {
+    const revisionNo = Math.max(1, Math.round(Number(metadata.revisionNo ?? currentProjectRecord.revisionNo) || 1));
+    const values = {
+      customer: normalizeProjectText(metadata.customer ?? ($('customer') ? $('customer').value : '')),
+      project: normalizeProjectText(metadata.project ?? ($('project') ? $('project').value : '')),
+      version: revisionVersionValue(revisionNo),
+      drawnBy: normalizeProjectText(metadata.drawnBy ?? ($('drawnBy') ? $('drawnBy').value : '')),
+      date: String(metadata.date ?? ($('date') ? $('date').value : today())).slice(0, 10) || today()
+    };
+    const previousSuppression = suppressFormPreviewUpdate;
+    suppressFormPreviewUpdate = true;
+    try {
+      Object.entries(values).forEach(([id, value]) => {
+        const el = $(id);
+        if (el) el.value = value;
+        dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_FORM_FIELD, { field: id, value }, { source: options.source || 'project-metadata', allowInvalid: true });
+      });
+    } finally {
+      suppressFormPreviewUpdate = previousSuppression;
+    }
+    if (options.updatePreview !== false) schedulePreviewUpdate(0);
+    return values;
+  }
+
   function setBooleanSelectTexts(lang) {
     BOOLEAN_FIELD_IDS.forEach(id => {
       const el = $(id);
@@ -899,7 +960,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r13.1').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r13.2').catch(() => {}), { once: true });
     }
   }
 
@@ -972,13 +1033,7 @@
       const el = $(id);
       if (!el) return acc;
       const value = el.value;
-      let normalized = id === 'extras'
-        ? normalizeExtrasFormValue(value, true)
-        : (upperTableFieldIds.includes(id)
-          ? String(value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
-          : value);
-      if (BOOLEAN_FIELD_IDS.includes(id)) normalized = normalizeYesNo(normalized);
-      acc[id] = normalized;
+      acc[id] = normalizeProjectFieldValue(id, value, false);
       return acc;
     }, {
       sideTrack: 'HAYIR',
@@ -6424,12 +6479,26 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  function cleanProjectFileToken(value, fallback) {
-    const raw = String(value ?? '').trim();
-    const safe = window.PulumurModernDXF && typeof window.PulumurModernDXF.safeFileName === 'function'
-      ? window.PulumurModernDXF.safeFileName(raw)
-      : raw.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+  function cleanProjectFileToken(value, fallback, options = {}) {
+    const preserveDots = options.preserveDots === true;
+    const maxLength = Math.max(12, Number(options.maxLength) || 64);
+    let safe = normalizeProjectText(value)
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-')
+      .replace(preserveDots ? /[^A-Z0-9._-]+/g : /[^A-Z0-9_-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^[._-]+|[._-]+$/g, '');
+    if (safe.length > maxLength) safe = safe.slice(0, maxLength).replace(/[._-]+$/g, '');
     return safe || fallback;
+  }
+
+  function projectArtifactNameRoot(metadata = {}, record = {}) {
+    const customer = cleanProjectFileToken(metadata.customer, 'MUSTERI', { maxLength: 60 });
+    const projectName = cleanProjectFileToken(metadata.project, 'PROJE', { maxLength: 60 });
+    const projectCode = cleanProjectFileToken(record.projectCode, 'LOCAL', { preserveDots: true, maxLength: 40 });
+    const revisionNo = Math.max(1, Math.round(Number(record.revisionNo) || 1));
+    const revision = `R${String(revisionNo).padStart(2, '0')}`;
+    return `${customer}-${projectName}-${projectCode}-${revision}`;
   }
 
   function captureRuntimeFormData() {
@@ -6438,11 +6507,7 @@
       const el = $(id);
       if (!el) return;
       const rawValue = String(el.value ?? '');
-      formData[id] = BOOLEAN_FIELD_IDS.includes(id)
-        ? normalizeYesNo(rawValue)
-        : (id === 'extras'
-          ? normalizeExtrasFormValue(rawValue, true)
-          : (upperTableFieldIds.includes(id) ? rawValue.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : rawValue));
+      formData[id] = normalizeProjectFieldValue(id, rawValue, false);
     });
     return formData;
   }
@@ -6581,9 +6646,10 @@
       ids.forEach(id => {
         const el = $(id);
         if (!el || formData[id] === undefined || formData[id] === null) return;
-        el.value = BOOLEAN_FIELD_IDS.includes(id) ? normalizeYesNo(formData[id]) : String(formData[id]);
+        el.value = normalizeProjectFieldValue(id, String(formData[id]), false);
         autosizeTextarea(el);
       });
+      if ($('version')) $('version').value = revisionVersionValue(currentProjectRecord.revisionNo);
 
       manualPostPlacementMode = typeof drawingState.manualPostPlacementMode === 'string'
         ? drawingState.manualPostPlacementMode
@@ -6740,11 +6806,7 @@
     const model = window.PulumurProjectModel.normalize(snapshot && snapshot.projectModel);
     const meta = model.metadata || {};
     const record = model.revisionInfo || {};
-    const projectName = cleanProjectFileToken(meta.project, currentLanguage === 'en' ? 'project' : 'proje');
-    const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
-    const revision = `R${String(revisionNo).padStart(2, '0')}`;
-    const projectCode = cleanProjectFileToken(record.projectCode, 'LOCAL');
-    return `${projectCode}-${projectName}-${revision}.plmr`;
+    return `${projectArtifactNameRoot(meta, record)}.plmr`;
   }
 
   function exportProjectSnapshot() {
@@ -6785,6 +6847,7 @@
     detachedModel.revisionInfo = { projectId: null, projectCode: null, revisionNo: 1, serverVersion: null };
     const snapshot = window.PulumurProjectSchema.createEnvelope(detachedModel, { appVersion: APP_VERSION, limits: applicationLimits() });
     restoreProjectSnapshotWithHistory(snapshot, { resetZoom: false, resetHistory: true });
+    setProjectWorkspaceActive(true);
     statusText.textContent = currentLanguage === 'en'
       ? `Project loaded: ${file.name}`
       : `Proje yüklendi: ${file.name}`;
@@ -6809,12 +6872,24 @@
       serverVersion: Number.isInteger(Number(record.serverVersion)) && Number(record.serverVersion) > 0 ? Number(record.serverVersion) : null
     };
     dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_REVISION_INFO, currentProjectRecord, { source: 'project-record' });
+    const versionValue = revisionVersionValue(currentProjectRecord.revisionNo);
+    if ($('version')) $('version').value = versionValue;
+    dispatchProjectAction(window.PulumurProjectActions.TYPES.SET_FORM_FIELD, { field: 'version', value: versionValue }, { source: 'revision-version', allowInvalid: true });
     return getCurrentProjectRecord();
   }
 
   if (window.PulumurLimits && typeof window.PulumurLimits.subscribe === 'function') {
     window.PulumurLimits.subscribe(() => { trimProjectHistory(); updateHistoryControls(); schedulePreviewUpdate(0); });
   }
+
+  window.PulumurProjectUi = Object.freeze({
+    normalizeText: (value, options = {}) => normalizeProjectText(value, options),
+    normalizeField: (id, value, preserveTrailingSpace = true) => normalizeProjectFieldValue(id, value, preserveTrailingSpace),
+    setWorkspaceActive: active => setProjectWorkspaceActive(active),
+    applyMetadata: (metadata, options) => applyProjectMetadataFields(metadata, options),
+    revisionVersion: revisionNo => revisionVersionValue(revisionNo),
+    artifactNameRoot: (metadata, record) => projectArtifactNameRoot(metadata, record)
+  });
 
   window.PulumurDiagnostics = Object.freeze({
     getHistory: () => ({ index: projectHistory.index, entries: projectHistory.entries.length, limit: applicationLimits().historySteps }),
@@ -6869,10 +6944,8 @@
 
   function buildNameRoot(drawing) {
     const record = currentProjectRecord || {};
-    const revisionNo = Number(record.revisionNo) > 0 ? Number(record.revisionNo) : 1;
-    const revision = `R${String(revisionNo).padStart(2, '0')}`;
-    const projectCode = record.projectCode || 'LOCAL';
-    return window.PulumurModernDXF.safeFileName(`${projectCode}-${drawing.input.project}-${revision}-${drawing.input.product}-web-dxf-v${APP_VERSION.replace(/\./g, '_')}-v${drawing.input.version}`);
+    const input = drawing && drawing.input ? drawing.input : {};
+    return projectArtifactNameRoot({ customer: input.customer, project: input.project }, record);
   }
 
   function currentDxfDimensionHiddenLayers() {
@@ -7133,8 +7206,16 @@ ${err.message}`);
   }
 
   function resetForm() {
+    const metadata = {
+      customer: $('customer') ? $('customer').value : '',
+      project: $('project') ? $('project').value : '',
+      revisionNo: currentProjectRecord.revisionNo,
+      drawnBy: $('drawnBy') ? $('drawnBy').value : '',
+      date: $('date') ? $('date').value : today()
+    };
     resetProjectHistory(false);
     fillInitial();
+    applyProjectMetadataFields(metadata, { source: 'form-reset', updatePreview: false });
     document.querySelectorAll('.quick-test-btn.active').forEach(btn => btn.classList.remove('active'));
     updatePreview();
   }
@@ -7408,10 +7489,18 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
   }
 
   function applyPresetValues(values) {
+    const metadata = {
+      customer: $('customer') ? $('customer').value : '',
+      project: $('project') ? $('project').value : '',
+      revisionNo: currentProjectRecord.revisionNo,
+      drawnBy: $('drawnBy') ? $('drawnBy').value : '',
+      date: $('date') ? $('date').value : today()
+    };
     resetProjectHistory(false);
     fillInitial();
     const deferredManual = {};
     Object.entries(values || {}).forEach(([id, value]) => {
+      if (['customer', 'project', 'version', 'drawnBy', 'date'].includes(id)) return;
       const el = $(id);
       if (!el) return;
       if (id === 'rayCount' || id === 'postCount') {
@@ -7420,6 +7509,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
       }
       el.value = value;
     });
+    applyProjectMetadataFields(metadata, { source: 'quick-test', updatePreview: false });
     if (Object.prototype.hasOwnProperty.call(values || {}, 'glassTrack')) setMainSideFeatureValue('glassTrack', normalizeYesNo(values.glassTrack) === 'EVET');
     if (Object.prototype.hasOwnProperty.call(values || {}, 'triangleJoinery')) setMainSideFeatureValue('triangleJoinery', normalizeYesNo(values.triangleJoinery) === 'EVET');
     updateRemoteOptions(false);
@@ -7698,6 +7788,18 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
       el.addEventListener('input', () => {
         if (suppressFormPreviewUpdate) return;
         if (wrappingFields) return;
+        if (PROJECT_TEXT_FIELD_IDS.has(id)) {
+          const selectionStart = typeof el.selectionStart === 'number' ? el.selectionStart : null;
+          const originalValue = String(el.value);
+          const normalized = normalizeProjectFieldValue(id, originalValue, true);
+          if (originalValue !== normalized) {
+            const caret = selectionStart === null ? null : normalizeProjectFieldValue(id, originalValue.slice(0, selectionStart), true).length;
+            el.value = normalized;
+            if (caret !== null && typeof el.setSelectionRange === 'function') {
+              try { el.setSelectionRange(Math.min(caret, normalized.length), Math.min(caret, normalized.length)); } catch (_) {}
+            }
+          }
+        }
         autosizeTextarea(el);
         if (id === 'rayCount' || id === 'postCount') {
           el.dataset.userEdited = String(el.value || '').trim() ? 'true' : 'false';
@@ -7729,6 +7831,7 @@ Pulumur Automation Studio creates DXF and A0 PDF files for Pergo Rise Module 1.
   bindStrictInputs();
   renderQuickTests();
   fillInitial();
+  setProjectWorkspaceActive(false);
   bindEvents();
   setupPwaInstall();
   const savedLang = (() => { try { return localStorage.getItem('pulumur_lang') || 'tr'; } catch (e) { return 'tr'; } })();

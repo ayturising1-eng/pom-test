@@ -11,13 +11,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Pülümür Automation Studio" />
   <title>Pülümür Automation Studio</title>
-  <script src="buildBootstrap.js?v=10.4-r13.1"></script>
-  <link rel="manifest" href="manifest.webmanifest?v=10.4-r13.1" />
+  <script src="buildBootstrap.js?v=10.4-r13.2"></script>
+  <link rel="manifest" href="manifest.webmanifest?v=10.4-r13.2" />
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=10.4-r13.1" />
-  <link rel="preload" href="blocks/filteredBlocks.js?v=10.4-r13.1" as="script" />
-  <link rel="preload" href="peri01Geometry.js?v=10.4-r13.1" as="script" />
+  <link rel="stylesheet" href="style.css?v=10.4-r13.2" />
+  <link rel="preload" href="blocks/filteredBlocks.js?v=10.4-r13.2" as="script" />
+  <link rel="preload" href="peri01Geometry.js?v=10.4-r13.2" as="script" />
 </head>
 <body class="auth-pending">
   <section id="authGate" class="auth-gate" aria-label="Kullanıcı girişi">
@@ -88,6 +88,21 @@
   </section>
   <div id="backendWarningBanner" class="backend-warning-banner" role="status" aria-live="polite" hidden></div>
 
+  <section id="projectStartScreen" class="project-start-screen" aria-label="Proje başlangıcı" hidden>
+    <div class="project-start-card">
+      <div class="project-start-copy">
+        <span class="project-start-kicker">PLMR</span>
+        <h2 id="projectStartTitle">Çalışmaya başlamak için bir proje seçin</h2>
+        <p id="projectStartText">Yeni bir proje oluşturun, kayıtlı projelerinizi açın veya bir PLMR proje dosyası yükleyin.</p>
+      </div>
+      <div class="project-start-actions">
+        <button id="startNewProjectBtn" type="button" class="primary-btn">Yeni Proje</button>
+        <button id="startOpenProjectsBtn" type="button" class="secondary-btn">Projelerim</button>
+        <button id="startImportProjectBtn" type="button" class="soft-btn">Proje Dosyası Aç</button>
+      </div>
+    </div>
+  </section>
+
   <main class="layout">
     <section class="panel input-panel" aria-label="Parametreler">
       <div class="selector-grid">
@@ -114,11 +129,14 @@
       <div class="form-grid">
         <fieldset>
           <legend id="legendProject">Proje Bilgileri</legend>
-          <label><span>Müşteri</span><input id="customer" autocomplete="organization" /></label>
-          <label><span>Proje</span><input id="project" /></label>
-          <label><span>Versiyon</span><input id="version" value="01" /></label>
-          <label><span>Çizen</span><input id="drawnBy" value="AYETULLAH KILINC" /></label>
-          <label><span>Tarih</span><input id="date" type="date" /></label>
+          <label><span>Müşteri</span><input id="customer" autocomplete="organization" readonly aria-readonly="true" /></label>
+          <label><span>Proje</span><input id="project" readonly aria-readonly="true" /></label>
+          <label><span>Versiyon</span><input id="version" value="01" readonly aria-readonly="true" /></label>
+          <label><span>Çizen</span><input id="drawnBy" value="AYETULLAH KILINC" readonly aria-readonly="true" /></label>
+          <label><span>Tarih</span><input id="date" type="date" readonly aria-readonly="true" /></label>
+          <div class="project-info-edit-row">
+            <button id="editProjectInfoBtn" class="soft-btn form-action-btn" type="button">Proje Bilgilerini Düzenle</button>
+          </div>
           <div class="project-inline-actions">
             <button id="resetBtn" class="danger-btn form-action-btn" type="button">Değerleri Resetle</button>
             <button id="calcBtn" class="accent-btn form-action-btn" type="button">Pülümür Hesaplayıcı</button>
@@ -312,6 +330,29 @@
         <p id="projectsEmpty" class="projects-empty">Projeler yükleniyor…</p>
       </div>
     </div>
+  </dialog>
+
+
+  <dialog id="newProjectDialog" class="modal new-project-modal">
+    <form id="newProjectForm" class="modal-card new-project-card">
+      <div class="modal-head">
+        <h2 id="newProjectTitle">Yeni Proje</h2>
+        <button id="newProjectCloseBtn" type="button" class="icon-btn" aria-label="Kapat">×</button>
+      </div>
+      <div class="new-project-body">
+        <div class="new-project-identity">
+          <div><span id="newProjectCodeLabel">Proje Kodu</span><strong id="newProjectCodeValue">-</strong></div>
+          <div><span id="newProjectRevisionLabel">Revizyon No</span><strong id="newProjectRevisionValue">R01</strong></div>
+        </div>
+        <label class="new-project-field"><span id="newProjectCustomerLabel">Müşteri Adı</span><input id="newProjectCustomer" type="text" maxlength="120" autocomplete="organization" required /></label>
+        <label class="new-project-field"><span id="newProjectNameLabel">Proje Adı</span><input id="newProjectName" type="text" maxlength="120" required /></label>
+        <p id="newProjectMessage" class="modal-sub">Müşteri ve proje adı büyük harfli İngilizce karakterlere otomatik dönüştürülür.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="newProjectCancelBtn" type="button" class="soft-btn">İptal</button>
+        <button id="newProjectConfirmBtn" type="submit" class="primary-btn">Tamam</button>
+      </div>
+    </form>
   </dialog>
 
 
@@ -646,30 +687,30 @@
     </form>
   </dialog>
 
-  <script src="core/backendCompatibility.js?v=10.4-r13.1"></script>
-  <script src="diagnostics/runtimeMonitor.js?v=10.4-r13.1"></script>
-  <script src="appLimits.js?v=10.4-r13.1"></script>
-  <script src="core/actions.js?v=10.4-r13.1"></script>
-  <script src="core/projectModel.js?v=10.4-r13.1"></script>
-  <script src="core/topologyReconcile.js?v=10.4-r13.1"></script>
-  <script src="core/validation.js?v=10.4-r13.1"></script>
-  <script src="core/reducer.js?v=10.4-r13.1"></script>
-  <script src="history/historyManager.js?v=10.4-r13.1"></script>
-  <script src="persistence/schema.js?v=10.4-r13.1"></script>
-  <script src="render/renderPipeline.js?v=10.4-r13.1"></script>
-  <script src="blocks/filteredBlocks.js?v=10.4-r13.1"></script>
-  <script src="peri01ExcelBridge.js?v=10.4-r13.1"></script>
-  <script src="peri01Geometry.js?v=10.4-r13.1"></script>
-  <script src="modernDxfTemplate.js?v=10.4-r13.1"></script>
-  <script src="dxfModernEngine.js?v=10.4-r13.1"></script>
+  <script src="core/backendCompatibility.js?v=10.4-r13.2"></script>
+  <script src="diagnostics/runtimeMonitor.js?v=10.4-r13.2"></script>
+  <script src="appLimits.js?v=10.4-r13.2"></script>
+  <script src="core/actions.js?v=10.4-r13.2"></script>
+  <script src="core/projectModel.js?v=10.4-r13.2"></script>
+  <script src="core/topologyReconcile.js?v=10.4-r13.2"></script>
+  <script src="core/validation.js?v=10.4-r13.2"></script>
+  <script src="core/reducer.js?v=10.4-r13.2"></script>
+  <script src="history/historyManager.js?v=10.4-r13.2"></script>
+  <script src="persistence/schema.js?v=10.4-r13.2"></script>
+  <script src="render/renderPipeline.js?v=10.4-r13.2"></script>
+  <script src="blocks/filteredBlocks.js?v=10.4-r13.2"></script>
+  <script src="peri01ExcelBridge.js?v=10.4-r13.2"></script>
+  <script src="peri01Geometry.js?v=10.4-r13.2"></script>
+  <script src="modernDxfTemplate.js?v=10.4-r13.2"></script>
+  <script src="dxfModernEngine.js?v=10.4-r13.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="supabaseConfig.js?v=10.4-r13.1"></script>
-  <script src="adminUsersApi.js?v=10.4-r13.1"></script>
-  <script src="activityTracker.js?v=10.4-r13.1"></script>
-  <script src="app.js?v=10.4-r13.1"></script>
-  <script src="recovery/recoveryManager.js?v=10.4-r13.1"></script>
-  <script src="cloudProjects.js?v=10.4-r13.1"></script>
-  <script src="adminPanel.js?v=10.4-r13.1"></script>
+  <script src="supabaseConfig.js?v=10.4-r13.2"></script>
+  <script src="adminUsersApi.js?v=10.4-r13.2"></script>
+  <script src="activityTracker.js?v=10.4-r13.2"></script>
+  <script src="app.js?v=10.4-r13.2"></script>
+  <script src="recovery/recoveryManager.js?v=10.4-r13.2"></script>
+  <script src="cloudProjects.js?v=10.4-r13.2"></script>
+  <script src="adminPanel.js?v=10.4-r13.2"></script>
 </body>
 </html>
