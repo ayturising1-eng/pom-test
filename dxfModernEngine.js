@@ -329,6 +329,19 @@
     return out;
   }
   function textAsMText(e) {
+    if (e.dxfCellText !== undefined) {
+      return {
+        ...e,
+        type: 'mtext',
+        x: Number(e.dxfCellX),
+        y: Number(e.dxfCellY),
+        value: String(e.dxfCellText),
+        width: Math.max(1, Number(e.dxfCellWidth) || Number(e.width) || 1000),
+        attachment: Number(e.dxfAttachment) || 4,
+        lineSpacing: Number(e.dxfLineSpacing) || 1.0,
+        __convertedFromText: true
+      };
+    }
     const raw = String(e.value || '');
     const lines = raw.replace(/\\P/g, '\n').split(/\r?\n/);
     const longest = lines.reduce((value, line) => Math.max(value, line.length), 1);
@@ -337,6 +350,7 @@
     const attachment = e.align === 'center' ? 8 : (e.align === 'right' ? 9 : 7);
     return { ...e, type: 'mtext', width, attachment, lineSpacing: e.lineSpacing || 1.0, __convertedFromText: true };
   }
+
   function mtextEntity(e, ctx) {
     const attachment = Number(e.attachment) || (e.align === 'center' ? 5 : (e.align === 'right' ? 3 : 1));
     const out = [...commonEntityPrefix('MTEXT', ctx.nextHandle(), ctx.owner, ctx.layerName(e.layer), e), pair(100, 'AcDbMText'), pair(10, fixed(e.x)), pair(20, fixed(e.y)), pair(30, 0), pair(40, fixed(e.height || 80)), pair(41, fixed(Math.max(1, Number(e.width) || 1000))), pair(71, attachment), pair(72, 1), pair(1, cleanMText(e.value)), pair(7, 'Standard'), pair(44, fixed(e.lineSpacing || 1.15))];
@@ -414,7 +428,7 @@
     ];
   }
   function entityOut(e, ctx, sourceBlocks) {
-    if (!e) return [];
+    if (!e || e.dxfSkip) return [];
     if (e.type === 'line') return lineEntity(e, ctx);
     if (e.type === 'polyline') return polyEntity(e, ctx);
     if (e.type === 'circle') return circleEntity(e, ctx);

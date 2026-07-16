@@ -263,6 +263,41 @@
   function numberValue(value, fallback) { return numFromToken(firstSemi(value), fallback); }
   function intValue(value, fallback) { return Math.max(0, Math.round(numberValue(value, fallback))); }
   function textValue(value, fallback = '-') { const out = String(value ?? '').trim(); return out.length ? out : fallback; }
+
+  const EXTRAS_MAX_LINES = 5;
+  const EXTRAS_MAX_CHARS = 82;
+
+  function normalizeExtrasText(value, options = {}) {
+    const preserveTrailingSpace = options.preserveTrailingSpace === true;
+    const source = String(value ?? '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\t/g, ' ')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+    const output = [];
+
+    source.split('\n').some(manualLine => {
+      let remaining = manualLine;
+      if (remaining.length === 0) {
+        output.push('');
+        return output.length >= EXTRAS_MAX_LINES;
+      }
+      while (remaining.length > EXTRAS_MAX_CHARS && output.length < EXTRAS_MAX_LINES) {
+        const spaceIndex = remaining.lastIndexOf(' ', EXTRAS_MAX_CHARS);
+        const splitAt = spaceIndex > 0 ? spaceIndex : EXTRAS_MAX_CHARS;
+        output.push(remaining.slice(0, splitAt).replace(/[ ]+$/g, ''));
+        remaining = remaining.slice(splitAt);
+        if (spaceIndex > 0) remaining = remaining.replace(/^[ ]+/g, '');
+      }
+      if (output.length < EXTRAS_MAX_LINES) output.push(remaining.slice(0, EXTRAS_MAX_CHARS));
+      return output.length >= EXTRAS_MAX_LINES;
+    });
+
+    let result = output.slice(0, EXTRAS_MAX_LINES).join('\n');
+    if (!preserveTrailingSpace) result = result.replace(/[ ]+\n/g, '\n').replace(/[ ]+$/g, '');
+    return result;
+  }
+
   function yes(value) { return String(value ?? '').trim().toLocaleUpperCase('tr-TR') === 'EVET'; }
   function isNoToken(value) { return String(value ?? '').trim().toLocaleUpperCase('tr-TR') === 'NO'; }
   function nthOrLast(list, idx) { if (!list || !list.length) return undefined; return idx < list.length ? list[idx] : list[list.length - 1]; }
@@ -1064,7 +1099,7 @@
     d.remote = textValue(d.remote);
     d.led = textValue(d.led);
     d.dimmer = textValue(d.dimmer);
-    d.extras = textValue(d.extras);
+    d.extras = textValue(normalizeExtrasText(d.extras));
     d.sideTrack = textValue(d.sideTrack, 'HAYIR');
     d.glassTrackProfile = normalizeGlassTrackProfile(raw && raw.__glassTrackProfile);
     d.glassTrackSupportProfiles = {
@@ -3319,17 +3354,26 @@
     const lineStep = fit.h * 1.18;
     const textBlockH = fit.h + Math.max(0, fit.lines.length - 1) * lineStep;
     const centerY = yTop - rowH / 2;
-    // PERI01 tablo mantığı: metin bloğu hücrenin düşey merkezine oturur.
-    // TEXT entity baseline verdiği için ilk satır baseline'ı optik merkeze göre ayarlanır.
+    // SVG/PDF için mevcut optik baseline yerleşimi korunur.
     const firstBaseline = centerY + textBlockH / 2 - fit.h * 0.72;
     const textX = x + padX;
     const mtextCellWidth = Math.max(1, w - 2 * padX);
+    const dxfCellText = fit.lines.join('\n');
     fit.lines.forEach((line, i) => {
       const ent = g.text(textX, firstBaseline - i * lineStep, line, fit.h, layer, 'left');
-      // Modern DXF'te MTEXT genişliği hücrenin kullanılabilir genişliği kadar olsun.
-      // Böylece CAD tarafında beklenmeyen otomatik satır kırımları oluşmaz.
       ent.width = mtextCellWidth;
       ent.cellWidth = mtextCellWidth;
+      if (i === 0) {
+        // DXF'te hücre başına tek MTEXT: sol hizalı ve düşey orta bağlantılı.
+        ent.dxfCellText = dxfCellText;
+        ent.dxfCellX = textX;
+        ent.dxfCellY = centerY;
+        ent.dxfCellWidth = mtextCellWidth;
+        ent.dxfAttachment = 4;
+        ent.dxfLineSpacing = 1.0;
+      } else {
+        ent.dxfSkip = true;
+      }
     });
   }
 
@@ -4215,7 +4259,7 @@
     return { entities: out, bounds: bounds(out), layerStyle: drawing.layerStyle || LAYER_STYLE };
   }
 
-  const api = { SAMPLE_INPUT, LAYER_STYLE, K, BUILD_LABEL, DIMENSION_EDIT_RULES, DIMENSION_ACTIONS, PROFILE_LIBRARY, PRODUCT_LIBRARY, normalizeInput, buildDrawing, renderSvg, flattenDrawingForExport, bounds, formatMm, formatDeg, parapetAngleDegrees, parapetDisplayAngleDegrees, parapetModelAngleDegrees, resolveParapetEndHeight, alignParapetNeighborEndpoints, parapetDimensionStations, sanitizeSignedDecimalInput, trapezSheetExtensions, trapezSheetBoundsFromExtensions, trapezSheetEditorAxisState, trapezSheetEditorState, trapezSheetBoundsFromEditor, rayLenFor, sideAngleRadFor, getBlocks, upperTableValueWrapInfo, wrapTextForUpperInput, aciColorToHex };
+  const api = { SAMPLE_INPUT, LAYER_STYLE, K, BUILD_LABEL, DIMENSION_EDIT_RULES, DIMENSION_ACTIONS, PROFILE_LIBRARY, PRODUCT_LIBRARY, normalizeInput, buildDrawing, renderSvg, flattenDrawingForExport, bounds, formatMm, formatDeg, parapetAngleDegrees, parapetDisplayAngleDegrees, parapetModelAngleDegrees, resolveParapetEndHeight, alignParapetNeighborEndpoints, parapetDimensionStations, sanitizeSignedDecimalInput, trapezSheetExtensions, trapezSheetBoundsFromExtensions, trapezSheetEditorAxisState, trapezSheetEditorState, trapezSheetBoundsFromEditor, rayLenFor, sideAngleRadFor, getBlocks, upperTableValueWrapInfo, wrapTextForUpperInput, normalizeExtrasText, EXTRAS_MAX_LINES, EXTRAS_MAX_CHARS, aciColorToHex };
   root.PulumurGeometry = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

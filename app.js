@@ -740,6 +740,13 @@
     return String(value ?? '').trim();
   }
 
+  function normalizeExtrasFormValue(value, preserveTrailingSpace = true) {
+    if (window.PulumurGeometry && typeof window.PulumurGeometry.normalizeExtrasText === 'function') {
+      return window.PulumurGeometry.normalizeExtrasText(value, { preserveTrailingSpace });
+    }
+    return String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').slice(0, 5).map(line => line.slice(0, 82)).join('\n');
+  }
+
   function setBooleanSelectTexts(lang) {
     BOOLEAN_FIELD_IDS.forEach(id => {
       const el = $(id);
@@ -892,7 +899,7 @@
     }
 
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r12.12.9').catch(() => {}), { once: true });
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10.4-r13.1').catch(() => {}), { once: true });
     }
   }
 
@@ -965,9 +972,11 @@
       const el = $(id);
       if (!el) return acc;
       const value = el.value;
-      let normalized = upperTableFieldIds.includes(id)
-        ? String(value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
-        : value;
+      let normalized = id === 'extras'
+        ? normalizeExtrasFormValue(value, true)
+        : (upperTableFieldIds.includes(id)
+          ? String(value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+          : value);
       if (BOOLEAN_FIELD_IDS.includes(id)) normalized = normalizeYesNo(normalized);
       acc[id] = normalized;
       return acc;
@@ -1238,8 +1247,9 @@
       upperTableFieldIds.forEach(id => {
         const el = $(id);
         if (!el || el.tagName !== 'TEXTAREA') return;
-        const plain = String(el.value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        const wrapped = window.PulumurGeometry.wrapTextForUpperInput(plain, data);
+        const wrapped = id === 'extras'
+          ? normalizeExtrasFormValue(el.value, true)
+          : window.PulumurGeometry.wrapTextForUpperInput(String(el.value || '').replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(), data);
         if (el.value !== wrapped) el.value = wrapped;
         autosizeTextarea(el);
       });
@@ -6430,7 +6440,9 @@
       const rawValue = String(el.value ?? '');
       formData[id] = BOOLEAN_FIELD_IDS.includes(id)
         ? normalizeYesNo(rawValue)
-        : (upperTableFieldIds.includes(id) ? rawValue.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : rawValue);
+        : (id === 'extras'
+          ? normalizeExtrasFormValue(rawValue, true)
+          : (upperTableFieldIds.includes(id) ? rawValue.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : rawValue));
     });
     return formData;
   }
